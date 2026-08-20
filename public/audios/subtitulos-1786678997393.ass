@@ -1,0 +1,86 @@
+[Script Info]
+Title: Loquendo Studio
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,48,&H00FFFFFF,&H00FFFF00,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,2,10,10,40,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.82,Default,,0,0,0,,{\fad(200,200)}Hola gente de yutub.
+Dialogue: 0,0:00:00.82,0:00:01.64,Default,,0,0,0,,{\fad(200,200)}Soy Baf Ya Revival.
+Dialogue: 0,0:00:01.64,0:00:02.46,Default,,0,0,0,,{\fad(200,200)}Mientras hacía El Guat if de Yóske Era El asesino En Persona 4, se me ocurrió efectuar Este mini Guat if: Qué hubiera Pasados Si Kotonója llegaba a tiempo Para salvar a Makoto
+Dialogue: 0,0:00:02.46,0:00:03.28,Default,,0,0,0,,{\fad(200,200)}Esto debido a que, Por alegría o Gracias, un recuerdo En mí revivió recientemente.
+Dialogue: 0,0:00:03.28,0:00:04.10,Default,,0,0,0,,{\fad(200,200)}Y antes de que alguien En los comentarios salte a decir que Makoto se lo merecía quédense hasta El final, Ya que La historia tomará otro rumbo totalmente distinto.
+Dialogue: 0,0:00:04.10,0:00:04.93,Default,,0,0,0,,{\fad(200,200)}Tómelo como un Ovn Shot.
+Dialogue: 0,0:00:04.93,0:00:05.75,Default,,0,0,0,,{\fad(200,200)}Sin más que decir.
+Dialogue: 0,0:00:05.75,0:00:06.57,Default,,0,0,0,,{\fad(200,200)}..
+Dialogue: 0,0:00:06.57,0:00:07.39,Default,,0,0,0,,{\fad(200,200)}¡comencemos!
+Dialogue: 0,0:00:07.39,0:00:08.21,Default,,0,0,0,,{\fad(200,200)}Todo transcurre como En La historia original hasta La escena, Dónde Sekái Le da La cachetada a Kotonója En La puerta.
+Dialogue: 0,0:00:08.21,0:00:09.04,Default,,0,0,0,,{\fad(200,200)}Pero aquí inicia El gran cambio.
+Dialogue: 0,0:00:09.04,0:00:09.86,Default,,0,0,0,,{\fad(200,200)}Katsura confrontaría con Su misma firmeza a La que creyó Era Su mejor amiga, Esto haciendo que Itou se sienta más culpable Por El dolor que Le causó a Su novia.
+Dialogue: 0,0:00:09.86,0:00:10.68,Default,,0,0,0,,{\fad(200,200)}Para El que Nos lo haya notado En El anime, Makoto durante La fiesta de Navidad Ya se había dado cuenta Nos solo El daño físico y psicológico que tenía Kotonója Sin de Esa mirada completamente perdida En Su ojos.
+Dialogue: 0,0:00:10.68,0:00:11.50,Default,,0,0,0,,{\fad(200,200)}Así que Al Era En Este Esto tan lamentable, La preocupación de Makoto Por fin se vuelve genuina.
+Dialogue: 0,0:00:11.50,0:00:12.32,Default,,0,0,0,,{\fad(200,200)}Le pregunta directamente Qué Le sucedió.
+Dialogue: 0,0:00:12.32,0:00:13.15,Default,,0,0,0,,{\fad(200,200)}Katsura Al sentir La calidez y El interés sincero de Makoto se abre con Él y Le cuenta Todo
+Dialogue: 0,0:00:13.15,0:00:13.97,Default,,0,0,0,,{\fad(200,200)}..
+Dialogue: 0,0:00:13.97,0:00:14.79,Default,,0,0,0,,{\fad(200,200)}incluyendo uno de los momentos más perturbadores El anime: cómo Táiske abusó de Ella
+Dialogue: 0,0:00:14.79,0:00:15.61,Default,,0,0,0,,{\fad(200,200)}Makoto queda helado.
+Dialogue: 0,0:00:15.61,0:00:16.43,Default,,0,0,0,,{\fad(200,200)}En Este instante comprende La clase de sujeto con El que Esto conviviendo y recuerda lo que El propio Táiske Le dijo Nos días antes sobre que Kotonója lo había rechazado.
+Dialogue: 0,0:00:16.43,0:00:17.26,Default,,0,0,0,,{\fad(200,200)}Al fin, El protagonista arrancaría a reaccionar, quedando atónito y entendiendo que Su deber ahora mismo Esa Esa junto a Kotonója Para protegerla.
+Dialogue: 0,0:00:17.26,0:00:18.08,Default,,0,0,0,,{\fad(200,200)}Mientras tanto, con Sekái La culpa La persigue.
+Dialogue: 0,0:00:18.08,0:00:18.90,Default,,0,0,0,,{\fad(200,200)}Setsuna o un fantasma de lo que dejó Setsuna La confronta y Le cuestiona Por Qué hizo lo que hizo.
+Dialogue: 0,0:00:18.90,0:00:19.72,Default,,0,0,0,,{\fad(200,200)}A diferencia El anime, cuando Makoto Le envía los mensajes a Sekái Nos lo hace Desde La cobardía.
+Dialogue: 0,0:00:19.72,0:00:20.54,Default,,0,0,0,,{\fad(200,200)}Como Kotonója fue transparente y Le recomendó exigir La prueba de embarazo, Makoto va directo Al grano: Dónde Esto La prueba?
+Dialogue: 0,0:00:20.54,0:00:21.36,Default,,0,0,0,,{\fad(200,200)}Adjuntando La recomendación El hospital que Katsura Le sugirió, Ya que Su síntomas Era extraños.
+Dialogue: 0,0:00:21.36,0:00:22.19,Default,,0,0,0,,{\fad(200,200)}Sekái se siente acorralada.
+Dialogue: 0,0:00:22.19,0:00:23.01,Default,,0,0,0,,{\fad(200,200)}Su mayor Mientras, La última carta que Le quedaba Para manipular y retener a Itou queda expuesta.
+Dialogue: 0,0:00:23.01,0:00:23.83,Default,,0,0,0,,{\fad(200,200)}Pasaría un día de escuela En Dónde Makoto buscaría encarar a Táiske aunque Nos tendría éxito, Ya que Este faltó.
+Dialogue: 0,0:00:23.83,0:00:24.65,Default,,0,0,0,,{\fad(200,200)}Mientras tanto, Makoto y Kotonója conversan sobre lo sucedido.
+Dialogue: 0,0:00:24.65,0:00:25.47,Default,,0,0,0,,{\fad(200,200)}Makoto lleno de rabia hacia Su ex amigo, Le insiste a Kotonója En que deben denunciarlo, prometiéndose Esa El uno Para El otro.
+Dialogue: 0,0:00:25.47,0:00:26.30,Default,,0,0,0,,{\fad(200,200)}Pero Por parte de Saionji devorada Por La frustración y totalmente desquiciada, decide ejecutar Su plan original.
+Dialogue: 0,0:00:26.30,0:00:27.12,Default,,0,0,0,,{\fad(200,200)}Lleva a Itou a Su cuarto y Mientras prepara La bebida En La cocina, Le manda un mensaje y.
+Dialogue: 0,0:00:27.12,0:00:27.94,Default,,0,0,0,,{\fad(200,200)}..
+Dialogue: 0,0:00:27.94,0:00:28.76,Default,,0,0,0,,{\fad(200,200)}Sekái apuñala a Makoto
+Dialogue: 0,0:00:28.76,0:00:29.58,Default,,0,0,0,,{\fad(200,200)}Él cae Al suelo sangrando.
+Dialogue: 0,0:00:29.58,0:00:30.41,Default,,0,0,0,,{\fad(200,200)}Pero antes de que Ella pueda asestar un golpe definitivo, La puerta se abre.
+Dialogue: 0,0:00:30.41,0:00:31.23,Default,,0,0,0,,{\fad(200,200)}Esa Kotonója
+Dialogue: 0,0:00:31.23,0:00:32.05,Default,,0,0,0,,{\fad(200,200)}Ella había dejado rápidamente a Kokoro En Su vivienda y fue apresuradamente a ver a Su novio Sin imaginar Esa escena.
+Dialogue: 0,0:00:32.05,0:00:32.87,Default,,0,0,0,,{\fad(200,200)}Al ver a Makoto herido y a Sekái sosteniendo El cuchillo, El ambiente se congela.
+Dialogue: 0,0:00:32.87,0:00:33.69,Default,,0,0,0,,{\fad(200,200)}Sekái Al ver a Kotonója aprieta más El cuchillo e intenta manipular La situación gritando que Makoto merecía morir Por haberlas engañado a Ambos.
+Dialogue: 0,0:00:33.69,0:00:34.52,Default,,0,0,0,,{\fad(200,200)}Kotonója despierta un lado muchísimo más oscuro.
+Dialogue: 0,0:00:34.52,0:00:35.34,Default,,0,0,0,,{\fad(200,200)}Avanza con una frialdad aterradora lista Para neutralizar a Sekái
+Dialogue: 0,0:00:35.34,0:00:36.16,Default,,0,0,0,,{\fad(200,200)}Sin embargo, antes de que cometa una locura, Makoto reacciona.
+Dialogue: 0,0:00:36.16,0:00:36.98,Default,,0,0,0,,{\fad(200,200)}Desde El suelo, sujetándose La herida y reuniendo Su últimas fuerzas, Le implora: Kotonója Nos lo hagas!
+Dialogue: 0,0:00:36.98,0:00:37.80,Default,,0,0,0,,{\fad(200,200)}Por favor!
+Dialogue: 0,0:00:37.80,0:00:38.63,Default,,0,0,0,,{\fad(200,200)}Si lo haces, irás a La cárcel.
+Dialogue: 0,0:00:38.63,0:00:39.45,Default,,0,0,0,,{\fad(200,200)}..
+Dialogue: 0,0:00:39.45,0:00:40.27,Default,,0,0,0,,{\fad(200,200)}y Ya Nos podremos Esa juntos.
+Dialogue: 0,0:00:40.27,0:00:41.09,Default,,0,0,0,,{\fad(200,200)}..
+Dialogue: 0,0:00:41.09,0:00:41.91,Default,,0,0,0,,{\fad(200,200)}Esas palabras detienen a Kotonója En seco.
+Dialogue: 0,0:00:41.91,0:00:42.73,Default,,0,0,0,,{\fad(200,200)}Sekái aterrorizada Al ver La mirada Sin sentimientos de Katsura y comprendiendo que perdió totalmente El control, tira El cuchillo y huye corriendo El departamento.
+Dialogue: 0,0:00:42.73,0:00:43.56,Default,,0,0,0,,{\fad(200,200)}Kotonója soporte a Makoto a levantarse y haciendo uso de los contactos de Su familia, gestiona Su traslado a un buen hospital.
+Dialogue: 0,0:00:43.56,0:00:44.38,Default,,0,0,0,,{\fad(200,200)}Sin embargo, En El trayecto, encuentran La escena desgarradora y escalofriante de Sekái colapsada y Sin vida.
+Dialogue: 0,0:00:44.38,0:00:45.20,Default,,0,0,0,,{\fad(200,200)}Era evidente que Ella misma había acabado consigo tras Su Quiero mental.
+Dialogue: 0,0:00:45.20,0:00:46.02,Default,,0,0,0,,{\fad(200,200)}Este hecho impacta profundamente a Makoto dejándolo traumatizado Al ver a Su amiga muerta, Mientras Él lidia con Su propia herida.
+Dialogue: 0,0:00:46.02,0:00:46.84,Default,,0,0,0,,{\fad(200,200)}Ya En El hospital, Al tratarse de una estocada inicial que Nos comprometió órganos vitales, Makoto Esa atendido rápidamente y recibe calmantes Para recuperarse.
+Dialogue: 0,0:00:46.84,0:00:47.67,Default,,0,0,0,,{\fad(200,200)}Esa misma noche, Kotonója motivada Por La rabia de Itou y con Esa frialdad calculadora que La caracteriza, decide mover los contactos e influencias de Su familia Para amenazar a La institución educativa Si Nos actúan de inmediato contra Táiske
+Dialogue: 0,0:00:47.67,0:00:48.49,Default,,0,0,0,,{\fad(200,200)}Quiero recalcar que Kotonója Nos lo hacía Por amor propio, Sin Por amor a Su Para.
+Dialogue: 0,0:00:48.49,0:00:49.31,Default,,0,0,0,,{\fad(200,200)}Al día siguiente, Makoto y Kotonója acuden a La dirección.
+Dialogue: 0,0:00:49.31,0:00:50.13,Default,,0,0,0,,{\fad(200,200)}Gracias a La presión ejercida Por La familia Katsura La autoridades escolares citan e intervienen de inmediato a Táiske
+Dialogue: 0,0:00:50.13,0:00:50.95,Default,,0,0,0,,{\fad(200,200)}Makoto lo encararía con profunda rabia, Pero debido a La herida de Su ataque, Le Esa físicamente imposible llegar a los golpes, dejando que La policía se lo Lleva arrestado frente a La mirada atónita de Todo.
+Dialogue: 0,0:00:50.95,0:00:51.78,Default,,0,0,0,,{\fad(200,200)}El grupo de acosadoras de Otome guardaría un silencio absoluto.
+Dialogue: 0,0:00:51.78,0:00:52.60,Default,,0,0,0,,{\fad(200,200)}Pasados Nos días, tras rendir Su declaraciones como testigos y recibir El alta médica, Kotonója Le propone a Makoto irse En El yate de Su familia.
+Dialogue: 0,0:00:52.60,0:00:53.42,Default,,0,0,0,,{\fad(200,200)}Ambos buscando dejar atrás El trauma y Todo El infierno vivido, deciden alejarse juntos.
+Dialogue: 0,0:00:53.42,0:00:54.24,Default,,0,0,0,,{\fad(200,200)}Y Así La famosa escena El Nais Bot transcurre.
+Dialogue: 0,0:00:54.24,0:00:55.06,Default,,0,0,0,,{\fad(200,200)}..
+Dialogue: 0,0:00:55.06,0:00:55.89,Default,,0,0,0,,{\fad(200,200)}Pero Esa vez con un Makoto completamente vivo, junto a Kotonója navegando hacia El horizonte Para tratar sanar.
+Dialogue: 0,0:00:55.89,0:00:56.71,Default,,0,0,0,,{\fad(200,200)}Y bueno, gente, aquí termina Este Guat if.
+Dialogue: 0,0:00:56.71,0:00:57.53,Default,,0,0,0,,{\fad(200,200)}Qué Le pareció?
+Dialogue: 0,0:00:57.53,0:00:58.35,Default,,0,0,0,,{\fad(200,200)}La verdad ha sido una historia corta y siéndoles sincero, notablemente curiosa y entretenida de efectuar.
+Dialogue: 0,0:00:58.35,0:00:59.17,Default,,0,0,0,,{\fad(200,200)}Si Le gustó Este viaje de redención, Nos olviden dejar Su Like suscribirse Para Nos perderse El próximo video de Persona 4 y dejarme En los comentarios Su opinión.
+Dialogue: 0,0:00:59.17,0:01:00.00,Default,,0,0,0,,{\fad(200,200)}Nos vemos En El próximo video!

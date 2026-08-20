@@ -1,0 +1,15 @@
+[Script Info]
+Title: Loquendo Studio
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,48,&H00FFFFFF,&H00FFFF00,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,2,10,10,40,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:07.55,Default,,0,0,0,,{\fad(200,200)}{\k50}Hola {\fad(200,200)}{\k50}soy {\fad(200,200)}{\k50}BafYamRevival. {\fad(200,200)}{\k50}Y {\fad(200,200)}{\k50}hoy {\fad(200,200)}{\k50}inauguramos {\fad(200,200)}{\k50}una {\fad(200,200)}{\k50}nueva {\fad(200,200)}{\k50}sección {\fad(200,200)}{\k50}en {\fad(200,200)}{\k50}el {\fad(200,200)}{\k50}canal, {\fad(200,200)}{\k50}Qué {\fad(200,200)}{\k50}pasó {\fad(200,200)}{\k50}con.
+Dialogue: 0,0:00:07.55,0:00:12.75,Default,,0,0,0,,{\fad(200,200)}{\k34}El {\fad(200,200)}{\k34}espacio, {\fad(200,200)}{\k34}donde {\fad(200,200)}{\k34}recordamos {\fad(200,200)}{\k34}a {\fad(200,200)}{\k34}creadores {\fad(200,200)}{\k34}que {\fad(200,200)}{\k34}dejaron {\fad(200,200)}{\k34}su {\fad(200,200)}{\k34}huella {\fad(200,200)}{\k34}y {\fad(200,200)}{\k34}analizamos {\fad(200,200)}{\k34}por {\fad(200,200)}{\k34}Qué {\fad(200,200)}{\k34}desaparecieron.

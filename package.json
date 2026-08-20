@@ -1,0 +1,86 @@
+{
+  "name": "loquendo-Studio",
+  "version": "1.0.0",
+  "description": "Loquendo Studio",
+  "main": "main-electron.js",
+  "author": "BafYam",
+  "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+     "prebuild": "node scripts/check_build_prereqs.js",
+     "clean": "rmdir /s /q dist 2>nul & echo Limpiado",
+  "build": "electron-builder",
+  "build:safe": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build_safe.ps1",
+    "build:dir": "electron-builder --win dir",
+    "build:ts": "tsc",
+    "watch:ts": "tsc --watch"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "wavesurfer.js": "^7.8.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.fabrizzio.loquendo",
+    "productName": "Loquendo PLUS",
+    "files": [
+      "main-electron.js",
+      "server.js",
+      "index.html",
+      "public/**/*",
+      "bin/**/*",
+      "db/**/*",
+      "modules/**/*",
+      "services/**/*",
+      "css/**/*",
+      "js/**/*",
+      "img/**/*",
+      "!**/*.map",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/.bin/*",
+      "!**/*.{o,hprof,orig,pyc,pyo,rbc}",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "asarUnpack": [
+      "bin/**",
+      "modules/**",
+      "python/**"
+    ],
+    "extraResources": [
+      "bin/**",
+      {
+        "from": "bin/ffmpeg.exe",
+        "to": "bin/ffmpeg.exe"
+      },
+      {
+        "from": "python/",
+        "to": "python/"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "img/logo.png",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "portable": {
+      "requestExecutionLevel": "user"
+    }
+  }
+}

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loquendo Studio</title>
+    
+    <!-- Archivos CSS compilados -->
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/output.css">
+    
+    <!-- ✅ WaveSurfer (CDN o local) -->
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/hover.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="top-bar">
+            <img src="img/logo.png" class="logo-top" alt="Lyra Logo">
+            <button type="button" onclick="cambiarTema()">🌓 Tema</button>
+            <button type="button" onclick="cambiarDiseno()">🔄 Cambiar Vista (H/V)</button>
+        </div>
+        <h1>Loquendo Studio</h1>
+        <p>Tu herramienta profesional de automatización y edición.</p>
+    </header>
+
+    <main>
+        <!-- 1. ENTRADA DE TEXTO -->
+        <textarea id="textoEntrada" placeholder="Pega aquí tu texto..."></textarea>
+        <small id="contadorCaracteres" style="color: #888;">Caracteres: 0</small>
+        
+        <!-- 2. CONTROLES PRINCIPALES -->
+        <div class="controles-principales">
+            <select id="vozSeleccionada">
+                <optgroup label="🎙️ Voces Loquendo Modernas">
+                    <option value="Loquendo Jorge">Jorge (Clásico)</option>
+                    <option value="Loquendo Carlos">Carlos</option>
+                    <option value="Loquendo Carmen">Carmen</option>
+                    <option value="Loquendo Diego">Diego</option>
+                    <option value="Loquendo Ludoviko">Ludoviko</option>
+                </optgroup>
+                <optgroup label="🎵 Voces Acapella">
+                    <option value="Acapella Diego">Diego</option>
+                    <option value="Acapella Carmen">Carmen</option>
+                    <option value="Acapella Jorge">Jorge</option>
+                </optgroup>
+                <optgroup label="💻 Voces Microsoft">
+                    <option value="Microsoft Helena Desktop">Helena</option>
+                    <option value="Microsoft Sabina Desktop">Sabina</option>
+                </optgroup>
+            </select>
+            <button type="button" onclick="optimizar()">⚡ Automatizar Texto</button>
+            <button type="button" onclick="generarAudio()" class="btn-audio">🎙️ Generar Audio</button>
+            <button type="button" onclick="automatizarTodo()" class="btn-maestro">🚀 Todo en Uno</button>
+        </div>
+
+        <!-- 3. CONTROLES DE VIDEO PNGTUBER -->
+        <div class="controles-video">
+            <label for="fondoPNGTuber">🎨 Fondo del Video:</label>
+            <select id="fondoPNGTuber">
+                <option value="green">🟢 Verde (Chroma Key - Recomendado)</option>
+                <option value="black">⚫ Negro</option>
+                <option value="transparent">🔲 Transparente</option>
+            </select>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; align-items: center;">
+                <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #d9d9d9;">
+                    Idle PNG
+                    <input type="file" id="pngtuberIdleInput" accept="image/png">
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #d9d9d9;">
+                    Talking PNG
+                    <input type="file" id="pngtuberTalkingInput" accept="image/png">
+                </label>
+                <button type="button" onclick="subirImagenPNGTuber('idle')" class="btn-video" style="padding: 8px 12px;">📤 Idle</button>
+                <button type="button" onclick="subirImagenPNGTuber('talking')" class="btn-video" style="padding: 8px 12px;">📤 Talking</button>
+                <button type="button" class="tag-help-btn" title="Etiquetas soportadas: [pause], [pause:1000], [slow]texto[/slow], [fast]texto[/fast], [soft]texto[/soft], [loud]texto[/loud], [voz:nombre]texto[/voz]" aria-label="Ayuda de etiquetas">❔</button>
+            </div>
+            <button type="button" onclick="generarVideoPNGTuber()" class="btn-video">🎬 Generar Video PNGTuber</button>
+        </div>
+
+        <!-- 4. ÁREA DE TRABAJO FLEXIBLE -->
+        <div class="contenedor-flexible"> 
+            
+            <!-- COLUMNA IZQUIERDA: Editor y Resultados -->
+            <div class="columna-izquierda">
+                <textarea id="resultado" class="salida-editable" placeholder="El texto automatizado aparecerá aquí. ¡Puedes editarlo antes de generar el audio!"></textarea>
+
+                <!-- Reproductor con Editor de Audio -->
+                <div id="contenedorReproductor" class="custom-player" style="display: none;">
+                    <div class="player-info">
+                        <span id="trackName">🎵 Audio Optimizado.wav</span>
+                        <span id="currentTime">00:00</span>
+                    </div>
+                    
+                    <!-- Waveform Principal (Voz) -->
+                    <div id="waveform-container" class="waveform-container">
+                        <div id="waveform" class="waveform"></div>
+                        <div id="timeline" class="timeline"></div>
+                    </div>
+                    
+                    <!-- Waveform Secundario (Música de Fondo) -->
+                    <div id="waveform-musica" class="waveform-container" style="display: none; margin-top: 10px;">
+                        <div class="player-info">
+                            <span style="color: #8e44ad;">🎵 Música de Fondo</span>
+                            <span id="musicaVolumeDisplay" style="color: #9b59b6; font-size: 12px;">Volumen música: 50%</span>
+                        </div>
+                        <div class="musica-volume-controls">
+                            <button type="button" onclick="bajarVolumenMusica()" class="btn-volume">🔉</button>
+                            <input type="range" id="musicaVolumeSlider" min="0" max="100" value="50" oninput="cambiarVolumenMusica(this.value)" class="volume-slider" title="Volumen de la música de fondo">
+                            <button type="button" onclick="subirVolumenMusica()" class="btn-volume">🔊</button>
+                            <button type="button" onclick="mutearMusica()" class="btn-volume" id="btnMuteMusica">🔊</button>
+                        </div>
+                        <div id="waveform-musica-inner" class="waveform"></div>
+                    </div>
+                    
+                    <!-- Controles del Editor -->
+                    <div class="editor-controls-compact">
+                        <div class="control-group">
+                            <button type="button" onclick="editorZoomOut()" title="Alejar">🔍-</button>
+                            <button type="button" onclick="editorResetZoom()" title="Zoom normal">⊡</button>
+                            <button type="button" onclick="editorZoomIn()" title="Acercar">🔍+</button>
+                        </div>
+                        <div class="control-group">
+                            <button type="button" onclick="restartAudio()" title="Reiniciar">🔄</button>
+                            <button type="button" onclick="togglePlay()" id="playBtn" title="Play/Pausa">▶️</button>
+                            <button type="button" onclick="stopAudio()" title="Detener">⏹️</button>
+                        </div>
+                        <div class="control-group">
+                            <button type="button" onclick="eliminarSeleccion()" title="Cortar selección" id="btnEliminar" disabled>✂</button>
+                        </div>
+                    </div>
+
+                    <!-- Controles de Fade MEJORADOS -->
+                    <div class="fade-controls-compact">
+                        <div class="fade-group">
+                            <label style="color: #e41a1a;">🎤 Fade Voz In: <span id="fadeInValue">2</span>s</label>
+                            <input type="range" id="fadeInDuration" min="0.5" max="10" step="0.5" value="2" 
+                                   oninput="document.getElementById('fadeInValue').innerText = this.value">
+                            <button type="button" onclick="window.audioEditor.aplicarFadeIn(parseFloat(document.getElementById('fadeInDuration').value))">▶️ Aplicar a Voz</button>
+                        </div>
+                        
+                        <div class="fade-group">
+                            <label style="color: #e41a1a;">🎤 Fade Voz Out: <span id="fadeOutValue">2</span>s</label>
+                            <input type="range" id="fadeOutDuration" min="0.5" max="10" step="0.5" value="2" 
+                                   oninput="document.getElementById('fadeOutValue').innerText = this.value">
+                            <button type="button" onclick="window.audioEditor.aplicarFadeOut(parseFloat(document.getElementById('fadeOutDuration').value))">▶️ Aplicar a Voz</button>
+                        </div>
+                    </div>
+
+                    <!-- Fade para Música -->
+                    <div class="fade-controls-compact" style="background: rgba(142, 68, 173, 0.1); border: 1px solid #8e44ad;">
+                        <h4 style="margin: 0 0 10px 0; color: #8e44ad; font-size: 14px;">🎵 Fade Música (en Ducking)</h4>
+                        <div class="fade-group">
+                            <label>Fade In Música: <span id="fadeInMusicaValue">2</span>s</label>
+                            <input type="range" id="fadeInMusicaDuration" min="0.5" max="10" step="0.5" value="2" 
+                                   oninput="document.getElementById('fadeInMusicaValue').innerText = this.value">
+                        </div>
+                        
+                        <div class="fade-group">
+                            <label>Fade Out Música: <span id="fadeOutMusicaValue">3</span>s</label>
+                            <input type="range" id="fadeOutMusicaDuration" min="0.5" max="10" step="0.5" value="3" 
+                                   oninput="document.getElementById('fadeOutMusicaValue').innerText = this.value">
+                        </div>
+                        <small style="color: #888; margin-top: 5px;">* Se aplican automáticamente al generar Ducking</small>
+                    </div>
+                    
+                    <!-- Efectos rápidos -->
+                    <div class="efectos-rapidos">
+                        <button type="button" onclick="window.audioEditor.normalizarVolume(0.95)">📊 Normalizar</button>
+                        <button type="button" onclick="window.audioEditor.eliminarSilencios(0.05, 0.5)">🤫 Quitar Silencios</button>
+                    </div>
+                    
+                    <!-- Música de Fondo (Ducking) -->
+                    <div class="panel-musica">
+                        <h4>🎵 Mezcla con Música</h4>
+                        <div class="inputs-musica">
+                            <input type="file" id="backgroundMusicInput" accept="audio/*">
+                            <button type="button" onclick="subirMusicaFondo()">📤 Subir música</button>
+                        </div>
+                        <div class="controls-musica">
+                            <label class="opcion-card" style="margin-top: 10px; padding: 8px;">
+                                <input type="checkbox" id="chkLoopMusica" checked>
+                                <span class="opcion-texto">🔁 Repetir en bucle</span>
+                            </label>
+
+                            <small style="color: #b5b5b5; display: block; margin-top: 8px;">Volumen moderado recomendado: 40–60%</small>
+
+                            <label>Cuando habla la voz, bajar música: <span id="thresholdValue">0.1</span></label>
+                            <input type="range" id="duckingThreshold" min="0.01" max="0.5" step="0.01" value="0.1" oninput="document.getElementById('thresholdValue').innerText = this.value" title="Sensibilidad del ducking">
+                            
+                            <label>Cuánto baja la música: <span id="ratioValue">4</span></label>
+                            <input type="range" id="duckingRatio" min="1" max="10" step="1" value="4" oninput="document.getElementById('ratioValue').innerText = this.value" title="Intensidad del ducking">
+                            
+                            <button type="button" onclick="aplicarDucking()" class="btn-ducking">✅ Aplicar mezcla</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Controles de descarga -->
+                    <div class="player-controls">
+                        <a id="btnDescargar" href="#" download="audio_loquendo.wav" class="btn-descarga">📥 Descargar Audio</a>
+                        <a id="btnDescargaSRT" href="#" download="subtitulos.srt" style="display: none;" class="btn-descarga">📥 Descargar SRT</a>
+                        <a id="btnDescargaASS" href="#" download="subtitulos.ass" style="display: none;" class="btn-descarga">🎨 Descargar ASS (Efectos)</a>
+                        <button type="button" id="btnExportarMP3" onclick="exportarAMp3()" style="display: none;" class="btn-descarga">🎵 Exportar a MP3</button>
+                    </div>
+                    
+                    <audio id="audioReproductor"></audio>
+                </div>
+            </div>
+
+            <!-- COLUMNA DERECHA: Configuración y Entrenamiento -->
+            <div class="columna-derecha">
+                <div class="panel-opciones">
+                    <h4>⚙️ Opciones de Procesamiento</h4>
+                    <div class="opciones-grid">
+                        <label class="opcion-card">
+                            <input type="checkbox" id="chkComas" checked>
+                            <span class="opcion-texto">Auto-Comas</span>
+                        </label>
+                        <label class="opcion-card">
+                            <input type="checkbox" id="chkPuntos" checked>
+                            <span class="opcion-texto">Auto-Puntos</span>
+                        </label>
+                        <label class="opcion-card">
+                            <input type="checkbox" id="chkLoquendo" checked>
+                            <span class="opcion-texto">Fonética Loquendo</span>
+                        </label>
+                        <label class="opcion-card">
+                            <input type="checkbox" id="chkNeutro" checked>
+                            <span class="opcion-texto">Neutralizar</span>
+                        </label>
+                        <label class="opcion-card">
+                            <input type="checkbox" id="chkSinonimos" checked>
+                            <span class="opcion-texto">Usar Sinónimos 🧠</span>
+                        </label>
+                        <label class="opcion-card">
+                            <input type="checkbox" id="chkSRT_IA" checked>
+                            <span class="opcion-texto">SRT con IA 🤖</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="selector-modo">
+                    <label for="modo">🎭 Modo de Narración:</label>
+                    <select id="modo">
+                        <option value="normal">📖 Estándar</option>
+                        <option value="creepy">🩸 Creepypasta</option>
+                        <option value="tutorial">🎓 Tutorial</option>
+                        <option value="gameplay">🎮 Gameplay</option>
+                    </select>
+                </div>
+
+                <section class="dictionary-editor-section">
+                    <h3>📚 Diccionarios Personalizados</h3>
+                    <div id="dictionaryEditor"></div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts locales -->
+    <script src="js/narrationModes.js"></script>
+    <script src="js/dictionaryEditor.js"></script>
+    <script src="js/audioEditor.js"></script>
+    <script src="js/audioPlayer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

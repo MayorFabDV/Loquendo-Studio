@@ -1,0 +1,22 @@
+{
+    "hacer": ["realizar", "efectuar", "llevar a cabo", "ejecutar"],
+    "empezar": ["iniciar", "comenzar", "arrancar", "dar inicio"],
+    "terminar": ["concluir", "finalizar", "acabar", "rematar"],
+    "rápido": ["veloz", "ágil", "acelerado", "apresurado"],
+    "problema": ["inconveniente", "dificultad", "obstáculo", "contratiempo"],
+    "error": ["fallo", "equivocación", "desacierto", "metedura de pata"],
+    "ayuda": ["asistencia", "apoyo", "auxilio", "soporte"],
+    "crear": ["diseñar", "inventar", "construir", "elaborar"],
+    "intentar": ["procurar", "tratar", "buscar", "esforzarse"],
+    "proyecto": ["plan", "iniciativa", "propuesta", "empresa"],
+    "compañero": ["aliado", "colega", "camarada", "compinche"],
+    "miedo": ["terror", "temor", "pavor", "espanto"],
+    "oscuridad": ["penumbra", "tinieblas", "sombra", "lobreguez"],
+    "misterio": ["enigma", "secreto", "incógnita", "misterio"],
+    "caminar": ["avanzar", "andar", "marchar", "transitar"],
+    "hablar": ["comentar", "decir", "expresar", "manifestar"],
+    "extraño": ["inusual", "raro", "peculiar", "insólito"],
+    "encontrar": ["hallar", "descubrir", "localizar", "atinar"],
+    "casa": ["hogar", "vivienda", "morada", "residencia"],
+    "bastante": ["realmente", "suficientemente", "considerablemente", "notablemente"]
+}

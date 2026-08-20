@@ -1,0 +1,12 @@
+/* css/main.css */
+@import './base/variables.css';
+@import './base/reset.css';
+@import './base/typography.css';
+
+@import './components/buttons.css';
+@import './components/inputs.css';
+@import './components/panels.css';
+@import './components/audio-editor.css';
+
+@import './features/ducking.css';
+@import './features/waveform.css';
