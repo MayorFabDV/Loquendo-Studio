@@ -3,4 +3,12 @@ dist/
 build/
 __pycache__/
 *.pyc
+dist voz/
+build voz/
 .env
+*.log
+db/*.json
+public/audios/*
+public/pngtuber/*
+!public/audios/.gitkeep
+!public/pngtuber/.gitkeep

@@ -1,3 +1,4 @@
+# modules/generar_ass.py
 # -*- coding: utf-8 -*-
 """
 Generador de subtítulos ASS (Advanced SubStation Alpha) con efectos visuales.
@@ -16,12 +17,32 @@ if sys.platform == "win32":
     import codecs
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
+# --- CONFIGURACIÓN DE RUTAS BULLETPROOF (Igual que en SRT) ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+def encontrar_ffmpeg():
+    posibles_rutas = [
+        os.path.join(current_dir, '..', 'bin', 'ffmpeg.exe'),
+        os.path.join(current_dir, 'ffmpeg.exe'),
+        os.path.join(current_dir, '..', '..', 'app.asar.unpacked', 'bin', 'ffmpeg.exe'),
+        os.path.join(current_dir, '..', '..', 'bin', 'ffmpeg.exe'),
+    ]
+    for ruta in posibles_rutas:
+        ruta_absoluta = os.path.abspath(ruta)
+        if os.path.exists(ruta_absoluta):
+            return ruta_absoluta
+    return None
+
+ffmpeg_path = encontrar_ffmpeg()
+if ffmpeg_path:
+    os.environ["PATH"] = os.path.dirname(ffmpeg_path) + os.pathsep + os.environ.get("PATH", "")
+    print(f"[OK] FFmpeg encontrado para ASS: {ffmpeg_path}")
+
 try:
     import whisper
     WHISPER_DISPONIBLE = True
 except ImportError:
     WHISPER_DISPONIBLE = False
-
 
 def formatear_tiempo_ass(segundos):
     horas = int(segundos // 3600)
@@ -29,7 +50,6 @@ def formatear_tiempo_ass(segundos):
     segs = int(segundos % 60)
     centesimas = int((segundos % 1) * 100)
     return f"{horas}:{minutos:02d}:{segs:02d}.{centesimas:02d}"
-
 
 def extraer_vocabulario_guion(texto_original):
     if not texto_original:
@@ -48,7 +68,6 @@ def extraer_vocabulario_guion(texto_original):
     for palabra in destacadas:
         vocabulario[palabra.lower()] = palabra
     return vocabulario
-
 
 def limpiar_repeticiones_whisper(texto):
     if not texto:
@@ -82,7 +101,6 @@ def limpiar_repeticiones_whisper(texto):
             texto_limpio = ' '.join(resultado)
     return re.sub(r'\s+', ' ', texto_limpio).strip()
 
-
 def corregir_por_similitud_fonetica(texto, vocabulario_guion, umbral=0.75):
     if not vocabulario_guion or not texto:
         return texto
@@ -110,7 +128,6 @@ def corregir_por_similitud_fonetica(texto, vocabulario_guion, umbral=0.75):
             resultado.append(palabra)
     return ' '.join(resultado)
 
-
 def corregir_alucinaciones_universal(texto, texto_original=None):
     if not texto:
         return texto
@@ -119,7 +136,6 @@ def corregir_alucinaciones_universal(texto, texto_original=None):
     if vocabulario:
         texto = corregir_por_similitud_fonetica(texto, vocabulario)
     return texto.strip()
-
 
 def parsear_srt(ruta_srt):
     segmentos = []
@@ -146,7 +162,6 @@ def parsear_srt(ruta_srt):
         texto = ' '.join(lineas[2:]).strip()
         segmentos.append({'start': inicio, 'end': fin, 'text': texto})
     return segmentos
-
 
 def generar_script_ass(segmentos, modo="normal", titulo="Loquendo Studio"):
     estilos_modo = {
@@ -183,10 +198,10 @@ def generar_script_ass(segmentos, modo="normal", titulo="Loquendo Studio"):
     lines.append("[V4+ Styles]")
     lines.append("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding")
     estilo_str = (
-        f"Style: Default,Arial,{estilo['Fontsize']},"
-        f"{estilo['PrimaryColour']},{estilo['SecondaryColour']},"
-        f"{estilo['OutlineColour']},{estilo['BackColour']},"
-        f"{estilo['Bold']},{estilo['Italic']},0,0,100,100,0,0,1,"
+        f"Style: Default,Arial,{estilo['Fontsize']}, "
+        f"{estilo['PrimaryColour']},{estilo['SecondaryColour']}, "
+        f"{estilo['OutlineColour']},{estilo['BackColour']}, "
+        f"{estilo['Bold']},{estilo['Italic']},0,0,100,100,0,0,1, "
         f"{estilo['Outline']},{estilo['Shadow']},2,10,10,40,1"
     )
     lines.append(estilo_str)
@@ -205,7 +220,6 @@ def generar_script_ass(segmentos, modo="normal", titulo="Loquendo Studio"):
         lines.append(linea)
     return '\n'.join(lines)
 
-
 def aplicar_efectos(texto, duracion, modo):
     palabras = texto.split(' ')
     if not palabras:
@@ -219,6 +233,7 @@ def aplicar_efectos(texto, duracion, modo):
             return "{\\fad(400,400)}" + texto
         else:
             return "{\\fad(200,200)}" + texto
+    
     duracion_total_cs = int(duracion * 100)
     duracion_palabra = duracion_total_cs // max(len(palabras), 1)
     resultado = []
@@ -240,7 +255,6 @@ def aplicar_efectos(texto, duracion, modo):
             fx_extra = "{\\fad(200,200)}"
             resultado.append(fx_extra + karaoke_tag + palabra_limpia)
     return ' '.join(resultado)
-
 
 def generar_ass(ruta_audio, ruta_salida, ruta_srt=None, modo="normal", texto_original=None):
     print(f"[ASS] Generando subtitulos con efectos ({modo})...")
@@ -273,24 +287,27 @@ def generar_ass(ruta_audio, ruta_salida, ruta_srt=None, modo="normal", texto_ori
                     'end': seg['end'],
                     'text': texto_corregido
                 })
+    
     if not segmentos:
         print("[ASS] No hay segmentos. Creando ASS vacio.")
         segmentos = [{'start': 0, 'end': 5, 'text': '[Sin subtitulos]'}]
+    
     contenido_ass = generar_script_ass(segmentos, modo=modo)
     with open(ruta_salida, 'w', encoding='utf-8') as f:
         f.write(contenido_ass)
     print(f"[ASS] Generado exitosamente: {ruta_salida} ({len(segmentos)} segmentos)")
     return ruta_salida
 
-
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("ERROR: Uso -> python generar_ass.py <ruta_audio.wav> <ruta_salida.ass> [modo] [ruta_srt] [texto_original]")
         print("  modo: normal | creepy | tutorial | gameplay")
         sys.exit(1)
+    
     ruta_audio = sys.argv[1]
     ruta_salida = sys.argv[2]
     modo = sys.argv[3] if len(sys.argv) > 3 else "normal"
     ruta_srt = sys.argv[4] if len(sys.argv) > 4 else None
     texto_original = sys.argv[5] if len(sys.argv) > 5 else None
+    
     generar_ass(ruta_audio, ruta_salida, ruta_srt=ruta_srt, modo=modo, texto_original=texto_original)

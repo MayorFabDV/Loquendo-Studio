@@ -1,134 +1,147 @@
 <#
 PowerShell helper para construir evitando locks en bin\ffmpeg.exe.
 Comportamiento:
-- Si existe bin\ffmpeg.exe lo mueve a %TEMP%.
-- Ejecuta npx electron-builder (evita el prebuild de npm).
-- Restaura ffmpeg.exe al final, incluso si hay errores.
-
-Uso:
-  .\scripts\build_safe.ps1 [args...]
-Ejemplo:
-  .\scripts\build_safe.ps1 --win --x64
+- Mata procesos previos de Loquendo Studio.
+- Borra dist/ con retries.
+- Ejecuta npx electron-builder.
+- Copia ffmpeg.exe a resources/bin/ y junto al portable.
 #>
-
 param()
 
-# directorio del script
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-# raíz del proyecto es la carpeta superior a `scripts`
 $projectRoot = Split-Path -Parent $scriptDir
 $src = Join-Path $projectRoot 'bin\ffmpeg.exe'
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("ffmpeg-build-temp-{0}.exe" -f ([guid]::NewGuid().ToString()))
 $moved = $false
 
-# Helper: test if file is locked by attempting exclusive open
 function Test-FileLocked {
     param([string]$file)
     try {
         $stream = [System.IO.File]::Open($file, 'Open', 'ReadWrite', 'None')
         if ($stream) { $stream.Close(); return $false }
         return $false
-    } catch {
-        return $true
-    }
+    } catch { return $true }
 }
 
-# Helper: try to find and kill processes holding the handle using handle.exe
-function Run-HandleAndKill {
-    param([string]$targetName)
-    $handleExe = Get-Command handle.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue
-    if (-not $handleExe) {
-        # Attempt to download Handle.zip from Sysinternals to temp
-        $zipUrl = 'https://download.sysinternals.com/files/Handle.zip'
-        $dl = Join-Path ([IO.Path]::GetTempPath()) ("handle_{0}.zip" -f ([guid]::NewGuid().ToString()))
+function Kill-LoquendoProcesses {
+    Write-Host "Buscando procesos de Loquendo Studio..."
+    $processes = Get-Process | Where-Object { 
+        $_.ProcessName -like "*Loquendo*" -or 
+        $_.ProcessName -like "*electron*" 
+    }
+    foreach ($p in $processes) {
         try {
-            Write-Host "Descargando handle.exe..."
-            Invoke-WebRequest -Uri $zipUrl -OutFile $dl -UseBasicParsing -ErrorAction Stop
-            $tmpDir = Join-Path ([IO.Path]::GetTempPath()) ("handle_{0}" -f ([guid]::NewGuid().ToString()))
-            New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
-            Expand-Archive -Path $dl -DestinationPath $tmpDir -Force
-            $maybe = Join-Path $tmpDir 'handle.exe'
-            if (Test-Path $maybe) { $handleExe = $maybe }
+            Write-Host ("  Matando proceso: " + $p.ProcessName + " (PID: " + $p.Id + ")")
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+        } catch { Write-Warning ("No se pudo matar PID " + $p.Id) }
+    }
+    Start-Sleep -Seconds 2
+}
+
+function Remove-DistFolder {
+    param([string]$distPath, [int]$maxAttempts = 5)
+    for ($i = 1; $i -le $maxAttempts; $i++) {
+        if (-not (Test-Path $distPath)) { return $true }
+        try {
+            Write-Host ("Intentando borrar dist/ (intento " + $i + "/" + $maxAttempts + ")...")
+            Remove-Item -Path $distPath -Recurse -Force -ErrorAction Stop
+            Write-Host "  OK - dist/ eliminado"
+            return $true
         } catch {
-            Write-Warning ("No se pudo descargar handle.exe: " + $_)
-            return $false
+            Write-Warning ("  No se pudo borrar dist/: " + $_)
+            Start-Sleep -Seconds (2 * $i)
         }
     }
-
-    if (-not $handleExe) { Write-Warning "handle.exe no disponible"; return $false }
-
-    try {
-        Write-Host "Ejecutando handle.exe para buscar locks de '$targetName'..."
-        $out = & $handleExe $targetName -nobanner 2>&1
-        $pids = @()
-        foreach ($line in $out) {
-            if ($line -match 'pid:\s*(\d+)') { $pids += [int]$Matches[1] }
-            elseif ($line -match '\s+(\w+)\s+pid:\s*(\d+)\s') { $pids += [int]$Matches[2] }
-        }
-        $pids = $pids | Select-Object -Unique
-        if ($pids.Count -eq 0) { Write-Host "No se encontraron PIDs con handle.exe"; return $false }
-        foreach ($pid in $pids) {
-            try {
-                Write-Host ("Matando PID: " + $pid)
-                taskkill /PID $pid /F | Out-Null
-            } catch { Write-Warning ("No se pudo matar PID " + $pid + ": " + $_) }
-        }
-        return $true
-    } catch {
-        Write-Warning ("handle.exe falló: " + $_)
-        return $false
-    }
+    return $false
 }
 
 try {
     Write-Host ("Script dir: " + $scriptDir)
     Write-Host ("Project root: " + $projectRoot)
     Write-Host ("Buscando ffmpeg en: " + $src)
+    
+    # 1. Matar procesos previos que bloqueen app.asar
+    Kill-LoquendoProcesses
+    
+    # 2. Borrar dist/ si existe
+    $distPath = Join-Path $projectRoot 'dist'
+    if (-not (Remove-DistFolder -distPath $distPath)) {
+        throw "No se pudo eliminar la carpeta dist/. Cierra la app manualmente y reintenta."
+    }
+    
+    # 3. Mover ffmpeg.exe temporalmente para evitar lock
     if (Test-Path $src) {
-        # Si está bloqueado, intentar identificar y liberar el handle
         if (Test-FileLocked $src) {
-            Write-Warning "El archivo $src parece estar bloqueado. Intentando identificar proceso..."
-            $killed = Run-HandleAndKill (Split-Path $src -Leaf)
-            if ($killed) { Start-Sleep -Seconds 2 }
+            Write-Warning "ffmpeg.exe esta bloqueado. Esperando..."
+            Start-Sleep -Seconds 3
         }
-
         Write-Host ("Moviendo ffmpeg.exe a temporal: " + $tmp)
         Move-Item -Path $src -Destination $tmp -Force
         $moved = $true
     } else {
-        Write-Host ("No se encontro " + $src + " - continuara el build (asegure ffmpeg si lo necesita).")
+        Write-Host ("No se encontro " + $src + " - continuara el build.")
     }
 
-    Write-Host "Ejecutando electron-builder via npx (reintentos habilitados)..."
-    $allArgsArray = @()
-    if ($args) { $allArgsArray = $args }
+    # 4. Ejecutar electron-builder
+    Write-Host "Ejecutando electron-builder via npx..."
     $maxAttempts = 3
     $attempt = 0
     $success = $false
+    
     while ($attempt -lt $maxAttempts -and -not $success) {
         $attempt++
-        Write-Host ("Intento $attempt de $maxAttempts...")
-        & npx electron-builder @allArgsArray
+        Write-Host ("Intento " + $attempt + " de " + $maxAttempts + "...")
+        & npx electron-builder
         $exitCode = $LASTEXITCODE
         if ($exitCode -eq 0) { $success = $true; break }
-        Write-Warning ("electron-builder falló con código $exitCode. Esperando antes de reintentar...")
+        Write-Warning ("electron-builder fallo con codigo " + $exitCode + ". Esperando...")
         Start-Sleep -Seconds (5 * $attempt)
-        # Si el problema parece EBUSY, volver a intentar liberar lock
-        if (Test-Path $src -and (Test-FileLocked $src)) {
-            Write-Host "Reintentando liberar lock sobre $src"
-            Run-HandleAndKill (Split-Path $src -Leaf) | Out-Null
+    }
+    
+    if (-not $success) { 
+        throw ("electron-builder fallo tras " + $maxAttempts + " intentos. Codigo: " + $exitCode) 
+    }
+
+    # 5. Restaurar ffmpeg.exe y copiar a destinos finales
+    if ($moved -and (Test-Path $tmp)) {
+        Write-Host ("Restaurando ffmpeg.exe a " + $src)
+        Move-Item -Path $tmp -Destination $src -Force
+        $moved = $false
+        
+        # Copiar a resources/bin/
+        $destBin = Join-Path $projectRoot 'dist\win-unpacked\resources\bin'
+        if (-not (Test-Path $destBin)) { 
+            New-Item -ItemType Directory -Path $destBin -Force | Out-Null 
+        }
+        Copy-Item -Path $src -Destination $destBin -Force
+        Write-Host "ffmpeg.exe copiado manualmente a resources/bin/"
+
+        # Copiar junto al portable como fallback
+        $portables = Get-ChildItem -Path (Join-Path $projectRoot 'dist') -Filter "*.exe" | 
+            Where-Object { $_.Name -notmatch "Uninstall|Setup" }
+        foreach ($p in $portables) {
+            Copy-Item -Path $src -Destination $p.DirectoryName -Force
+            Write-Host ("ffmpeg.exe copiado junto al portable: " + $p.Name)
         }
     }
-    if (-not $success) { throw ("electron-builder fallo con codigo " + $exitCode) }
+
+    Write-Host ""
+    Write-Host "========================================"
+    Write-Host "  BUILD COMPLETADO EXITOSAMENTE"
+    Write-Host "========================================"
 
 } catch {
     Write-Error ("Error durante build: " + $_)
     exit 1
+    
 } finally {
+    # Restaurar ffmpeg.exe si quedo en temp
     if ($moved -and (Test-Path $tmp)) {
         Write-Host ("Restaurando ffmpeg.exe desde temporal a " + $src)
-        try { Move-Item -Path $tmp -Destination $src -Force } catch { Write-Warning ("No se pudo restaurar ffmpeg.exe: " + $_) }
+        try { 
+            Move-Item -Path $tmp -Destination $src -Force 
+        } catch { 
+            Write-Warning ("No se pudo restaurar ffmpeg.exe: " + $_) 
+        }
     }
 }
-
-Write-Host "Build terminado."

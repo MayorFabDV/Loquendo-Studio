@@ -6,28 +6,38 @@ const { spawn } = require('child_process');
 class VideoService {
     constructor(ffmpegPath, audioFolder, pngtuberFolder) {
         this.ffmpegPath = ffmpegPath;
-        this.audioFolder = audioFolder;
-        this.pngtuberFolder = pngtuberFolder;
+        this.audioFolder = audioFolder;        // Ya resuelto por server.js
+        this.pngtuberFolder = pngtuberFolder;  // Ya resuelto por server.js
     }
 
     normalizarRutaImagen(rutaImagen) {
         if (!rutaImagen) return null;
 
-        const limpia = String(rutaImagen).replace(/^\/+/, '').replace(/^public\//i, '');
-        const rutaCompleta = path.join(__dirname, '..', 'public', limpia);
+        // ✅ CORRECCIÓN: Limpiar la ruta relativa
+        const limpia = String(rutaImagen)
+            .replace(/^\/+/, '')
+            .replace(/^public\//i, '')
+            .replace(/^pngtuber\//i, '');
 
+        // 1. Buscar en pngtuberFolder (la carpeta real de uploads, fuera del ASAR)
+        const rutaEnPngtuber = path.join(this.pngtuberFolder, path.basename(limpia));
+        if (fs.existsSync(rutaEnPngtuber)) return rutaEnPngtuber;
+
+        // 2. Buscar con la ruta limpia completa dentro de pngtuberFolder
+        const rutaCompleta = path.join(this.pngtuberFolder, limpia);
         if (fs.existsSync(rutaCompleta)) return rutaCompleta;
-
-        const fallback = path.join(this.pngtuberFolder, path.basename(limpia));
-        if (fs.existsSync(fallback)) return fallback;
 
         return null;
     }
 
-    async generarPNGTuber(audioPathRelativo, opciones = {}) {
+    async generarPNGTuber(audioPathAbsoluto, opciones = {}) {
         return new Promise((resolve, reject) => {
-            const idleFile = this.normalizarRutaImagen(opciones.idleImagePath || '/pngtuber/idle.png') || path.join(this.pngtuberFolder, 'idle.png');
-            const talkingFile = this.normalizarRutaImagen(opciones.talkingImagePath || '/pngtuber/talking.png') || idleFile;
+            // ✅ CORRECCIÓN: Usar this.pngtuberFolder en lugar de __dirname
+            const idleFile = this.normalizarRutaImagen(opciones.idleImagePath) 
+                || path.join(this.pngtuberFolder, 'idle.png');
+            const talkingFile = this.normalizarRutaImagen(opciones.talkingImagePath) 
+                || idleFile;
+
             const idleImage = idleFile;
             const talkingImage = talkingFile;
 
@@ -35,8 +45,9 @@ class VideoService {
                 return reject(new Error('Falta la imagen PNGTuber idle. Sube una imagen o usa el valor por defecto.'));
             }
 
-            const audioCompleto = path.join(__dirname, '..', 'public', String(audioPathRelativo || '').replace(/^\/+/, '').replace(/^public\//i, ''));
-            
+            // ✅ CORRECCIÓN: audioPathAbsoluto ya es absoluto y validado por server.js
+            const audioCompleto = audioPathAbsoluto;
+
             if (!fs.existsSync(audioCompleto)) {
                 return reject(new Error(`El archivo de audio no existe: ${audioCompleto}`));
             }
@@ -45,12 +56,13 @@ class VideoService {
             const rutaVideo = path.join(this.audioFolder, nombreVideo);
 
             console.log('🎬 Generando video PNGTuber con FONDO VERDE...');
-            console.log(`  idle: ${idleImage}`);
-            console.log(`  talking: ${talkingImage}`);
+            console.log(`  idle: ${idleImage} | Existe: ${fs.existsSync(idleImage)}`);
+            console.log(`  talking: ${talkingImage} | Existe: ${fs.existsSync(talkingImage)}`);
+            console.log(`  audio: ${audioCompleto} | Existe: ${fs.existsSync(audioCompleto)}`);
 
             const usarTalking = fs.existsSync(talkingImage) && talkingImage !== idleImage;
             const imagenBase = usarTalking ? talkingImage : idleImage;
-//ffmpeg comandos de video
+
             const ffmpegArgs = [
                 '-i', audioCompleto,
                 '-loop', '1',
@@ -88,7 +100,8 @@ class VideoService {
                     resolve({ video: `/audios/${nombreVideo}` });
                 } else {
                     console.error('❌ Error al generar video. Código:', code);
-                    reject(new Error(`No se pudo generar el video. Detalles: ${stderr}`));
+                    console.error('FFmpeg stderr:', stderr);
+                    reject(new Error(`No se pudo generar el video. Detalles: ${stderr.substring(0, 1000)}`));
                 }
             });
 
@@ -99,5 +112,4 @@ class VideoService {
     }
 }
 
-// ✅ ESTO ES LO QUE FALTA - AGREGA ESTA LÍNEA AL FINAL
 module.exports = VideoService;

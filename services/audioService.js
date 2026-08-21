@@ -2,116 +2,26 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
-const os = require('os');
-let app;
-try {
-    app = require('electron').app;
-} catch (e) {
-    app = null;
-}
-const isDev = (process.env.NODE_ENV !== 'production') && (!app || !app.isPackaged);
 
-function getAssetPath(...subPaths) {
-    if (isDev) {
-        // En desarrollo: relativo al proyecto
-        return path.join(__dirname, '..', ...subPaths);
-    } else {
-        // En producción: SIEMPRE desde resources/
-        return path.join(process.resourcesPath, ...subPaths);
-    }
-}
 class AudioService {
     constructor(pythonScript, audioFolder, ffmpegPath, pythonBinPath) {
-        // Localizar scripts Python en desarrollo o en app.asar.unpacked/resources
-        this.findModule = (name) => {
-            const local = path.join(__dirname, '..', 'modules', name);
-            if (fs.existsSync(local)) return local;
-            if (process.resourcesPath) {
-                const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked', 'modules', name);
-                if (fs.existsSync(unpacked)) return unpacked;
-                const resMod = path.join(process.resourcesPath, 'modules', name);
-                if (fs.existsSync(resMod)) return resMod;
-            }
-            return local;
-        };
-        this.vozScript = this.findModule('generar_voz.py');
-        // Intentar localizar el exe en varias ubicaciones (desarrollo, app.asar.unpacked, resources)
-        this.findBin = (name) => {
-            const local = path.join(__dirname, '..', 'bin', name);
-            if (fs.existsSync(local)) return local;
-            if (process.resourcesPath) {
-                const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked', 'bin', name);
-                if (fs.existsSync(unpacked)) return unpacked;
-                const resBin = path.join(process.resourcesPath, 'bin', name);
-                if (fs.existsSync(resBin)) return resBin;
-            }
-            return local; // devolver local por defecto (existirá o no)
-        };
-        this.vozExe32 = this.findBin('generar_voz.exe');
+        this.vozScript = pythonScript ? path.join(path.dirname(pythonScript), 'generar_voz.py') : null;
+        this.vozExe32 = path.join(path.dirname(ffmpegPath || '.'), '..', 'bin', 'generar_voz.exe');
+        this.assScript = pythonScript ? path.join(path.dirname(pythonScript), 'generar_ass.py') : null;
+
         this.pythonScript = pythonScript;
-        // Ruta al intérprete Python embebido (si se empaqueta). Si no, se usará 'python' del PATH.
-        this.pythonBin = pythonBinPath || null;
         this.audioFolder = audioFolder;
         this.ffmpegPath = ffmpegPath;
-        this.assScript = this.findModule('generar_ass.py');
-
-        // Resolver rutas para spawn: si una ruta apunta dentro de app.asar, intentar app.asar.unpacked u otras variantes.
-        this.resolveScriptForSpawn = (p) => {
-            if (!p) return p;
-            try {
-                if (fs.existsSync(p)) return p;
-            } catch (e) {}
-            // Si contiene app.asar, intentar app.asar.unpacked
-            if (String(p).includes('app.asar')) {
-                const alt = String(p).replace('app.asar', 'app.asar.unpacked');
-                try { if (fs.existsSync(alt)) return alt; } catch (e) {}
-            }
-            // Intentar buscar por nombre en resources/app.asar.unpacked/modules or resources/modules
-            if (process.resourcesPath) {
-                const name = path.basename(p);
-                const candidate1 = path.join(process.resourcesPath, 'app.asar.unpacked', 'modules', name);
-                const candidate2 = path.join(process.resourcesPath, 'modules', name);
-                try { if (fs.existsSync(candidate1)) return candidate1; } catch (e) {}
-                try { if (fs.existsSync(candidate2)) return candidate2; } catch (e) {}
-            }
-            return p; // fallback: devolver original
-        };
-
-        // Si el script está dentro de un ASAR, extraerlo a un archivo temporal y devolver la ruta temporal
-        this.extractScriptIfNeeded = (p) => {
-            try {
-                if (!p) return p;
-                const lower = String(p).toLowerCase();
-                // Si no contiene app.asar y existe en el FS, devolver tal cual
-                if (!lower.includes('app.asar') && fs.existsSync(p)) return p;
-
-                // Intentar resolver alternativas primero
-                const alt = this.resolveScriptForSpawn(p);
-                if (alt && fs.existsSync(alt) && !String(alt).toLowerCase().includes('app.asar')) return alt;
-
-                // Si aún apunta dentro de app.asar pero el archivo se puede leer con fs (lectura de archivo dentro de asar devuelve contenido), extraer
-                let content = null;
-                try {
-                    content = fs.readFileSync(p);
-                } catch (e) {
-                    // No se puede leer desde esa ruta
-                    content = null;
-                }
-
-                if (!content) return p; // no hay forma de extraer
-
-                const tmpName = `loquendo_module_${Date.now()}_${path.basename(p)}`;
-                const tmpPath = path.join(os.tmpdir(), tmpName);
-                fs.writeFileSync(tmpPath, content);
-                return tmpPath;
-            } catch (e) {
-                return p;
-            }
-        };
+        this.pythonBin = pythonBinPath;
 
         if (!fs.existsSync(this.audioFolder)) {
             fs.mkdirSync(this.audioFolder, { recursive: true });
         }
+
+        console.log('[AudioService] Rutas inicializadas:');
+        console.log('  - vozExe32:', this.vozExe32, '| Existe:', fs.existsSync(this.vozExe32));
+        console.log('  - ffmpegPath:', this.ffmpegPath, '| Existe:', fs.existsSync(this.ffmpegPath));
+        console.log('  - audioFolder:', this.audioFolder);
     }
 
     limpiarTagsParaSubtitulos(texto) {
@@ -177,7 +87,7 @@ class AudioService {
             const duracionTotal = this.obtenerDuracionAudio(rutaAudio);
             if (duracionTotal <= 0) return null;
 
-            let oraciones = texto.split(/(?<=[.!?¡¿])\s+/).filter(o => o.trim().length > 0);
+            let oraciones = texto.split(/(?<=[.!?\u00A1\u00BF])\s+/).filter(o => o.trim().length > 0);
             if (oraciones.length === 0) return null;
 
             let fragmentos = [];
@@ -231,55 +141,50 @@ class AudioService {
 
             const tieneTags = /\[voz:|\/voz\]|\[pause|\[slow|\[fast|\[soft|\[loud|\[emphasis|\[spell/i.test(textoParaVoz);
 
-            // Detectar si existe el exe nativo y si está accesible (no dentro de un .asar)
             let exeExiste = false;
             try {
-                exeExiste = fs.existsSync(this.vozExe32);
-                // Si la ruta está dentro de un ASAR empaquetado, no es ejecutable — forzar fallback a Python
-                if (exeExiste && String(this.vozExe32).toLowerCase().includes('.asar')) {
-                    exeExiste = false;
-                }
+                exeExiste = fs.existsSync(this.vozExe32) && 
+                           !String(this.vozExe32).toLowerCase().includes('.asar');
             } catch (e) {
                 exeExiste = false;
             }
             const usarPython = !exeExiste;
 
             if (usarPython && tieneTags) {
-                console.log('[INFO] Tags detectados, usando Python 64-bit (limitado a voces 64-bit)');
+                console.log('[INFO] Tags detectados, usando Python 64-bit');
             } else if (!usarPython) {
-                console.log('[INFO] Sin tags, usando .exe 32-bit (todas las voces disponibles)');
+                console.log('[INFO] Sin tags, usando .exe 32-bit');
             }
 
             console.log('Generando voz: ' + vozFinal);
             let proceso;
 
             if (usarPython) {
-                // Comprobar si 'python' está disponible en PATH antes de intentar spawn
-                // Usar el intérprete embebido si existe, sino 'python' del PATH
                 const pythonCmd = this.pythonBin || 'python';
-                let pythonDisponible = true;
+
                 try {
                     const check = spawnSync(pythonCmd, ['--version'], { encoding: 'utf8' });
-                    if (check.error || check.status !== 0) pythonDisponible = false;
+                    if (check.error || check.status !== 0) {
+                        return reject(new Error('Python no encontrado. Instale Python 3 o incluya python/ en el paquete.'));
+                    }
                 } catch (e) {
-                    pythonDisponible = false;
+                    return reject(new Error('Python no disponible: ' + e.message));
                 }
 
-                if (!pythonDisponible) {
-                    return reject(new Error('Python no encontrado (ni embebido ni en PATH). Instale Python 3 o incluya la carpeta python/ en el paquete.'));
+                if (!fs.existsSync(this.vozScript)) {
+                    return reject(new Error(`Script de voz no encontrado: ${this.vozScript}`));
                 }
 
-                const scriptPathResolved = this.resolveScriptForSpawn(this.vozScript);
-                const scriptPathToRun = this.extractScriptIfNeeded(scriptPathResolved);
-                console.log('[DEBUG] usando vozScript ->', scriptPathResolved, '->', scriptPathToRun);
-                console.log('[DEBUG] usando pythonCmd ->', pythonCmd);
-                const argsVoz = [scriptPathToRun, textoParaVoz, vozFinal, rutaArchivo];
+                console.log('[DEBUG] vozScript:', this.vozScript);
+                console.log('[DEBUG] pythonCmd:', pythonCmd);
+
+                const argsVoz = [this.vozScript, textoParaVoz, vozFinal, rutaArchivo];
                 proceso = spawn(pythonCmd, argsVoz, { windowsHide: true, shell: false });
             } else {
-                const argsVoz = [textoParaVoz, vozFinal, rutaArchivo];
                 if (!fs.existsSync(this.vozExe32)) {
-                    return reject(new Error('Ejecutable generar_voz.exe no encontrado. Asegúrese de que el binario exista o instale Python.'));
+                    return reject(new Error('generar_voz.exe no encontrado: ' + this.vozExe32));
                 }
+                const argsVoz = [textoParaVoz, vozFinal, rutaArchivo];
                 proceso = spawn(this.vozExe32, argsVoz, { windowsHide: true, shell: false });
             }
 
@@ -303,28 +208,28 @@ class AudioService {
                 const rutaSRT = path.join(this.audioFolder, nombreSRT);
                 let srtUrl = null;
 
-                const usarPythonSRT = usarIA !== false && this.pythonScript !== null && fs.existsSync(this.pythonScript);
+                const usarPythonSRT = usarIA !== false && this.pythonScript && fs.existsSync(this.pythonScript);
 
                 const generarASS = () => {
                     return new Promise((resolveASS) => {
                         const nombreASS = `subtitulos-${Date.now()}.ass`;
                         const rutaASS = path.join(this.audioFolder, nombreASS);
-                        const assArgs = [
-                            this.assScript,
-                            rutaArchivo,
-                            rutaASS,
-                            modo || 'normal'
-                        ];
+
+                        if (!fs.existsSync(this.assScript)) {
+                            console.warn('ASS script no encontrado:', this.assScript);
+                            return resolveASS(null);
+                        }
+
+                        const assArgs = [this.assScript, rutaArchivo, rutaASS, modo || 'normal'];
                         if (rutaSRT && fs.existsSync(rutaSRT)) {
                             assArgs.push(rutaSRT);
                         }
                         assArgs.push(textoParaSubtitulos);
 
                         const pythonCmd = this.pythonBin || 'python';
-                        const assScriptResolved = this.resolveScriptForSpawn(this.assScript);
-                        const assScriptToRun = this.extractScriptIfNeeded(assScriptResolved);
-                        console.log('[DEBUG] usando assScript ->', assScriptResolved, '->', assScriptToRun);
-                        const assProcess = spawn(pythonCmd, [assScriptToRun, ...assArgs.slice(0)], { windowsHide: true, shell: false });
+                        console.log('[DEBUG] assScript:', this.assScript);
+
+                        const assProcess = spawn(pythonCmd, assArgs, { windowsHide: true, shell: false });
                         let assOut = '', assErr = '';
                         assProcess.stdout.on('data', (d) => { assOut += d.toString(); });
                         assProcess.stderr.on('data', (d) => { assErr += d.toString(); });
@@ -361,14 +266,10 @@ class AudioService {
                 if (usarPythonSRT) {
                     console.log('Generando SRT con Whisper...');
                     const pythonCmd = this.pythonBin || 'python';
-                    const pythonScriptResolved = this.resolveScriptForSpawn(this.pythonScript);
-                    const pythonScriptToRun = this.extractScriptIfNeeded(pythonScriptResolved);
-                    console.log('[DEBUG] usando pythonSRT ->', pythonScriptResolved, '->', pythonScriptToRun);
+                    console.log('[DEBUG] pythonSRT:', this.pythonScript);
+
                     const pythonProcess = spawn(pythonCmd, [
-                        pythonScriptToRun,
-                        rutaArchivo,
-                        rutaSRT,
-                        textoParaSubtitulos
+                        this.pythonScript, rutaArchivo, rutaSRT, textoParaSubtitulos
                     ]);
 
                     let pyStdout = '', pyStderr = '';
@@ -409,7 +310,7 @@ class AudioService {
         });
     }
 
-    async aplicarDucking(voiceAudioPath, musicPath, options = {}) {
+    async aplicarDucking(voiceAudioPathAbsoluta, musicPathAbsoluta, options = {}) {
         return new Promise((resolve, reject) => {
             const {
                 musicVolume = 0.5,
@@ -424,17 +325,23 @@ class AudioService {
 
             const nombreSalida = `ducked-${Date.now()}.wav`;
             const rutaSalida = path.join(this.audioFolder, nombreSalida);
-            const normalizedVoicePath = String(voiceAudioPath || '').replace(/^\/+/, '').replace(/^public\//i, '');
-            const normalizedMusicPath = String(musicPath || '').replace(/^\/+/, '').replace(/^public\//i, '');
-            const voiceAudioCompleto = path.join(__dirname, '..', 'public', normalizedVoicePath);
-            const musicCompleto = path.join(__dirname, '..', 'public', normalizedMusicPath);
+
+            const voiceAudioCompleto = voiceAudioPathAbsoluta;
+            const musicCompleto = musicPathAbsoluta;
 
             console.log('Aplicando Ducking Real (Sidechain)...');
+            console.log('  - Voz:', voiceAudioCompleto, '| Existe:', fs.existsSync(voiceAudioCompleto));
+            console.log('  - Musica:', musicCompleto, '| Existe:', fs.existsSync(musicCompleto));
 
-            // Obtener duración de la voz para el fade-out
+            if (!fs.existsSync(voiceAudioCompleto)) {
+                return reject(new Error('Audio de voz no encontrado: ' + voiceAudioCompleto));
+            }
+            if (!fs.existsSync(musicCompleto)) {
+                return reject(new Error('Musica no encontrada: ' + musicCompleto));
+            }
+
             const ffmpegInfo = spawn(this.ffmpegPath, ['-i', voiceAudioCompleto], {
-                windowsHide: true,
-                shell: false
+                windowsHide: true, shell: false
             });
 
             let stderrInfo = '';
@@ -450,24 +357,22 @@ class AudioService {
                 }
 
                 if (isNaN(duracionVoz) || duracionVoz <= 0) {
-                    return reject(new Error('No se pudo obtener la duracion del audio'));
+                    duracionVoz = this.obtenerDuracionAudio(voiceAudioCompleto);
+                    if (duracionVoz <= 0) {
+                        return reject(new Error('No se pudo obtener la duracion del audio'));
+                    }
                 }
 
                 const fadeOutStart = Math.max(0, duracionVoz - fadeOutMusic);
-                console.log(`Voz: ${duracionVoz.toFixed(1)}s | Fade out: ${fadeOutStart.toFixed(1)}s | Vol música: ${musicVolume}`);
+                console.log(`Voz: ${duracionVoz.toFixed(1)}s | Fade out: ${fadeOutStart.toFixed(1)}s | Vol musica: ${musicVolume}`);
 
                 const ffmpegArgs = ['-i', voiceAudioCompleto];
-
                 if (loopMusic) {
                     ffmpegArgs.push('-stream_loop', '-1', '-i', musicCompleto);
                 } else {
                     ffmpegArgs.push('-i', musicCompleto);
                 }
 
-                // DUCKING REAL CON SIDECHAINCOMPRESS
-                // [0:a] = voz (detector / sidechain)
-                // [1:a] = música (señal a comprimir)
-                // La música se reduce cuando la voz entra en el detector.
                 const filterComplex =
                     `[1:a]volume=${musicVolume},` +
                     `afade=t=in:st=0:d=${fadeInMusic},` +
@@ -485,8 +390,7 @@ class AudioService {
                 );
 
                 const ffmpegProcess = spawn(this.ffmpegPath, ffmpegArgs, {
-                    windowsHide: true,
-                    shell: false
+                    windowsHide: true, shell: false
                 });
 
                 let stderr = '';
@@ -496,7 +400,7 @@ class AudioService {
                     if (code === 0 && fs.existsSync(rutaSalida)) {
                         const outStats = fs.statSync(rutaSalida);
                         if (outStats.size < 2000) {
-                            return reject(new Error('Ducking generó archivo vacío'));
+                            return reject(new Error('Ducking genero archivo vacio'));
                         }
                         console.log('Ducking aplicado: ' + nombreSalida);
                         resolve({
@@ -515,21 +419,23 @@ class AudioService {
             });
 
             ffmpegInfo.on('error', (err) => {
-                reject(new Error('Error obteniendo duración: ' + err.message));
+                reject(new Error('Error obteniendo duracion: ' + err.message));
             });
         });
     }
 
-    async convertirAMp3(wavPathRelativo) {
+    async convertirAMp3(wavPathAbsoluta, outputFolder) {
         return new Promise((resolve, reject) => {
-            const wavCompleto = path.join(__dirname, '..', 'public', wavPathRelativo);
+            const wavCompleto = wavPathAbsoluta;
+
             if (!fs.existsSync(wavCompleto)) {
-                return reject(new Error('WAV no existe: ' + wavPathRelativo));
+                return reject(new Error('WAV no existe: ' + wavCompleto));
             }
 
             const nombreMp3 = `export-${Date.now()}.mp3`;
-            const rutaMp3 = path.join(this.audioFolder, nombreMp3);
-            console.log('MP3: ' + wavPathRelativo);
+            const rutaMp3 = path.join(outputFolder || this.audioFolder, nombreMp3);
+
+            console.log('MP3: ' + wavCompleto);
 
             const ffmpegArgs = [
                 '-i', wavCompleto,
@@ -540,8 +446,7 @@ class AudioService {
             ];
 
             const ffmpegProcess = spawn(this.ffmpegPath, ffmpegArgs, {
-                windowsHide: true,
-                shell: false
+                windowsHide: true, shell: false
             });
 
             let stderr = '';
