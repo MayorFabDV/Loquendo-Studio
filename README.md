@@ -52,7 +52,7 @@
 ### Instalación
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/tuusuario/loquendo-studio.git
+git clone https://github.com/MayorFabDV/Loquendo-Studio.git
 cd loquendo-studio
 
 # 2. Instalar dependencias
