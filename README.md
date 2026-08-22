@@ -33,7 +33,7 @@
 ## Descarga e Instalación
 
 ### Para Usuarios (Portable)
-1. Ve a la sección **[Releases](https://github.com/tuusuario/loquendo-studio/releases)**.
+1. Ve a la sección **[Releases](https://github.com/MayorFabDV/Loquendo-Studio/releases)**.
 2. Descarga `Loquendo-Studio-vX.X.X-portable.zip`.
 3. Descomprime en cualquier carpeta.
 4. Ejecuta `Loquendo Studio.exe`.
