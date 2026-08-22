@@ -98,3 +98,5 @@ Este proyecto está bajo la licencia ISC.
 Creado con amor al Loquendo por BafYam. 
 Youtube
 https://www.youtube.com/@BafYamRevival
+
+PD:Yo no lo descargo porque ya lo tengo XD
