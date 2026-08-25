@@ -1,3 +1,4 @@
+// utils.js
 const fs = require('fs');
 const path = require('path');
 
@@ -53,8 +54,6 @@ function aplicarDiccionarios(textoOriginal) {
 function obtenerDuracionAudio(rutaAudio) {
   try {
     const buffer = fs.readFileSync(rutaAudio);
-    
-    // Verificar que sea WAV válido (RIFF header)
     const riff = buffer.toString('ascii', 0, 4);
     const wave = buffer.toString('ascii', 8, 12);
     
@@ -63,13 +62,9 @@ function obtenerDuracionAudio(rutaAudio) {
       return Math.max(0, (buffer.length - 44) / 32000);
     }
     
-    // Leer sample rate (bytes 24-27, little-endian)
     const sampleRate = buffer.readUInt32LE(24);
-    // Leer número de canales (bytes 22-23)
     const numChannels = buffer.readUInt16LE(22);
-    // Leer bits per sample (bytes 34-35)
     const bitsPerSample = buffer.readUInt16LE(34);
-    // Leer tamaño de datos de audio (bytes 40-43)
     const dataSize = buffer.readUInt32LE(40);
     
     const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
@@ -85,7 +80,7 @@ function obtenerDuracionAudio(rutaAudio) {
     
   } catch (e) {
     console.error("[DURACIÓN] Error leyendo audio:", e);
-    return 60; // Default 1 minuto
+    return 60;
   }
 }
 
@@ -101,10 +96,10 @@ function formatoTiempo(segundos) {
 }
 
 /**
- * Divide una oración larga en fragmentos de máximo maxChars caracteres,
- * respetando palabras completas.
+ * Divide una oración larga en fragmentos de máximo maxChars caracteres.
+ * ✅ FIX: Aumentado a 80 caracteres para evitar fragmentación excesiva.
  */
-function partirOracion(oracion, maxChars = 42) {
+function partirOracion(oracion, maxChars = 80) {
   if (oracion.length <= maxChars) return [oracion];
   
   const palabras = oracion.split(/\s+/);
@@ -125,16 +120,16 @@ function partirOracion(oracion, maxChars = 42) {
 }
 
 /**
- * Genera SRT matemático MEJORADO:
- * - Lee duración exacta del header WAV (sin ffprobe)
- * - Ningún subtítulo dura más de maxDuracionSeg (default 7s)
- * - Máximo 42 caracteres por línea
+ * Genera SRT matemático MEJORADO Y BLINDADO:
+ * - Lee duración exacta del header WAV
+ * - Máximo 80 caracteres por línea
  * - Gap de 0.15s entre subtítulos
+ * - ✅ FIX: Protección matemática contra tiempos negativos que "comían" el texto.
  */
 function generarSRTMatematico(texto, rutaAudio, rutaSRT, nombreSRT, opciones = {}) {
   try {
     const maxDuracionSeg = opciones.maxDuracionSeg || 7.0;
-    const maxChars = opciones.maxChars || 42;
+    const maxChars = opciones.maxChars || 80; // ✅ Usar 80 en lugar de 42
     const gapSeg = opciones.gapSeg || 0.15;
     
     const duracionTotal = obtenerDuracionAudio(rutaAudio);
@@ -157,8 +152,10 @@ function generarSRTMatematico(texto, rutaAudio, rutaSRT, nombreSRT, opciones = {
     const totalPalabras = fragmentos.reduce((sum, f) => sum + f.split(/\s+/).length, 0);
     if (totalPalabras === 0) return null;
 
-    // 3. Calcular tiempo por palabra base
-    const tiempoPorPalabra = (duracionTotal - (fragmentos.length * gapSeg)) / totalPalabras;
+    // 3. Calcular tiempo por palabra base (✅ PROTEGIDO CONTRA NEGATIVOS)
+    const tiempoTotalGaps = fragmentos.length * gapSeg;
+    const tiempoDisponible = Math.max(0, duracionTotal - tiempoTotalGaps);
+    const tiempoPorPalabra = Math.max(0.05, tiempoDisponible / totalPalabras); // Mínimo 0.05s por palabra
     
     let srtContent = '';
     let tiempoActual = 0;
@@ -175,7 +172,11 @@ function generarSRTMatematico(texto, rutaAudio, rutaSRT, nombreSRT, opciones = {
       if (tiempoActual + duracionFragmento > duracionTotal) {
         duracionFragmento = duracionTotal - tiempoActual;
       }
-      if (duracionFragmento <= 0) break;
+      
+      // ✅ FIX: Si por alguna razón la duración es <= 0, forzamos al menos 0.5s para no romper el loop
+      if (duracionFragmento <= 0) {
+        duracionFragmento = 0.5;
+      }
       
       const tiempoInicio = formatoTiempo(tiempoActual);
       tiempoActual += duracionFragmento;

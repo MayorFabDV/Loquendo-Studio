@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+bin/
 __pycache__/
 *.pyc
 dist voz/
@@ -12,3 +13,5 @@ public/audios/*
 public/pngtuber/*
 !public/audios/.gitkeep
 !public/pngtuber/.gitkeep
+python_venv/**/*
+python/

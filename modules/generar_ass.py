@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Generador de subtítulos ASS (Advanced SubStation Alpha) con efectos visuales.
-Versión UNIVERSAL: El modo SOLO controla colores/efectos visuales.
+Versión OPTIMIZADA PARA KDENLIVE: Efectos a nivel de línea (sin karaoke por palabra).
 """
 import os
 import sys
@@ -17,7 +17,7 @@ if sys.platform == "win32":
     import codecs
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
-# --- CONFIGURACIÓN DE RUTAS BULLETPROOF (Igual que en SRT) ---
+# --- CONFIGURACIÓN DE RUTAS BULLETPROOF ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 def encontrar_ffmpeg():
@@ -221,40 +221,27 @@ def generar_script_ass(segmentos, modo="normal", titulo="Loquendo Studio"):
     return '\n'.join(lines)
 
 def aplicar_efectos(texto, duracion, modo):
-    palabras = texto.split(' ')
-    if not palabras:
+    """
+    Efectos ultra-ligeros optimizados para Kdenlive.
+    Se eliminaron \k (karaoke por palabra) y \t (escalado) porque causan lagueo severo.
+    Se usa solo \fad (fade in/out) que es nativo, rápido y se ve muy profesional.
+    """
+    texto = texto.strip()
+    if not texto:
         return texto
-    if len(palabras) <= 2 or duracion < 2.0:
-        if modo == "creepy":
-            return "{\\fad(300,500)}" + texto
-        elif modo == "gameplay":
-            return "{\\fad(100,200)}" + texto
-        elif modo == "tutorial":
-            return "{\\fad(400,400)}" + texto
-        else:
-            return "{\\fad(200,200)}" + texto
     
-    duracion_total_cs = int(duracion * 100)
-    duracion_palabra = duracion_total_cs // max(len(palabras), 1)
-    resultado = []
-    for palabra in palabras:
-        palabra_limpia = palabra.strip()
-        if not palabra_limpia:
-            continue
-        karaoke_tag = "{\\k" + str(duracion_palabra) + "}"
-        if modo == "creepy":
-            fx_extra = "{\\fad(300,500)\\t(0,500,\\fscx105\\fscy105)}"
-            resultado.append(fx_extra + karaoke_tag + palabra_limpia)
-        elif modo == "gameplay":
-            fx_extra = "{\\fad(100,200)\\t(0,300,\\fscx110\\fscy110)}"
-            resultado.append(fx_extra + karaoke_tag + palabra_limpia)
-        elif modo == "tutorial":
-            fx_extra = "{\\fad(400,400)}"
-            resultado.append(fx_extra + palabra_limpia)
-        else:
-            fx_extra = "{\\fad(200,200)}"
-            resultado.append(fx_extra + karaoke_tag + palabra_limpia)
-    return ' '.join(resultado)
+    if modo == "creepy":
+        # Fade in lento, fade out muy lento para efecto inquietante
+        return "{\\fad(500,800)}" + texto
+    elif modo == "gameplay":
+        # Fade rápido y dinámico, estilo videojuego
+        return "{\\fad(100,150)}" + texto
+    elif modo == "tutorial":
+        # Fade suave y simétrico para lectura cómoda
+        return "{\\fad(250,250)}" + texto
+    else:
+        # Normal: fade estándar profesional
+        return "{\\fad(200,300)}" + texto
 
 def generar_ass(ruta_audio, ruta_salida, ruta_srt=None, modo="normal", texto_original=None):
     print(f"[ASS] Generando subtitulos con efectos ({modo})...")

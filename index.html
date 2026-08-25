@@ -21,6 +21,8 @@
             <img src="img/logo.png" class="logo-top" alt="Lyra Logo">
             <button type="button" onclick="cambiarTema()">🌓 Tema</button>
             <button type="button" onclick="cambiarDiseno()">🔄 Cambiar Vista (H/V)</button>
+            <button type="button" onclick="abrirAyuda()">❔ Ayuda</button>  
+            <button type="button" onclick="abrirEnlaceExterno('https://ko-fi.com/bafyam')">☕ Invítame un café</button>
         </div>
         <h1>Loquendo Studio</h1>
         <p>Tu herramienta profesional de automatización y edición.</p>
@@ -182,7 +184,7 @@
                         </div>
                         <div class="controls-musica">
                             <label class="opcion-card" style="margin-top: 10px; padding: 8px;">
-                                <input type="checkbox" id="chkLoopMusica" checked>
+                                <input type="checkbox" id="chkLoopMusica">
                                 <span class="opcion-texto">🔁 Repetir en bucle</span>
                             </label>
 
@@ -216,27 +218,27 @@
                     <h4>⚙️ Opciones de Procesamiento</h4>
                     <div class="opciones-grid">
                         <label class="opcion-card">
-                            <input type="checkbox" id="chkComas" checked>
+                            <input type="checkbox" id="chkComas" >
                             <span class="opcion-texto">Auto-Comas</span>
                         </label>
                         <label class="opcion-card">
-                            <input type="checkbox" id="chkPuntos" checked>
+                            <input type="checkbox" id="chkPuntos">
                             <span class="opcion-texto">Auto-Puntos</span>
                         </label>
                         <label class="opcion-card">
-                            <input type="checkbox" id="chkLoquendo" checked>
+                            <input type="checkbox" id="chkLoquendo">
                             <span class="opcion-texto">Fonética Loquendo</span>
                         </label>
                         <label class="opcion-card">
-                            <input type="checkbox" id="chkNeutro" checked>
+                            <input type="checkbox" id="chkNeutro">
                             <span class="opcion-texto">Neutralizar</span>
                         </label>
                         <label class="opcion-card">
-                            <input type="checkbox" id="chkSinonimos" checked>
+                            <input type="checkbox" id="chkSinonimos">
                             <span class="opcion-texto">Usar Sinónimos 🧠</span>
                         </label>
                         <label class="opcion-card">
-                            <input type="checkbox" id="chkSRT_IA" checked>
+                            <input type="checkbox" id="chkSRT_IA">
                             <span class="opcion-texto">SRT con IA 🤖</span>
                         </label>
                     </div>

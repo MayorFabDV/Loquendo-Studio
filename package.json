@@ -29,7 +29,6 @@
     "files": [
       "main-electron.js",
       "server.js",
-      "preload.js",
       "index.html",
       "css/**/*",
       "js/**/*",
@@ -43,6 +42,11 @@
       "!**/._*",
       "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
       "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}"
+    ],
+    "asarUnpack": [
+      "bin/**/*",
+      "modules/**/*",
+      "services/**/*"
     ],
     "extraResources": [
       { "from": "bin/", "to": "bin/" },

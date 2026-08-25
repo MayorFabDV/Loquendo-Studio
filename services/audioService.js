@@ -1,4 +1,4 @@
-// services/audioService.js
+// services/audioService.js - VERSIÓN UNIFICADA Y BLINDADA
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
@@ -65,7 +65,7 @@ class AudioService {
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
     }
 
-    partirOracion(oracion, maxChars = 42) {
+    partirOracion(oracion, maxChars = 80) {
         if (oracion.length <= maxChars) return [oracion];
         const palabras = oracion.split(/\s+/);
         const fragmentos = [];
@@ -86,41 +86,50 @@ class AudioService {
         try {
             const duracionTotal = this.obtenerDuracionAudio(rutaAudio);
             if (duracionTotal <= 0) return null;
-
+            
             let oraciones = texto.split(/(?<=[.!?\u00A1\u00BF])\s+/).filter(o => o.trim().length > 0);
             if (oraciones.length === 0) return null;
-
+            
             let fragmentos = [];
             for (const oracion of oraciones) {
-                const partes = this.partirOracion(oracion, 42);
+                const partes = this.partirOracion(oracion, 80); // ✅ 80 caracteres para no fragmentar de más
                 fragmentos.push(...partes);
             }
-
+            
             const totalPalabras = fragmentos.reduce((sum, f) => sum + f.split(/\s+/).length, 0);
             if (totalPalabras === 0) return null;
-
-            const tiempoPorPalabra = (duracionTotal - (fragmentos.length * 0.15)) / totalPalabras;
+            
+            // ✅ FIX: Protección matemática contra tiempos negativos
+            const tiempoTotalGaps = fragmentos.length * 0.15;
+            const tiempoDisponible = Math.max(0, duracionTotal - tiempoTotalGaps);
+            const tiempoPorPalabra = Math.max(0.05, tiempoDisponible / totalPalabras); // Mínimo 0.05s por palabra
+            
             let srtContent = '';
-            let tiempoActual = 0;
-
+            let tiempoActual = 0; // ✅ FIX: Declaración correcta de la variable
+            
             for (let i = 0; i < fragmentos.length; i++) {
                 const fragmento = fragmentos[i];
                 const palabrasFragmento = fragmento.split(/\s+/).length;
+                
                 let duracionFragmento = Math.min(palabrasFragmento * tiempoPorPalabra, 7.0);
-
+                
                 if (tiempoActual + duracionFragmento > duracionTotal) {
                     duracionFragmento = duracionTotal - tiempoActual;
                 }
-                if (duracionFragmento <= 0) break;
-
+                
+                // ✅ FIX: Si por alguna razón la duración es <= 0, forzamos al menos 0.5s
+                if (duracionFragmento <= 0) {
+                    duracionFragmento = 0.5;
+                }
+                
                 const tiempoInicio = this.formatoTiempo(tiempoActual);
                 tiempoActual += duracionFragmento;
                 const tiempoFin = this.formatoTiempo(tiempoActual);
-
+                
                 srtContent += `${i + 1}\n${tiempoInicio} --> ${tiempoFin}\n${fragmento.trim()}\n\n`;
                 tiempoActual += 0.15;
             }
-
+            
             fs.writeFileSync(rutaSRT, srtContent, 'utf8');
             console.log(`[SRT Matematico] ${fragmentos.length} lineas, ${duracionTotal.toFixed(1)}s`);
             return true;
@@ -143,8 +152,7 @@ class AudioService {
 
             let exeExiste = false;
             try {
-                exeExiste = fs.existsSync(this.vozExe32) && 
-                           !String(this.vozExe32).toLowerCase().includes('.asar');
+                exeExiste = fs.existsSync(this.vozExe32) && !String(this.vozExe32).toLowerCase().includes('.asar');
             } catch (e) {
                 exeExiste = false;
             }
@@ -161,7 +169,6 @@ class AudioService {
 
             if (usarPython) {
                 const pythonCmd = this.pythonBin || 'python';
-
                 try {
                     const check = spawnSync(pythonCmd, ['--version'], { encoding: 'utf8' });
                     if (check.error || check.status !== 0) {

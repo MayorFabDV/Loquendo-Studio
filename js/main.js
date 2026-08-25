@@ -203,10 +203,10 @@ async function generarVideoPNGTuber() {
         return;
     }
 
-    // ✅ LIMPIEZA CRÍTICA DE RUTA
+    // ✅ CORRECCIÓN: Limpieza completa de la ruta (Faltaba el replace de slashes)
     let rutaLimpia = String(audioPath)
         .replace(API_BASE, '')
-        .replace(/^\/+/, '')
+        .replace(/^\/+/, '') // <-- ESTO ELIMINA EL SLASH INICIAL QUE ROMPE EL BACKEND
         .split('?')[0];
 
     const btnVideo = document.querySelector('.btn-video');
@@ -280,28 +280,24 @@ function subirMusicaFondo() {
 // ✅ APLICAR DUCKING (VERSIÓN ÚNICA CORREGIDA)
 function aplicarDucking() {
     const btnDescargar = document.getElementById('btnDescargar');
-    let voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath;
-    
-    if (!voiceAudioPath || voiceAudioPath.startsWith('blob:')) {
-        alert('⚠️ Genera un audio nuevo primero (el actual es temporal o editado).');
+    const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || (btnDescargar ? btnDescargar.href : '') || '';
+
+    if (!voiceAudioPath || voiceAudioPath === window.location.href) {
+        alert('Primero genera un audio de voz.');
         return;
     }
-    
+    if (voiceAudioPath.startsWith('blob:')) {
+        alert('⚠️ El audio actual es una versión editada temporal. Genera uno nuevo primero.');
+        return;
+    }
     if (!musicaFondoPath) {
         alert('Primero sube una música de fondo.');
         return;
     }
 
-    // ✅ LIMPIEZA CRÍTICA DE RUTAS
-    const cleanVoicePath = String(voiceAudioPath)
-        .replace(API_BASE, '')
-        .replace(/^\/+/, '')
-        .split('?')[0];
-    
-    const cleanMusicPath = String(musicaFondoPath)
-        .replace(API_BASE, '')
-        .replace(/^\/+/, '')
-        .split('?')[0];
+    // ✅ CORRECCIÓN: Limpiar AMBAS rutas (A Kimi se le olvidó limpiar musicaFondoPath)
+    const cleanVoicePath = String(voiceAudioPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
+    const cleanMusicPath = String(musicaFondoPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
 
     const chkLoop = document.getElementById('chkLoopMusica');
     const fadeInInput = document.getElementById('fadeInMusicaDuration');
@@ -312,9 +308,10 @@ function aplicarDucking() {
     
     const sliderValue = musicaSlider ? parseFloat(musicaSlider.value || '50') : 50;
     const musicVolume = Math.min(0.8, Math.max(0.15, sliderValue / 100));
-    
+
     const options = {
         musicVolume,
+        duckAmount: 0.15,
         threshold: parseFloat(thresholdInput?.value || '0.1') || 0.1,
         ratio: parseFloat(ratioInput?.value || '4') || 4,
         attack: 50,
@@ -328,8 +325,8 @@ function aplicarDucking() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            voiceAudioPath: cleanVoicePath,
-            musicPath: cleanMusicPath,
+            voiceAudioPath: cleanVoicePath, // <-- RUTA LIMPIA
+            musicPath: cleanMusicPath,      // <-- RUTA LIMPIA (Aquí estaba el error 403)
             options
         })
     })
@@ -337,25 +334,20 @@ function aplicarDucking() {
     .then((data) => {
         if (data.url) {
             voiceAudioRealPath = data.url;
-            window.voiceAudioRealPath = data.url;
-            
             if (btnDescargar) {
                 btnDescargar.href = `${API_BASE}${data.url}`;
                 btnDescargar.setAttribute('download', `audio_con_ducking_${Date.now()}.wav`);
             }
-            
             const btnSRT = document.getElementById('btnDescargaSRT');
             if (btnSRT) btnSRT.style.display = 'inline-flex';
-            
             const btnMP3 = document.getElementById('btnExportarMP3');
             if (btnMP3) btnMP3.style.display = 'inline-block';
-
             if (typeof window.cargarYReproducir === 'function') {
                 window.cargarYReproducir(data.url);
             }
             alert('✅ Ducking aplicado.');
         } else {
-            alert('❌ Error: ' + (data.error || 'Desconocido'));
+            alert('Error: ' + (data.error || 'Desconocido'));
         }
     })
     .catch(error => {
@@ -451,7 +443,15 @@ document.addEventListener('keydown', (e) => {
         if (window.audioEditor) window.audioEditor.mutear();
     }
 });
-
+function abrirEnlaceExterno(url) {
+    if (typeof require !== 'undefined') {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('abrir-enlace-externo', url);
+    } else {
+        // Fallback por si pruebas la web en un navegador normal
+        window.open(url, '_blank');
+    }
+}
 document.addEventListener('DOMContentLoaded', () => {
     if (window.dictionaryEditor) window.dictionaryEditor.loadAll();
 
@@ -470,6 +470,8 @@ document.addEventListener('DOMContentLoaded', () => {
             resultado.addEventListener(evt, () => asegurarEditable(resultado));
         });
     }
+   
+
 
     console.log('✅ Loquendo Studio cargado y listo');
 });

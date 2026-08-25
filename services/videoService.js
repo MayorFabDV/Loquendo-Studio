@@ -1,4 +1,4 @@
-// services/videoService.js
+// services/videoService.js - VERSIÓN FINAL CON COMAS ESCAPADAS
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -6,108 +6,192 @@ const { spawn } = require('child_process');
 class VideoService {
     constructor(ffmpegPath, audioFolder, pngtuberFolder) {
         this.ffmpegPath = ffmpegPath;
-        this.audioFolder = audioFolder;        // Ya resuelto por server.js
-        this.pngtuberFolder = pngtuberFolder;  // Ya resuelto por server.js
+        this.audioFolder = audioFolder;
+        this.pngtuberFolder = pngtuberFolder;
     }
 
     normalizarRutaImagen(rutaImagen) {
         if (!rutaImagen) return null;
-
-        // ✅ CORRECCIÓN: Limpiar la ruta relativa
         const limpia = String(rutaImagen)
-            .replace(/^\/+/, '')
-            .replace(/^public\//i, '')
-            .replace(/^pngtuber\//i, '');
-
-        // 1. Buscar en pngtuberFolder (la carpeta real de uploads, fuera del ASAR)
-        const rutaEnPngtuber = path.join(this.pngtuberFolder, path.basename(limpia));
+            .replace(/^[\/\\]+/, '')
+            .replace(/^public[\/\\]/i, '')
+            .replace(/^pngtuber[\/\\]/i, '');
+        const basename = path.basename(limpia);
+        if (!basename) return null;
+        const rutaEnPngtuber = path.join(this.pngtuberFolder, basename);
         if (fs.existsSync(rutaEnPngtuber)) return rutaEnPngtuber;
-
-        // 2. Buscar con la ruta limpia completa dentro de pngtuberFolder
-        const rutaCompleta = path.join(this.pngtuberFolder, limpia);
-        if (fs.existsSync(rutaCompleta)) return rutaCompleta;
-
         return null;
     }
 
-    async generarPNGTuber(audioPathAbsoluto, opciones = {}) {
+    async detectarSegmentosVoz(rutaAudio) {
         return new Promise((resolve, reject) => {
-            // ✅ CORRECCIÓN: Usar this.pngtuberFolder en lugar de __dirname
-            const idleFile = this.normalizarRutaImagen(opciones.idleImagePath) 
-                || path.join(this.pngtuberFolder, 'idle.png');
-            const talkingFile = this.normalizarRutaImagen(opciones.talkingImagePath) 
-                || idleFile;
-
-            const idleImage = idleFile;
-            const talkingImage = talkingFile;
-
-            if (!fs.existsSync(idleImage)) {
-                return reject(new Error('Falta la imagen PNGTuber idle. Sube una imagen o usa el valor por defecto.'));
-            }
-
-            // ✅ CORRECCIÓN: audioPathAbsoluto ya es absoluto y validado por server.js
-            const audioCompleto = audioPathAbsoluto;
-
-            if (!fs.existsSync(audioCompleto)) {
-                return reject(new Error(`El archivo de audio no existe: ${audioCompleto}`));
-            }
-
-            const nombreVideo = `pngtuber-${Date.now()}.mp4`;
-            const rutaVideo = path.join(this.audioFolder, nombreVideo);
-
-            console.log('🎬 Generando video PNGTuber con FONDO VERDE...');
-            console.log(`  idle: ${idleImage} | Existe: ${fs.existsSync(idleImage)}`);
-            console.log(`  talking: ${talkingImage} | Existe: ${fs.existsSync(talkingImage)}`);
-            console.log(`  audio: ${audioCompleto} | Existe: ${fs.existsSync(audioCompleto)}`);
-
-            const usarTalking = fs.existsSync(talkingImage) && talkingImage !== idleImage;
-            const imagenBase = usarTalking ? talkingImage : idleImage;
-
-            const ffmpegArgs = [
-                '-i', audioCompleto,
-                '-loop', '1',
-                '-i', imagenBase,
-                '-filter_complex', 
-                // 1. Crear fondo verde sólido
-                `color=c=#00FF00:s=1280x720:d=1000[green];` +
-                // 2. Escalar la imagen PNGTuber
-                `[1:v]scale=1280:720:force_original_aspect_ratio=decrease[png];` +
-                // 3. Superponer PNG sobre fondo verde
-                `[green][png]overlay=(W-w)/2:(H-h)/2[video]`,
-                '-map', '[video]',
-                '-map', '0:a',
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-pix_fmt', 'yuv420p',
-                '-shortest',
-                '-y',
-                rutaVideo
-            ];
-
-            const ffmpegProcess = spawn(this.ffmpegPath, ffmpegArgs, { 
-                windowsHide: true, 
-                shell: false 
-            });
-
+            const args = ['-i', rutaAudio, '-af', 'silencedetect=noise=-40dB:d=0.3', '-f', 'null', '-'];
+            const proceso = spawn(this.ffmpegPath, args, { windowsHide: true, shell: false });
             let stderr = '';
-            ffmpegProcess.stderr.on('data', (data) => { stderr += data.toString(); });
-
-            ffmpegProcess.on('close', (code) => {
-                if (code === 0 && fs.existsSync(rutaVideo)) {
-                    console.log(`✅ Video PNGTuber con fondo verde generado: ${nombreVideo}`);
-                    resolve({ video: `/audios/${nombreVideo}` });
-                } else {
-                    console.error('❌ Error al generar video. Código:', code);
-                    console.error('FFmpeg stderr:', stderr);
-                    reject(new Error(`No se pudo generar el video. Detalles: ${stderr.substring(0, 1000)}`));
+            proceso.stderr.on('data', (data) => { stderr += data.toString(); });
+            proceso.on('close', (code) => {
+                const silenceStarts = [...stderr.matchAll(/silence_start:\s*([\d.]+)/g)].map(m => parseFloat(m[1]));
+                const silenceEnds = [...stderr.matchAll(/silence_end:\s*([\d.]+)/g)].map(m => parseFloat(m[1]));
+                const duracionMatch = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+                let duracionTotal = 0;
+                if (duracionMatch) {
+                    duracionTotal = parseInt(duracionMatch[1]) * 3600 + parseInt(duracionMatch[2]) * 60 + parseFloat(duracionMatch[3]);
                 }
+                if (duracionTotal <= 0) duracionTotal = 60;
+                
+                const segmentosVoz = [];
+                let tiempoActual = 0;
+                for (let i = 0; i < silenceStarts.length; i++) {
+                    const silStart = silenceStarts[i];
+                    const silEnd = silenceEnds[i] || duracionTotal;
+                    if (silStart > tiempoActual) {
+                        segmentosVoz.push({ start: Math.max(0, tiempoActual), end: Math.min(silStart, duracionTotal) });
+                    }
+                    tiempoActual = silEnd;
+                }
+                if (tiempoActual < duracionTotal) segmentosVoz.push({ start: tiempoActual, end: duracionTotal });
+                if (segmentosVoz.length === 0 && duracionTotal > 0) segmentosVoz.push({ start: 0, end: duracionTotal });
+                
+                console.log(`[PNGTuber] Segmentos de voz detectados: ${segmentosVoz.length}`);
+                segmentosVoz.forEach((s, i) => {
+                    console.log(`  [${i}] Voz: ${s.start.toFixed(2)}s - ${s.end.toFixed(2)}s`);
+                });
+                
+                resolve({ segmentosVoz, duracionTotal });
             });
+            proceso.on('error', (err) => reject(err));
+        });
+    }
 
-            ffmpegProcess.on('error', (err) => {
-                reject(new Error(`Error de FFmpeg: ${err.message}`));
-            });
+    _construirEnableExpression(segmentosVoz) {
+        if (!segmentosVoz || segmentosVoz.length === 0) return '0';
+        // ✅ FIX CRÍTICO: Escapar las comas con \, para que FFmpeg no las interprete como separadores
+        return segmentosVoz.map(s => `between(t\\,${s.start.toFixed(3)}\\,${s.end.toFixed(3)})`).join('+');
+    }
+
+    async generarPNGTuber(audioPathAbsoluto, opciones = {}) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const idleFile = this.normalizarRutaImagen(opciones.idleImagePath);
+                const talkingFile = this.normalizarRutaImagen(opciones.talkingImagePath);
+                
+                const idleDefault = path.join(this.pngtuberFolder, 'idle.png');
+                const idleImage = idleFile || (fs.existsSync(idleDefault) ? idleDefault : null);
+                const talkingImage = talkingFile || idleImage;
+
+                if (!idleImage || !fs.existsSync(idleImage)) {
+                    return reject(new Error('Falta la imagen PNGTuber idle. Sube una imagen primero.'));
+                }
+                if (!fs.existsSync(audioPathAbsoluto)) {
+                    return reject(new Error(`El archivo de audio no existe: ${audioPathAbsoluto}`));
+                }
+
+                const nombreVideo = `pngtuber-${Date.now()}.mp4`;
+                const rutaVideo = path.join(this.audioFolder, nombreVideo);
+                const usarTalking = talkingImage && fs.existsSync(talkingImage) && talkingImage !== idleImage;
+
+                let filterScript = '';
+                let ffmpegArgs = [];
+
+                if (usarTalking) {
+                    const { segmentosVoz, duracionTotal } = await this.detectarSegmentosVoz(audioPathAbsoluto);
+                    const enableExpr = this._construirEnableExpression(segmentosVoz);
+
+                    filterScript = path.join(this.audioFolder, `filter-${Date.now()}.txt`);
+                    
+                    // ✅ FIX: Comas escapadas con \, en la expresión enable
+                    const filterContent =
+                        `color=c=#00FF00:s=1280x720:d=${duracionTotal}[green];\n` +
+                        `[1:v]scale=1280:720:force_original_aspect_ratio=increase,setsar=1,crop=1280:720:(in_w-1280)/2:(in_h-720)/2[idle];\n` +
+                        `[2:v]scale=1280:720:force_original_aspect_ratio=increase,setsar=1,crop=1280:720:(in_w-1280)/2:(in_h-720)/2[talking];\n` +
+                        `[green][idle]overlay=(W-w)/2:(H-h)/2:format=auto[base];\n` +
+                        `[base][talking]overlay=(W-w)/2:(H-h)/2:format=auto:enable='${enableExpr}'[video]`;
+                    
+                    fs.writeFileSync(filterScript, filterContent, 'utf8');
+                    console.log(`[PNGTuber] Filter script escrito en: ${filterScript}`);
+                    console.log(`[PNGTuber] Enable expression: ${enableExpr}`);
+
+                    ffmpegArgs = [
+                        '-i', audioPathAbsoluto,
+                        '-loop', '1', '-i', idleImage,
+                        '-loop', '1', '-i', talkingImage,
+                        '-filter_complex_script', filterScript,
+                        '-map', '[video]',
+                        '-map', '0:a',
+                        '-c:v', 'libx264',
+                        '-preset', 'fast',
+                        '-crf', '23',
+                        '-c:a', 'aac',
+                        '-b:a', '192k',
+                        '-pix_fmt', 'yuv420p',
+                        '-shortest',
+                        '-y',
+                        rutaVideo
+                    ];
+                } else {
+                    filterScript = path.join(this.audioFolder, `filter-${Date.now()}.txt`);
+                    const filterContent =
+                        `color=c=#00FF00:s=1280x720:d=1000[green];\n` +
+                        `[1:v]scale=1280:720:force_original_aspect_ratio=increase,setsar=1,crop=1280:720:(in_w-1280)/2:(in_h-720)/2[idle];\n` +
+                        `[green][idle]overlay=(W-w)/2:(H-h)/2:format=auto[video]`;
+                    
+                    fs.writeFileSync(filterScript, filterContent, 'utf8');
+
+                    ffmpegArgs = [
+                        '-i', audioPathAbsoluto,
+                        '-loop', '1', '-i', idleImage,
+                        '-filter_complex_script', filterScript,
+                        '-map', '[video]',
+                        '-map', '0:a',
+                        '-c:v', 'libx264',
+                        '-preset', 'fast',
+                        '-crf', '23',
+                        '-c:a', 'aac',
+                        '-b:a', '192k',
+                        '-pix_fmt', 'yuv420p',
+                        '-shortest',
+                        '-y',
+                        rutaVideo
+                    ];
+                }
+
+                console.log('[FFmpeg] Iniciando renderizado...');
+                const ffmpegProcess = spawn(this.ffmpegPath, ffmpegArgs, { windowsHide: true, shell: false });
+                let stderr = '';
+                
+                ffmpegProcess.stderr.on('data', (data) => { 
+                    stderr += data.toString();
+                    if (data.toString().includes('frame=') || data.toString().includes('size=')) {
+                        process.stdout.write('\r[FFmpeg] ' + data.toString().trim().substring(0, 70));
+                    }
+                });
+
+                ffmpegProcess.on('close', (code) => {
+                    process.stdout.write('\n');
+                    if (filterScript && fs.existsSync(filterScript)) {
+                        try { fs.unlinkSync(filterScript); } catch (e) { /* ignore */ }
+                    }
+                    
+                    if (code === 0 && fs.existsSync(rutaVideo)) {
+                        const stats = fs.statSync(rutaVideo);
+                        console.log(`✅ Video PNGTuber generado: ${nombreVideo} (${(stats.size / 1024 / 1024).toFixed(1)} MB)`);
+                        resolve({ video: `/audios/${nombreVideo}` });
+                    } else {
+                        console.error('❌ Error al generar video. Codigo:', code);
+                        console.error('FFmpeg stderr:', stderr.substring(stderr.length - 1500));
+                        reject(new Error(`No se pudo generar el video. Codigo FFmpeg: ${code}`));
+                    }
+                });
+
+                ffmpegProcess.on('error', (err) => {
+                    if (filterScript && fs.existsSync(filterScript)) {
+                        try { fs.unlinkSync(filterScript); } catch (e) { /* ignore */ }
+                    }
+                    reject(new Error(`Error de FFmpeg: ${err.message}`));
+                });
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 }

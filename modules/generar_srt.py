@@ -3,6 +3,7 @@
 """
 Generador de subtítulos SRT - VERSIÓN BULLETPROOF PARA ELECTRON.
 Busca ffmpeg.exe dinámicamente en rutas de desarrollo y producción.
+Incluye fixes para evitar bucles de Whisper y cortes al inicio.
 """
 import os
 import sys
@@ -17,30 +18,20 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 def encontrar_ffmpeg():
     """Busca ffmpeg.exe en todas las rutas posibles de Electron."""
     posibles_rutas = [
-        # 1. Desarrollo normal (bin/ al lado de modules/)
         os.path.join(current_dir, '..', 'bin', 'ffmpeg.exe'),
-        # 2. Dentro de modules/ (si se movió por error)
         os.path.join(current_dir, 'ffmpeg.exe'),
-        # 3. Producción: resources/app.asar.unpacked/bin/
         os.path.join(current_dir, '..', '..', 'app.asar.unpacked', 'bin', 'ffmpeg.exe'),
-        # 4. Producción: resources/bin/ (extraResources directo)
         os.path.join(current_dir, '..', '..', 'bin', 'ffmpeg.exe'),
     ]
-    
-    # Si estamos en un entorno empaquetado de Electron, process.resourcesPath no existe en Python,
-    # pero podemos inferir la ruta relativa desde __file__
-    
     for ruta in posibles_rutas:
         ruta_absoluta = os.path.abspath(ruta)
         if os.path.exists(ruta_absoluta):
             return ruta_absoluta
-            
     return None
 
 ffmpeg_path = encontrar_ffmpeg()
 
 if ffmpeg_path:
-    # Agregar la carpeta de ffmpeg al PATH del sistema para este proceso
     os.environ["PATH"] = os.path.dirname(ffmpeg_path) + os.pathsep + os.environ.get("PATH", "")
     print(f"[OK] FFmpeg encontrado en: {ffmpeg_path}")
 else:
@@ -156,15 +147,29 @@ def deduplicar_segmentos_repetidos(segmentos, texto_original=None):
         texto_final = corregir_alucinaciones_universal(texto_crudo, texto_original)
         if len(texto_final.split()) < 2:
             continue
-        texto_norm = re.sub(r'\s+', ' ', texto_final.lower())
-        if resultado and re.sub(r'\s+', ' ', resultado[-1]['text'].lower()) == texto_norm:
-            resultado[-1]['end'] = max(resultado[-1]['end'], float(seg.get('end', resultado[-1]['end']) or resultado[-1]['end']))
-            continue
-        resultado.append({
-            'start': float(seg.get('start', 0) or 0),
-            'end': float(seg.get('end', 0) or 0),
-            'text': texto_final,
-        })
+
+        # ✅ FIX: Detección de duplicados "casi idénticos" (Bucle de Whisper)
+        es_duplicado = False
+        if resultado:
+            ultimo_texto = resultado[-1]['text'].lower()
+            actual_texto = texto_final.lower()
+            palabras_actuales = set(actual_texto.split())
+            palabras_anteriores = set(ultimo_texto.split())
+            
+            # Si más del 60% de las palabras se repiten, es un bucle de Whisper
+            if len(palabras_actuales) > 0:
+                similitud = len(palabras_actuales.intersection(palabras_anteriores)) / len(palabras_actuales)
+                if similitud > 0.6:
+                    es_duplicado = True
+                    # Extender el tiempo del segmento anterior en lugar de crear uno nuevo
+                    resultado[-1]['end'] = max(resultado[-1]['end'], float(seg.get('end', 0) or 0))
+
+        if not es_duplicado:
+            resultado.append({
+                'start': float(seg.get('start', 0) or 0),
+                'end': float(seg.get('end', 0) or 0),
+                'text': texto_final,
+            })
     return resultado
 
 def generar_srt_fallback(texto_original, duracion_total, ruta_salida):
@@ -193,7 +198,6 @@ def generar_srt_fallback(texto_original, duracion_total, ruta_salida):
 
 def obtener_duracion_audio(ruta_audio):
     try:
-        # Usar la ruta absoluta de ffmpeg encontrada anteriormente
         cmd = [ffmpeg_path if ffmpeg_path else 'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
                '-of', 'default=noprint_wrappers=1:nokey=1', ruta_audio]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -209,13 +213,28 @@ def generar_srt(ruta_audio, ruta_salida, texto_original=None):
         duracion = 5
         generar_srt_fallback(texto_original, duracion, ruta_salida)
         return
+
     try:
         if not WHISPER_DISPONIBLE:
             raise ImportError("Whisper no disponible")
+
+        # --- TRUCO: INYECTAR 0.5s DE SILENCIO AL INICIO ---
+        ruta_temporal = ruta_audio.replace('.wav', '_temp_silence.wav')
+        audio_a_transcribir = ruta_audio
+        
+        if ffmpeg_path and os.path.exists(ffmpeg_path):
+            print("[IA] Inyectando 0.5s de silencio para alinear Whisper...")
+            cmd = [ffmpeg_path, '-y', '-i', ruta_audio, '-af', 'adelay=500|500:all=1', ruta_temporal]
+            subprocess.run(cmd, capture_output=True, text=True)
             
+            if os.path.exists(ruta_temporal):
+                audio_a_transcribir = ruta_temporal
+        # -------------------------------------------------
+
         modelo_nombre = os.environ.get("WHISPER_MODEL", "small")
         print(f"[IA] Cargando modelo Whisper ({modelo_nombre})...")
         model = whisper.load_model(modelo_nombre)
+        
         opciones = {
             "language": "es",
             "temperature": 0.0,
@@ -224,19 +243,29 @@ def generar_srt(ruta_audio, ruta_salida, texto_original=None):
             "compression_ratio_threshold": 1.8,
             "no_speech_threshold": 0.5,
         }
+        
+        # ✅ FIX: Solo pasar nombres propios como guía (no el texto completo)
         if texto_original and len(texto_original.strip()) > 0:
-            prompt = texto_original.strip()[:300]
-            opciones["initial_prompt"] = f"Transcripción de video Loquendo: {prompt}"
-        
+            nombres_propios = re.findall(r'\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\b', texto_original)
+            vocabulario = " ".join(sorted(set(nombres_propios)))[:200]
+            if vocabulario:
+                opciones["initial_prompt"] = f"Vocabulario: {vocabulario}."
+
         print("[IA] Transcribiendo...")
-        result = model.transcribe(ruta_audio, **opciones)
-        
+        result = model.transcribe(audio_a_transcribir, **opciones)
+
+        # --- RESTAR 0.5s A LOS TIMESTAMPS ---
+        for seg in result.get("segments", []):
+            seg['start'] = max(0.0, seg['start'] - 0.5)
+            seg['end'] = max(0.0, seg['end'] - 0.5)
+        # ------------------------------------
+
         if not result.get("segments"):
             print("[ADVERTENCIA] Whisper no detectó segmentos. Usando fallback.")
             duracion = obtener_duracion_audio(ruta_audio) or 60
             generar_srt_fallback(texto_original, duracion, ruta_salida)
             return
-        
+
         segmentos_limpios = deduplicar_segmentos_repetidos(result.get("segments", []), texto_original)
         print(f"[OK] {len(segmentos_limpios)} segmento(s) válidos tras limpiar repeticiones")
         
@@ -248,8 +277,14 @@ def generar_srt(ruta_audio, ruta_salida, texto_original=None):
                 if len(texto_final.split()) < 2:
                     continue
                 f.write(f"{i}\n{inicio} --> {fin}\n{texto_final}\n\n")
+        
         print(f"[OK] SRT generado con Whisper: {ruta_salida}")
         
+        # Limpiar archivo temporal
+        if os.path.exists(ruta_temporal):
+            try: os.remove(ruta_temporal)
+            except: pass
+
     except Exception as e:
         print(f"[ERROR] Whisper falló: {str(e)}")
         traceback.print_exc()

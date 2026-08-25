@@ -1,14 +1,45 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+// main-electron.js - Versión Final Unificada y Sin Errores
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 // --- ARRANQUE DEL SERVIDOR EXPRESS ---
 require('./server.js');
 
-// --- RUTAS DE CARPETAS ---
-const __base = __dirname;
+// --- RUTAS DE CARPETAS (Corregido para Producción/Portable) ---
+const isDev = !app.isPackaged;
+const __base = isDev ? __dirname : process.resourcesPath;
 const audioFolder = path.join(__base, 'public', 'audios');
 const pngtuberFolder = path.join(__base, 'public', 'pngtuber');
+
+// Asegurar carpetas
+[audioFolder, pngtuberFolder].forEach(folder => {
+    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+});
+
+// --- FUNCIÓN PARA ESPERAR AL SERVIDOR ---
+function waitForServer(maxAttempts = 20, delay = 500) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const check = () => {
+            attempts++;
+            const req = http.get('http://localhost:3000', (res) => {
+                console.log(`[MAIN] ✅ Servidor listo después de ${attempts} intentos`);
+                resolve();
+            });
+            req.on('error', () => {
+                if (attempts >= maxAttempts) {
+                    reject(new Error('El servidor no arrancó después de ' + (maxAttempts * delay) + 'ms'));
+                } else {
+                    setTimeout(check, delay);
+                }
+            });
+            req.setTimeout(500, () => req.destroy());
+        };
+        check();
+    });
+}
 
 // --- VENTANA PRINCIPAL ---
 let mainWindow;
@@ -30,7 +61,6 @@ function createWindow() {
 
     mainWindow.loadURL('http://localhost:3000');
 
-    // DevTools solo con F12 o Ctrl+Shift+I
     mainWindow.webContents.on('before-input-event', (event, input) => {
         if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
             mainWindow.webContents.toggleDevTools();
@@ -38,12 +68,8 @@ function createWindow() {
         }
     });
 
-    // Manejo seguro de crashes del renderer
     mainWindow.webContents.on('render-process-gone', (event, details) => {
         console.error(`💥 RENDERER MURIÓ: ${details.reason} | Código: ${details.exitCode}`);
-        if (details.reason === 'oom') {
-            console.warn('⚠️ MEMORIA AGOTADA');
-        }
         setTimeout(() => {
             if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
         }, 2000);
@@ -56,9 +82,24 @@ function createWindow() {
 ipcMain.on('app-close', () => app.quit());
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 
+// ✅ NUEVO: Abrir enlaces en el navegador externo del sistema operativo (Para el botón de Ko-fi)
+ipcMain.on('abrir-enlace-externo', (event, url) => {
+    shell.openExternal(url);
+});
+
 // --- CICLO DE VIDA ---
-app.whenReady().then(() => {
-    setTimeout(createWindow, 500);
+app.whenReady().then(async () => {
+    try {
+        console.log('[MAIN] Esperando al servidor...');
+        await waitForServer();
+        console.log('[MAIN] ✅ Backend listo, creando ventana...');
+        createWindow();
+    } catch (err) {
+        console.error('[MAIN] ❌ Error:', err.message);
+        const { dialog } = require('electron');
+        dialog.showErrorBox('Error Crítico', `No se pudo iniciar el servidor:\n\n${err.message}`);
+        app.quit();
+    }
 });
 
 app.on('window-all-closed', () => {
@@ -72,25 +113,20 @@ app.on('activate', () => {
 // --- LIMPIEZA TOTAL AL CERRAR ---
 app.on('before-quit', async () => {
     console.log('🧹 Limpiando caché de audio y PNGTuber...');
-
     const carpetasALimpiar = [
-        { ruta: path.join(__base, 'public', 'audios'), extensiones: /\.(wav|srt|ass|mp3|mp4)$/i },
-        { ruta: path.join(__base, 'public', 'pngtuber'), extensiones: /\.(png|jpg|jpeg)$/i }
+        { ruta: audioFolder, extensiones: /\.(wav|srt|ass|mp3|mp4)$/i },
+        { ruta: pngtuberFolder, extensiones: /\.(png|jpg|jpeg)$/i }
     ];
-
     for (const carpeta of carpetasALimpiar) {
         if (!fs.existsSync(carpeta.ruta)) continue;
-
         try {
             const archivos = await fs.promises.readdir(carpeta.ruta);
             const borrables = archivos.filter(f => carpeta.extensiones.test(f));
-
             await Promise.all(
                 borrables.map(archivo =>
                     fs.promises.unlink(path.join(carpeta.ruta, archivo)).catch(() => {})
                 )
             );
-
             if (borrables.length > 0) {
                 console.log(`✅ ${borrables.length} temporales eliminados en ${path.basename(carpeta.ruta)}`);
             }
@@ -98,6 +134,5 @@ app.on('before-quit', async () => {
             console.error(`❌ Error limpiando ${carpeta.ruta}:`, err.message);
         }
     }
-
     console.log('🧹 Limpieza completada.');
 });
