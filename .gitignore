@@ -7,11 +7,26 @@ __pycache__/
 dist voz/
 build voz/
 .env
-*.log
-db/*.json
 public/audios/*
 public/pngtuber/*
 !public/audios/.gitkeep
 !public/pngtuber/.gitkeep
 python_venv/**/*
 python/
+backend/public/audios/*
+backend/public/pngtuber/*
+!backend/public/audios/.gitkeep
+!backend/public/pngtuber/.gitkeep
+
+backend/db/*.json
+!backend/db/.gitkeep
+
+backend/bin/*.exe
+backend/python/*.exe
+
+
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.env.local

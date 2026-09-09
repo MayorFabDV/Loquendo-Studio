@@ -34,11 +34,11 @@ class DictionaryService {
         return valor;
     }
 
+    // ✅ Método original (para compatibilidad - aplica todos los diccionarios)
     aplicar(textoOriginal) {
         let texto = textoOriginal;
         try {
             // ✅ ORDEN CRÍTICO: Fonética primero, luego jergas, sinónimos y perfil.
-            // Esto evita que una regla de jerga rompa una corrección fonética.
             const archivos = ['fonetica', 'jergas', 'sinonimos', 'perfil'];
             
             for (const tipo of archivos) {
@@ -56,6 +56,108 @@ class DictionaryService {
         } catch (err) {
             console.error("❌ Error al aplicar diccionarios:", err);
         }
+        return texto;
+    }
+
+    // ✅ NUEVO: Aplicar solo jergas
+    aplicarSoloJergas(textoOriginal) {
+        let texto = textoOriginal;
+        try {
+            const ruta = this.paths.jergas;
+            if (fs.existsSync(ruta)) {
+                const data = JSON.parse(fs.readFileSync(ruta, 'utf8') || '{}');
+                for (const [original, reemplazo] of Object.entries(data)) {
+                    const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+                    texto = texto.replace(regex, this.elegirReemplazo(reemplazo));
+                }
+            }
+        } catch (err) {
+            console.error("❌ Error al aplicar jergas:", err);
+        }
+        return texto;
+    }
+
+    // ✅ NUEVO: Aplicar solo fonética
+    aplicarSoloFonetica(textoOriginal) {
+        let texto = textoOriginal;
+        try {
+            const ruta = this.paths.fonetica;
+            if (fs.existsSync(ruta)) {
+                const data = JSON.parse(fs.readFileSync(ruta, 'utf8') || '{}');
+                for (const [original, reemplazo] of Object.entries(data)) {
+                    const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+                    texto = texto.replace(regex, this.elegirReemplazo(reemplazo));
+                }
+            }
+        } catch (err) {
+            console.error("❌ Error al aplicar fonética:", err);
+        }
+        return texto;
+    }
+
+    // ✅ NUEVO: Aplicar solo sinónimos
+    aplicarSoloSinonimos(textoOriginal) {
+        let texto = textoOriginal;
+        try {
+            const ruta = this.paths.sinonimos;
+            if (fs.existsSync(ruta)) {
+                const data = JSON.parse(fs.readFileSync(ruta, 'utf8') || '{}');
+                for (const [original, reemplazo] of Object.entries(data)) {
+                    const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+                    texto = texto.replace(regex, this.elegirReemplazo(reemplazo));
+                }
+            }
+        } catch (err) {
+            console.error("❌ Error al aplicar sinónimos:", err);
+        }
+        return texto;
+    }
+
+    // ✅ NUEVO: Aplicar solo perfil
+    aplicarSoloPerfil(textoOriginal) {
+        let texto = textoOriginal;
+        try {
+            const ruta = this.paths.perfil;
+            if (fs.existsSync(ruta)) {
+                const data = JSON.parse(fs.readFileSync(ruta, 'utf8') || '{}');
+                for (const [original, reemplazo] of Object.entries(data)) {
+                    const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+                    texto = texto.replace(regex, this.elegirReemplazo(reemplazo));
+                }
+            }
+        } catch (err) {
+            console.error("❌ Error al aplicar perfil:", err);
+        }
+        return texto;
+    }
+
+    // ✅ NUEVO: Aplicar selección según opciones
+    aplicarConOpciones(textoOriginal, opciones = {}) {
+        let texto = textoOriginal;
+        
+        // Aplicar solo lo que esté activado
+        if (opciones.jergas) {
+            texto = this.aplicarSoloJergas(texto);
+        }
+        if (opciones.fonetica) {
+            texto = this.aplicarSoloFonetica(texto);
+        }
+        if (opciones.sinonimos) {
+            texto = this.aplicarSoloSinonimos(texto);
+        }
+        if (opciones.perfil) {
+            texto = this.aplicarSoloPerfil(texto);
+        }
+        
+        // Si ninguna opción está activada, devolver el texto original
+        if (!opciones.jergas && !opciones.fonetica && !opciones.sinonimos && !opciones.perfil) {
+            return textoOriginal;
+        }
+        
         return texto;
     }
 

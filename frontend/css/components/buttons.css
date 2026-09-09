@@ -1,0 +1,63 @@
+button {
+  background-color: var(--accent-color);
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.88em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px var(--accent-glow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  user-select: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 6px 20px var(--accent-glow);
+    transform: translateY(-1px);
+    background-color: var(--accent-hover);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &.btn-theme {
+    background: var(--panel-bg);
+    color: var(--text-color);
+    border: 1px solid var(--panel-border);
+    box-shadow: none;
+
+    &:hover {
+      border-color: var(--accent-color);
+      background: var(--panel-bg-hover);
+    }
+  }
+
+  &.btn-maestro {
+    background: linear-gradient(135deg, #e41a1a 0%, #ff0037 100%);
+    box-shadow: 0 4px 16px rgba(255, 0, 55, 0.35);
+  }
+
+  &.btn-video {
+    background: var(--purple-accent);
+    box-shadow: 0 4px 14px var(--purple-glow);
+
+    &:hover {
+      background: var(--purple-hover);
+    }
+  }
+
+  &.btn-ducking {
+    background: var(--green-accent);
+    box-shadow: 0 4px 14px var(--green-glow);
+    width: 100%;
+
+    &:hover {
+      background: var(--green-hover);
+    }
+  }
+}

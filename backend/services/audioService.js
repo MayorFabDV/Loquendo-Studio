@@ -92,20 +92,19 @@ class AudioService {
             
             let fragmentos = [];
             for (const oracion of oraciones) {
-                const partes = this.partirOracion(oracion, 80); // ✅ 80 caracteres para no fragmentar de más
+                const partes = this.partirOracion(oracion, 80);
                 fragmentos.push(...partes);
             }
             
             const totalPalabras = fragmentos.reduce((sum, f) => sum + f.split(/\s+/).length, 0);
             if (totalPalabras === 0) return null;
             
-            // ✅ FIX: Protección matemática contra tiempos negativos
             const tiempoTotalGaps = fragmentos.length * 0.15;
             const tiempoDisponible = Math.max(0, duracionTotal - tiempoTotalGaps);
-            const tiempoPorPalabra = Math.max(0.05, tiempoDisponible / totalPalabras); // Mínimo 0.05s por palabra
+            const tiempoPorPalabra = Math.max(0.05, tiempoDisponible / totalPalabras);
             
             let srtContent = '';
-            let tiempoActual = 0; // ✅ FIX: Declaración correcta de la variable
+            let tiempoActual = 0;
             
             for (let i = 0; i < fragmentos.length; i++) {
                 const fragmento = fragmentos[i];
@@ -117,7 +116,6 @@ class AudioService {
                     duracionFragmento = duracionTotal - tiempoActual;
                 }
                 
-                // ✅ FIX: Si por alguna razón la duración es <= 0, forzamos al menos 0.5s
                 if (duracionFragmento <= 0) {
                     duracionFragmento = 0.5;
                 }
@@ -139,12 +137,15 @@ class AudioService {
         }
     }
 
-    procesar(texto, voz, usarIA, dictionaryService, modo = 'normal') {
+    procesar(texto, voz, usarIA, dictionaryService, modo = 'normal', opciones = {}) {
         return new Promise((resolve, reject) => {
             const nombreArchivo = `audio-${Date.now()}.wav`;
             const rutaArchivo = path.join(this.audioFolder, nombreArchivo);
             const vozFinal = voz || 'Loquendo Jorge';
-            const textoConDiccionarios = dictionaryService.aplicar(texto);
+            
+            // ✅ FIX: Usar aplicarConOpciones() que solo aplica los diccionarios activados
+            const textoConDiccionarios = dictionaryService.aplicarConOpciones(texto, opciones || {});
+            
             const textoParaVoz = textoConDiccionarios.replace(/[\r\n]+/g, ' ').replace(/"/g, "'");
             const textoParaSubtitulos = this.limpiarTagsParaSubtitulos(textoConDiccionarios);
 
@@ -211,6 +212,17 @@ class AudioService {
                     return reject(new Error('Audio vacio (' + stats.size + ' bytes)'));
                 }
 
+                // ✅ FIX CRÍTICO: Si usarIA es false, NO generamos SRT ni ASS. 
+                if (usarIA === false || usarIA === 'solo_audio') {
+                    console.log('[AudioService] ✅ Generando SOLO audio (sin subtítulos)');
+                    return resolve({
+                        url: '/audios/' + nombreArchivo,
+                        srt: null,
+                        ass: null,
+                        textoLimpio: textoParaSubtitulos,
+                        stats
+                    });
+                }
                 const nombreSRT = `subtitulos-${Date.now()}.srt`;
                 const rutaSRT = path.join(this.audioFolder, nombreSRT);
                 let srtUrl = null;

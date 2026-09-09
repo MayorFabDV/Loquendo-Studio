@@ -1,0 +1,58 @@
+:root {
+  /* Modos & Colores Base */
+  --bg-color: #0b0d10;
+  --text-color: #f1f5f9;
+  --text-dim: #94a3b8;
+
+  /* Paneles & Tarjetas */
+  --panel-bg: #12161f;
+  --panel-bg-hover: #1a202c;
+  --panel-border: rgba(255, 255, 255, 0.08);
+
+  /* Acentos */
+  --accent-color: #e41a1a;
+  --accent-hover: #ff2a55;
+  --accent-glow: rgba(228, 26, 26, 0.25);
+  
+  --purple-accent: #8e44ad;
+  --purple-hover: #9b59b6;
+  --purple-glow: rgba(142, 68, 173, 0.35);
+
+  --green-accent: #10b981;
+  --green-hover: #059669;
+  --green-glow: rgba(16, 185, 129, 0.3);
+
+  /* Bordes & Sombras */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+  /* Tipografías */
+  --font-main: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+[data-theme="light"] {
+  --bg-color: #f8fafc;
+  --text-color: #0f172a;
+  --text-dim: #64748b;
+
+  --panel-bg: #ffffff;
+  --panel-bg-hover: #f1f5f9;
+  --panel-border: rgba(0, 0, 0, 0.08);
+
+  --accent-color: #dc2626;
+  --accent-hover: #ef4444;
+  --accent-glow: rgba(220, 38, 38, 0.15);
+
+  --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+@theme {
+  --color-bg-main: var(--bg-color);
+  --color-panel: var(--panel-bg);
+  --color-panel-hover: var(--panel-bg-hover);
+  --color-accent: var(--accent-color);
+  --font-main: var(--font-main);
+  --font-mono: var(--font-mono);
+}

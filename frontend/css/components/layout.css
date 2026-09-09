@@ -1,0 +1,54 @@
+header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--panel-border);
+
+  & h1 {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ffffff 0%, var(--text-color) 60%, var(--accent-color) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.contenedor-flexible {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  &.modo-columnas {
+    flex-direction: row;
+
+    & .columna-izquierda {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    & .columna-derecha {
+      flex: 1.15;
+      min-width: 300px;
+      border-left: 1px solid var(--panel-border);
+      padding-left: 18px;
+    }
+  }
+}
+
+.panel-opciones, .panel-musica {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.panel-musica {
+  background: rgba(142, 68, 173, 0.05);
+  border-color: rgba(142, 68, 173, 0.28);
+}

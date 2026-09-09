@@ -5,7 +5,8 @@ const fs = require('fs');
 const http = require('http');
 
 // --- ARRANQUE DEL SERVIDOR EXPRESS ---
-require('./server.js');
+// Requerir el servidor y obtener la instancia exportada para conocer el puerto real
+const serverModule = require('./server.js');
 
 // --- RUTAS DE CARPETAS (Corregido para Producción/Portable) ---
 const isDev = !app.isPackaged;
@@ -19,12 +20,15 @@ const pngtuberFolder = path.join(__base, 'public', 'pngtuber');
 });
 
 // --- FUNCIÓN PARA ESPERAR AL SERVIDOR ---
+// Determinar puerto enlazado por el servidor (si está disponible)
+const BOUND_PORT = (serverModule && serverModule.server && serverModule.server.address && serverModule.server.address().port) || process.env.PORT || 3000;
+
 function waitForServer(maxAttempts = 20, delay = 500) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const check = () => {
             attempts++;
-            const req = http.get('http://localhost:3000', (res) => {
+            const req = http.get(`http://localhost:${BOUND_PORT}`, (res) => {
                 console.log(`[MAIN] ✅ Servidor listo después de ${attempts} intentos`);
                 resolve();
             });
@@ -59,7 +63,7 @@ function createWindow() {
         }
     });
 
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL(`http://localhost:${BOUND_PORT}`);
 
     mainWindow.webContents.on('before-input-event', (event, input) => {
         if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
@@ -110,13 +114,18 @@ app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
+
 // --- LIMPIEZA TOTAL AL CERRAR ---
 app.on('before-quit', async () => {
     console.log('🧹 Limpiando caché de audio y PNGTuber...');
+    
+    // ✅ FIX: Apuntar explícitamente a la carpeta backend/public
+    const backendPublic = path.join(__dirname, 'backend', 'public');
     const carpetasALimpiar = [
-        { ruta: audioFolder, extensiones: /\.(wav|srt|ass|mp3|mp4)$/i },
-        { ruta: pngtuberFolder, extensiones: /\.(png|jpg|jpeg)$/i }
+        { ruta: path.join(backendPublic, 'audios'), extensiones: /\.(wav|srt|ass|mp3|mp4)$/i },
+        { ruta: path.join(backendPublic, 'pngtuber'), extensiones: /\.(png|jpg|jpeg)$/i }
     ];
+
     for (const carpeta of carpetasALimpiar) {
         if (!fs.existsSync(carpeta.ruta)) continue;
         try {
