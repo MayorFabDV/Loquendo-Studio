@@ -26,7 +26,7 @@
 ## Vista Previa
 
 
-![Loquendo Studio Preview](img/preview.png)
+![Loquendo Studio Preview](frontend/img/preview.png)
 
 ---
 
