@@ -1,12 +1,8 @@
 // js/main.js - Loquendo Studio (Controlador Principal Definitivo y Blindado)
 
-// Inicialización segura de API_BASE (evita redeclaraciones con const/let)
+// Inicialización segura de API_BASE
 if (typeof API_BASE === 'undefined') {
-    var API_BASE = (function() {
-        if (window.CONFIG && window.CONFIG.API_BASE) return window.CONFIG.API_BASE;
-        if (window.location && window.location.port) return `http://localhost:${window.location.port}`;
-        return 'http://localhost:3000';
-    })();
+    var API_BASE = window.API_BASE || (window.location && window.location.port ? `http://localhost:${window.location.port}` : 'http://localhost:3000');
     window.API_BASE = API_BASE;
 }
 
@@ -17,7 +13,7 @@ let voiceAudioOriginalPath = null;
 let pngtuberIdlePath = null;
 let pngtuberTalkingPath = null;
 
-// Función auxiliar para mostrar notificaciones de forma segura
+// ✅ Función auxiliar para notificaciones
 function notificar(tipo, mensaje, duracion) {
     if (window.notifications && typeof window.notifications[tipo] === 'function') {
         window.notifications[tipo](mensaje, duracion);
@@ -49,14 +45,14 @@ function cambiarTema() {
 
 function cambiarDiseno() {
     document.querySelector('.contenedor-flexible')?.classList.toggle('modo-columnas');
-    notificar('info', ' Vista cambiada');
+    notificar('info', 'Vista cambiada');
 }
 
 function abrirEnlaceExterno(url) {
     if (typeof require !== 'undefined') {
         try {
-            const { ipcRenderer } = require('electron');
-            ipcRenderer.send('abrir-enlace-externo', url);
+            const { shell } = require('electron');
+            shell.openExternal(url);
         } catch (e) {
             window.open(url, '_blank');
         }
@@ -68,28 +64,16 @@ function abrirEnlaceExterno(url) {
 function abrirAyuda() {
     const modal = document.getElementById('modalAyuda');
     if (modal) {
-        // Actualizar contenido del modal con el texto personalizado
         const modalBody = modal.querySelector('.modal-body');
         if (modalBody) {
             modalBody.innerHTML = `
-                <pre style="
-                    font-family: 'Inter', system-ui, sans-serif;
-                    font-size: 14px;
-                    line-height: 1.8;
-                    color: var(--text-color);
-                    background: rgba(0, 0, 0, 0.3);
-                    padding: 16px;
-                    border-radius: 8px;
-                    white-space: pre-wrap;
-                    margin: 0;
-                ">${mensajeAyuda}</pre>
+                <pre style="font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.8; color: var(--text-color); background: rgba(0, 0, 0, 0.3); padding: 16px; border-radius: 8px; white-space: pre-wrap; margin: 0;">${mensajeAyuda}</pre>
             `;
         }
         modal.style.display = 'flex';
     }
 }
 
-// ✅ Variable con el mensaje de ayuda
 const mensajeAyuda = " Ayuda Rápida:\n\n" +
            "1. Escribe o pega tu texto\n" +
            "2. Selecciona el modo y opciones\n" +
@@ -97,29 +81,158 @@ const mensajeAyuda = " Ayuda Rápida:\n\n" +
            "4. Usa el editor para cortar/normalizar\n" +
            "5. Genera el video PNGTuber\n" +
            "6. Desliza para escuchar y ajustar la música\n" +
-             "7. Descarga subtítulos SRT/ASS si quieres\n\n" +
-             "¡Listo! Disfruta de tu audio y video.";
+           "7. Descarga subtítulos SRT/ASS si quieres\n\n" +
+           "¡Listo! Disfruta de tu audio y video.";
 
-// ✅ NUEVA FUNCIÓN: Cerrar modal de ayuda
 function cerrarAyuda() {
     const modal = document.getElementById('modalAyuda');
-    if (modal) {
-        modal.style.display = 'none';
+    if (modal) modal.style.display = 'none';
+}
+
+// ==========================================
+// 1.5 CARGAR VOCES DISPONIBLES DINÁMICAMENTE
+// ==========================================
+async function cargarVoces() {
+    const select = document.getElementById('vozSeleccionada');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">Detectando voces...</option>';
+    select.disabled = true;
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/voces`);
+        const data = await res.json();
+        
+        if (data.error) throw new Error(data.error);
+        if (!data.voces || data.voces.length === 0) {
+            select.innerHTML = '<option value="">No se detectaron voces</option>';
+            notificar('warning', 'No se detectaron voces en el sistema');
+            return;
+        }
+        
+        select.innerHTML = '';
+        
+        const vocesLoquendo = [];
+        const vocesAcapella = [];
+        const vocesMicrosoft = [];
+        const vocesOtras = [];
+        
+        data.voces.forEach(voz => {
+            const nombre = voz.nombre;
+            if (nombre.includes('Microsoft')) vocesMicrosoft.push(voz);
+            else if (nombre.toLowerCase().includes('acapella')) vocesAcapella.push(voz);
+            else if (['Jorge', 'Carlos', 'Carmen', 'Diego', 'Ludoviko', 'Esperanza', 'Francisca', 'Leonor', 'Soledad', 'Ximena'].includes(nombre)) vocesLoquendo.push(voz);
+            else vocesOtras.push(voz);
+        });
+        
+        if (vocesLoquendo.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Voces Loquendo';
+            vocesLoquendo.forEach(voz => {
+                const option = document.createElement('option');
+                option.value = voz.id;
+                option.textContent = voz.nombre;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+        }
+        
+        if (vocesAcapella.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Voces Acapella';
+            vocesAcapella.forEach(voz => {
+                const option = document.createElement('option');
+                option.value = voz.id;
+                option.textContent = voz.nombre;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+        }
+        
+        if (vocesMicrosoft.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Voces Microsoft';
+            vocesMicrosoft.forEach(voz => {
+                const option = document.createElement('option');
+                option.value = voz.id;
+                option.textContent = voz.nombre;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+        }
+        
+        if (vocesOtras.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Otras Voces';
+            vocesOtras.forEach(voz => {
+                const option = document.createElement('option');
+                option.value = voz.id;
+                option.textContent = voz.nombre;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+        }
+        
+        if (select.options.length > 0) select.selectedIndex = 0;
+        select.disabled = false;
+        console.log(`✅ ${data.total} voces cargadas`);
+        notificar('success', `${data.total} voces detectadas`);
+        
+    } catch (error) {
+        console.error('Error cargando voces:', error);
+        select.innerHTML = '<option value="">Error al detectar voces</option>';
+        select.disabled = false;
+        notificar('error', 'No se pudieron detectar las voces');
     }
 }
 
-function abrirEnlaceExterno(url) {
-    if (typeof require !== 'undefined') {
-        try {
-            const { shell } = require('electron');
-            shell.openExternal(url);
-            console.log('✅ Enlace abierto en navegador externo:', url);
-        } catch (e) {
-            console.error('❌ Error al abrir enlace:', e);
-            window.open(url, '_blank');
+// ==========================================
+// 1.6 CORREGIR TEXTO CON LANGUAGETOOL
+// ==========================================
+async function corregirTexto() {
+    const textarea = document.getElementById('resultado');
+    const textoOriginal = textarea?.value || '';
+    
+    if (!textoOriginal.trim()) {
+        notificar('warning', 'Primero escribe algo');
+        return;
+    }
+    
+    const btn = document.getElementById('btnCorregirTexto');
+    const textoBtnOriginal = btn ? btn.innerText : 'Corregir Texto';
+    
+    if (btn) { btn.innerText = 'Corrigiendo...'; btn.disabled = true; }
+    
+    try {
+        notificar('info', 'Analizando ortografía y gramática...');
+        
+        const res = await fetch(`${API_BASE}/api/corregir-texto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto: textoOriginal })
+        });
+        
+        const data = await res.json();
+        
+        if (data.error) {
+            notificar('error', 'Error: ' + data.error);
+            return;
         }
-    } else {
-        window.open(url, '_blank');
+        
+        if (textarea) textarea.value = data.textoCorregido;
+        
+        if (data.totalCorrecciones > 0) {
+            notificar('success', `${data.totalCorrecciones} correcciones aplicadas`);
+            console.log('Correcciones:', data.correcciones);
+        } else {
+            notificar('info', 'No se encontraron errores');
+        }
+        
+    } catch (error) {
+        console.error('Error corrigiendo:', error);
+        notificar('error', 'Error de conexión con LanguageTool');
+    } finally {
+        if (btn) { btn.innerText = textoBtnOriginal; btn.disabled = false; }
     }
 }
 
@@ -139,7 +252,7 @@ function optimizar() {
     let texto = entradaInput.value.trim();
     const modo = modoSelect?.value || "normal";
     
-    if (window.dictionaryEditor) {
+    if (window.dictionaryEditor && typeof window.dictionaryEditor.applyToText === 'function') {
         const opciones = {
             fonetica: document.getElementById("chkLoquendo")?.checked || false,
             jergas: document.getElementById("chkNeutro")?.checked || false,
@@ -179,72 +292,10 @@ function optimizar() {
         salida.value = textoFinal;
         asegurarEditable(salida);
     }
-    console.log(`✅ Texto optimizado. Modo: ${modo}`);
-    notificar('success', ' Texto optimizado correctamente');
+    console.log(`Texto optimizado. Modo: ${modo}`);
+    notificar('success', 'Texto optimizado correctamente');
 }
-// ==========================================
-// INSERTAR ETIQUETAS EN EL TEXTO
-// ==========================================
-function insertarEtiqueta() {
-    const selector = document.getElementById('tagSelector');
-    const textarea = document.getElementById('textoEntrada');
-    
-    if (!selector || !textarea) return;
-    
-    const etiqueta = selector.value;
-    if (!etiqueta) return;
-    
-    // Obtener la posición actual del cursor
-    const inicio = textarea.selectionStart;
-    const fin = textarea.selectionEnd;
-    const textoSeleccionado = textarea.value.substring(inicio, fin);
-    
-    let textoInsertar = '';
-    
-    switch (etiqueta) {
-        case 'pause':
-            textoInsertar = '[pause]';
-            break;
-        case 'pause:1000':
-            textoInsertar = '[pause:1000]';
-            break;
-        case 'slow':
-            textoInsertar = textoSeleccionado ? `[slow]${textoSeleccionado}[/slow]` : '[slow]texto lento[/slow]';
-            break;
-        case 'fast':
-            textoInsertar = textoSeleccionado ? `[fast]${textoSeleccionado}[/fast]` : '[fast]texto rápido[/fast]';
-            break;
-        case 'soft':
-            textoInsertar = textoSeleccionado ? `[soft]${textoSeleccionado}[/soft]` : '[soft]texto suave[/soft]';
-            break;
-        case 'loud':
-            textoInsertar = textoSeleccionado ? `[loud]${textoSeleccionado}[/loud]` : '[loud]texto fuerte[/loud]';
-            break;
-        case 'emphasis':
-            textoInsertar = textoSeleccionado ? `[emphasis]${textoSeleccionado}[/emphasis]` : '[emphasis]¡Importante![/emphasis]';
-            break;
-        case 'spell':
-            textoInsertar = textoSeleccionado ? `[spell]${textoSeleccionado}[/spell]` : '[spell]HOLA[/spell]';
-            break;
-        case 'voz':
-            textoInsertar = textoSeleccionado ? `[voz:Loquendo Carlos]${textoSeleccionado}[/voz]` : '[voz:Loquendo Carlos]texto[/voz]';
-            break;
-    }
-    
-    // Insertar el texto en la posición del cursor
-    textarea.value = textarea.value.substring(0, inicio) + textoInsertar + textarea.value.substring(fin);
-    
-    // Colocar el cursor después del texto insertado
-    const nuevaPosicion = inicio + textoInsertar.length;
-    textarea.focus();
-    textarea.setSelectionRange(nuevaPosicion, nuevaPosicion);
-    
-    // Resetear el selector
-    selector.value = '';
-    
-    // Mostrar notificación
-    notificar('info', `✅ Etiqueta [${etiqueta}] insertada`);
-}
+
 // ==========================================
 // 3. GENERACIÓN DE AUDIO
 // ==========================================
@@ -259,31 +310,30 @@ async function generarAudio(event) {
     const textoFinal = resultado ? resultado.value : "";
 
     if (!textoFinal || textoFinal === "El texto aparecerá aquí...") {
-        notificar('warning', ' Primero debes automatizar un texto.');
+        notificar('warning', 'Primero debes automatizar un texto.');
         return;
     }
 
-    if (btn) { btn.innerText = "Procesando Pipeline... "; btn.disabled = true; }
+    if (btn) { btn.innerText = "Procesando Pipeline..."; btn.disabled = true; }
 
     try {
-        // ✅ Obtener el estado de las opciones
         const opciones = {
             jergas: document.getElementById("chkNeutro")?.checked || false,
             fonetica: document.getElementById("chkLoquendo")?.checked || false,
             sinonimos: document.getElementById("chkSinonimos")?.checked || false
         };
 
-        notificar('info', ' Generando audio...');
+        notificar('info', 'Generando audio...');
 
         const respuesta = await fetch(`${API_BASE}/api/generar-audio`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 texto: textoFinal,
-                voz: vozSelect?.value || 'Loquendo Jorge',
+                voz: vozSelect?.value || 'Jorge',
                 usarIA: chkSRT?.checked || false,
                 modo: modoSelect?.value || 'normal',
-                opciones: opciones  // ✅ Enviar opciones al backend
+                opciones: opciones
             })
         });
 
@@ -299,11 +349,11 @@ async function generarAudio(event) {
             notificar('success', 'Audio generado correctamente');
         } else {
             const errorData = await respuesta.json();
-            notificar('error', ' Error: ' + (errorData.error || 'El servidor falló'));
+            notificar('error', 'Error: ' + (errorData.error || 'El servidor falló'));
         }
     } catch (error) {
         console.error("Error fatal en red:", error);
-        notificar('error', ' No hay conexión con la API. ¿Prendiste el servidor?');
+        notificar('error', 'No hay conexión con la API. ¿Prendiste el servidor?');
     } finally {
         if (btn) { btn.innerText = "Generar Audio Loquendo"; btn.disabled = false; }
         asegurarEditable(resultado);
@@ -313,32 +363,34 @@ async function generarAudio(event) {
 }
 
 async function automatizarTodo() {
-    notificar('info', ' Iniciando proceso maestro...');
+    notificar('info', 'Iniciando proceso maestro...');
     optimizar();
     await new Promise(resolve => setTimeout(resolve, 100));
     await generarAudio();
 }
 
 // ==========================================
-// 4. GENERACIÓN DE SUBTÍTULOS BAJO DEMANDA
+// 4. SUBTÍTULOS
 // ==========================================
 async function generarYDescargarSRT() {
     const audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
     const textoOriginal = document.getElementById('resultado')?.value || '';
+    const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
+
     if (!audioPath) { 
         notificar('warning', 'Genera un audio primero.');
         return; 
     }
 
     const btn = document.getElementById('btnGenerarSRT');
-    if (btn) { btn.innerText = " Generando SRT..."; btn.disabled = true; }
+    if (btn) { btn.innerText = "Generando SRT..."; btn.disabled = true; }
 
     try {
-        notificar('info', ' Generando SRT...');
+        notificar('info', `Generando SRT con ${maxPalabras} palabras...`);
         const res = await fetch(`${API_BASE}/api/generar-srt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audioPath, textoOriginal })
+            body: JSON.stringify({ audioPath, textoOriginal, maxPalabras: parseInt(maxPalabras) })
         });
         const data = await res.json();
         if (res.ok) {
@@ -349,14 +401,14 @@ async function generarYDescargarSRT() {
                 link.style.display = 'inline-flex';
                 link.click();
             }
-            notificar('success', ' SRT generado y descargado');
+            notificar('success', 'SRT generado y descargado');
         } else {
-            notificar('error', '❌ Error: ' + data.error);
+            notificar('error', 'Error: ' + data.error);
         }
     } catch (error) {
-        notificar('error', '❌ Error de conexión al generar SRT');
+        notificar('error', 'Error de conexión al generar SRT');
     } finally {
-        if (btn) { btn.innerText = " Generar y Descargar SRT"; btn.disabled = false; }
+        if (btn) { btn.innerText = "Generar SRT"; btn.disabled = false; }
     }
 }
 
@@ -364,12 +416,13 @@ async function generarYDescargarASS() {
     const audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
     const textoOriginal = document.getElementById('resultado')?.value || '';
     const modo = document.getElementById('modo')?.value || 'normal';
+    const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
     const linkSRT = document.getElementById('btnDescargaSRT');
     const srtPath = (linkSRT && linkSRT.href && !linkSRT.href.startsWith('blob:')) 
                     ? linkSRT.href.replace(API_BASE, '').split('?')[0] : null;
 
     if (!audioPath) { 
-        notificar('warning', ' Genera un audio primero.');
+        notificar('warning', 'Genera un audio primero.');
         return; 
     }
 
@@ -377,11 +430,11 @@ async function generarYDescargarASS() {
     if (btn) { btn.innerText = "Generando ASS..."; btn.disabled = true; }
 
     try {
-        notificar('info', ' Generando ASS...');
+        notificar('info', `Generando ASS con ${maxPalabras} palabras...`);
         const res = await fetch(`${API_BASE}/api/generar-ass`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audioPath, textoOriginal, modo, srtPath })
+            body: JSON.stringify({ audioPath, textoOriginal, modo, srtPath, maxPalabras: parseInt(maxPalabras) })
         });
         const data = await res.json();
         if (res.ok) {
@@ -392,14 +445,14 @@ async function generarYDescargarASS() {
                 link.style.display = 'inline-flex';
                 link.click();
             }
-            notificar('success', ' ASS generado y descargado');
+            notificar('success', 'ASS generado y descargado');
         } else {
-            notificar('error', ' Error: ' + data.error);
+            notificar('error', 'Error: ' + data.error);
         }
     } catch (error) {
-        notificar('error', ' Error de conexión al generar ASS');
+        notificar('error', 'Error de conexión al generar ASS');
     } finally {
-        if (btn) { btn.innerText = " Generar y Descargar ASS"; btn.disabled = false; }
+        if (btn) { btn.innerText = "Generar ASS"; btn.disabled = false; }
     }
 }
 
@@ -411,7 +464,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
     const input = document.getElementById(inputId);
     
     if (!input || !input.files || input.files.length === 0) {
-        notificar('warning', ` Selecciona una imagen ${tipo} antes de subirla.`);
+        notificar('warning', `Selecciona una imagen ${tipo} antes de subirla.`);
         return;
     }
     
@@ -419,7 +472,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
     formData.append(tipo, input.files[0]);
     
     try {
-        notificar('info', ` Subiendo imagen ${tipo}...`);
+        notificar('info', `Subiendo imagen ${tipo}...`);
         const res = await fetch(`${API_BASE}/api/upload-pngtuber`, { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al subir');
@@ -443,7 +496,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
 async function generarVideoPNGTuber() {
     let audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
     if (!audioPath || audioPath.startsWith('blob:')) {
-        notificar('warning', '⚠️ Primero genera un audio válido (no ediciones temporales).');
+        notificar('warning', 'Primero genera un audio válido (no ediciones temporales).');
         return;
     }
     
@@ -452,12 +505,12 @@ async function generarVideoPNGTuber() {
     const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Generar Video PNGTuber';
     
     if (btnVideo) {
-        btnVideo.innerText = '⏳ Procesando video...';
+        btnVideo.innerText = 'Procesando video...';
         btnVideo.disabled = true;
     }
     
     try {
-        notificar('info', '⏳ Procesando video...');
+        notificar('info', 'Procesando video...');
         const res = await fetch(`${API_BASE}/api/generar-video-pngtuber`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -469,7 +522,7 @@ async function generarVideoPNGTuber() {
         });
         const data = await res.json();
         if (res.ok) {
-            notificar('success', '✅ ¡Video PNGTuber generado con éxito!');
+            notificar('success', '¡Video PNGTuber generado con éxito!');
             const link = document.createElement('a');
             link.href = `${API_BASE}${data.video}`;
             link.download = 'video_pngtuber.mp4';
@@ -477,11 +530,11 @@ async function generarVideoPNGTuber() {
             link.click();
             document.body.removeChild(link);
         } else {
-            notificar('error', '❌ Error: ' + (data.error || 'Desconocido'));
+            notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     } catch (error) {
         console.error('Error generando video:', error);
-        notificar('error', '❌ Error de conexión al generar video.');
+        notificar('error', 'Error de conexión al generar video.');
     } finally {
         if (btnVideo) {
             btnVideo.innerText = textoOriginalBtn;
@@ -489,20 +542,21 @@ async function generarVideoPNGTuber() {
         }
     }
 }
+
 // ==========================================
-// 6. AUDIO AVANZADO (MÚSICA, DUCKING, MP3)
+// 6. AUDIO AVANZADO
 // ==========================================
 function subirMusicaFondo() {
     const input = document.getElementById('backgroundMusicInput');
     if (!input || !input.files || input.files.length === 0) {
-        notificar('warning', '⚠️ Selecciona un archivo de audio primero.');
+        notificar('warning', 'Selecciona un archivo de audio primero.');
         return;
     }
     
     const formData = new FormData();
     formData.append('music', input.files[0]);
     
-    notificar('info', '⏳ Subiendo música...');
+    notificar('info', 'Subiendo música...');
     
     fetch(`${API_BASE}/api/upload-music`, { method: 'POST', body: formData })
     .then(response => response.json())
@@ -512,21 +566,19 @@ function subirMusicaFondo() {
             if (window.audioEditor && typeof window.audioEditor.cargarMusica === 'function') {
                 window.audioEditor.cargarMusica(`${API_BASE}${data.url}`);
             }
-            notificar('success', '✅ Música de fondo subida');
+            notificar('success', 'Música de fondo subida');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        notificar('error', '❌ Error al subir música');
+        notificar('error', 'Error al subir música');
     });
 }
 
-// Función para recargar el audio si se queda en blanco
 function recargarAudio() {
     if (window.audioEditor && window.audioEditor._currentUrl) {
         window.audioEditor.cargarAudio(window.audioEditor._currentUrl);
-        console.log('Audio recargado');
-        notificar('success', ' Audio recargado');
+        notificar('success', 'Audio recargado');
     }
 }
 
@@ -535,15 +587,15 @@ function aplicarDucking() {
     const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || (btnDescargar ? btnDescargar.href : '') || '';
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
-        notificar('warning', '⚠️ Primero genera un audio de voz.');
+        notificar('warning', 'Primero genera un audio de voz.');
         return;
     }
     if (voiceAudioPath.startsWith('blob:')) {
-        notificar('warning', '⚠️ El audio actual es una versión editada temporal. Genera uno nuevo primero.');
+        notificar('warning', 'El audio actual es una versión editada temporal.');
         return;
     }
     if (!musicaFondoPath) {
-        notificar('warning', '⚠️ Primero sube una música de fondo.');
+        notificar('warning', 'Primero sube una música de fondo.');
         return;
     }
     
@@ -572,7 +624,7 @@ function aplicarDucking() {
         fadeOutMusic: parseFloat(fadeOutInput?.value || '3') || 3
     };
     
-    notificar('info', '⏳ Aplicando Ducking...');
+    notificar('info', 'Aplicando Ducking...');
     
     fetch(`${API_BASE}/api/audio/apply-ducking`, {
         method: 'POST',
@@ -583,7 +635,7 @@ function aplicarDucking() {
     .then((data) => {
         if (data.url) {
             voiceAudioRealPath = data.url;
-            window.voiceAudioRealPath = data.url; // ✅ También actualizar la variable global
+            window.voiceAudioRealPath = data.url;
             
             if (btnDescargar) {
                 btnDescargar.href = `${API_BASE}${data.url}`;
@@ -597,41 +649,40 @@ function aplicarDucking() {
             if (typeof window.cargarYReproducir === 'function') {
                 window.cargarYReproducir(data.url);
             }
-            notificar('success', ' Ducking aplicado correctamente.');
+            notificar('success', 'Ducking aplicado correctamente.');
         } else {
-            notificar('error', ' Error: ' + (data.error || 'Desconocido'));
+            notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        notificar('error', ' Error de conexión al aplicar ducking');
+        notificar('error', 'Error de conexión al aplicar ducking');
     });
 }
+
 function subirVolumenMusica() { if (window.audioEditor) window.audioEditor.subirVolumen(10); }
 function bajarVolumenMusica() { if (window.audioEditor) window.audioEditor.bajarVolumen(10); }
 function mutearMusica() { if (window.audioEditor) window.audioEditor.mutear(); }
 function cambiarVolumenMusica(valor) { if (window.audioEditor) window.audioEditor.cambiarVolumenDesdeSlider(valor); }
 
 async function exportarAMp3() {
-    // ✅ CORREGIDO: Usar voiceAudioRealPath directamente
     const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || '';
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
-        notificar('warning', '⚠️ Primero genera un audio válido.');
+        notificar('warning', 'Primero genera un audio válido.');
         return;
     }
     if (voiceAudioPath.startsWith('blob:')) {
-        notificar('warning', '⚠️ El audio actual es temporal. Genera uno nuevo primero.');
+        notificar('warning', 'El audio actual es temporal. Genera uno nuevo primero.');
         return;
     }
     
     const btnMP3 = document.getElementById('btnExportarMP3');
     const textoOriginal = btnMP3 ? btnMP3.innerText : ' Exportar a MP3';
-    if (btnMP3) { btnMP3.innerText = '⏳ Convirtiendo...'; btnMP3.disabled = true; }
+    if (btnMP3) { btnMP3.innerText = 'Convirtiendo...'; btnMP3.disabled = true; }
     
     try {
-        notificar('info', '⏳ Convirtiendo a MP3...');
-        // ✅ CORREGIDO: Limpiar ruta correctamente
+        notificar('info', 'Convirtiendo a MP3...');
         let rutaLimpia = String(voiceAudioPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
         let originalLimpia = voiceAudioOriginalPath ? String(voiceAudioOriginalPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0] : null;
         
@@ -645,71 +696,138 @@ async function exportarAMp3() {
         if (respuesta.ok) {
             const urls = data.urls || (data.url ? [data.url] : []);
             if (urls.length === 0) {
-                notificar('error', '❌ Error: ' + (data.error || 'Desconocido'));
+                notificar('error', 'Error: ' + (data.error || 'Desconocido'));
             } else {
                 urls.forEach(item => {
                     const u = typeof item === 'string' ? item : item.url;
                     const tipo = typeof item === 'object' && item.type ? item.type : 'mp3';
                     const link = document.createElement('a');
-                    // ✅ CORREGIDO: Usar API_BASE en la URL
                     link.href = `${API_BASE}${u}`;
                     link.download = `audio_loquendo_${tipo}_${Date.now()}.mp3`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
                 });
-                notificar('success', '✅ Exportado a MP3 correctamente');
+                notificar('success', 'Exportado a MP3 correctamente');
             }
         } else {
-            notificar('error', '❌ Error: ' + (data.error || 'Desconocido'));
+            notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     } catch (error) {
         console.error('Error:', error);
-        notificar('error', '❌ Error de conexión al exportar');
+        notificar('error', 'Error de conexión al exportar');
     } finally {
         if (btnMP3) { btnMP3.innerText = textoOriginal; btnMP3.disabled = false; }
     }
 }
+
 // ==========================================
-// 7. ATAJOS DE TECLADO E INICIALIZACIÓN
+// 7. INSERTAR ETIQUETAS
+// ==========================================
+function insertarEtiqueta() {
+    const selector = document.getElementById('tagSelector');
+    const textarea = document.getElementById('textoEntrada');
+    if (!selector || !textarea) return;
+    
+    const etiqueta = selector.value;
+    if (!etiqueta) return;
+    
+    const inicio = textarea.selectionStart;
+    const fin = textarea.selectionEnd;
+    const textoSeleccionado = textarea.value.substring(inicio, fin);
+    
+    let textoInsertar = '';
+    let etiquetaPadre = etiqueta.includes(':') ? etiqueta.split(':')[0] : etiqueta;
+    
+    switch (etiquetaPadre) {
+        case 'pause': textoInsertar = etiqueta === 'pause' ? '[pause]' : `[${etiqueta}]`; break;
+        case 'slow': textoInsertar = textoSeleccionado ? `[${etiqueta}]${textoSeleccionado}[/slow]` : `[${etiqueta}]texto lento[/slow]`; break;
+        case 'fast': textoInsertar = textoSeleccionado ? `[${etiqueta}]${textoSeleccionado}[/fast]` : `[${etiqueta}]texto rápido[/fast]`; break;
+        case 'rate': textoInsertar = textoSeleccionado ? `[rate:+5]${textoSeleccionado}[/rate]` : '[rate:+5]texto[/rate]'; break;
+        case 'pitch': textoInsertar = textoSeleccionado ? `[${etiqueta}]${textoSeleccionado}[/pitch]` : `[${etiqueta}]texto[/pitch]`; break;
+        case 'soft': textoInsertar = textoSeleccionado ? `[soft]${textoSeleccionado}[/soft]` : '[soft]texto suave[/soft]'; break;
+        case 'loud': textoInsertar = textoSeleccionado ? `[loud]${textoSeleccionado}[/loud]` : '[loud]texto fuerte[/loud]'; break;
+        case 'vol': textoInsertar = textoSeleccionado ? `[${etiqueta}]${textoSeleccionado}[/vol]` : `[${etiqueta}]texto[/vol]`; break;
+        case 'emphasis': textoInsertar = textoSeleccionado ? `[emphasis]${textoSeleccionado}[/emphasis]` : '[emphasis]¡Importante![/emphasis]'; break;
+        case 'spell': textoInsertar = textoSeleccionado ? `[spell]${textoSeleccionado}[/spell]` : '[spell]HOLA[/spell]'; break;
+        case 'voz': textoInsertar = textoSeleccionado ? `[voz:Jorge]${textoSeleccionado}[/voz]` : '[voz:Jorge]texto[/voz]'; break;
+        default: textoInsertar = etiqueta;
+    }
+    
+    textarea.value = textarea.value.substring(0, inicio) + textoInsertar + textarea.value.substring(fin);
+    const nuevaPosicion = inicio + textoInsertar.length;
+    textarea.focus();
+    textarea.setSelectionRange(nuevaPosicion, nuevaPosicion);
+    
+    selector.value = '';
+    notificar('info', `Etiqueta [${etiqueta}] insertada`);
+}
+
+// ==========================================
+// 8. INSERTAR EXPRESIONES RÁPIDAS
+// ==========================================
+function insertarExpresionRapida() {
+    const selector = document.getElementById('expresionRapidaSelector');
+    const textarea = document.getElementById('textoEntrada');
+    if (!selector || !textarea) return;
+    
+    const expresion = selector.value;
+    if (!expresion) return;
+    
+    const expresionesMap = {
+        'hola': '¡Hola!', 'hey': '¡Hey!', 'buenos-dias': '¡Buenos días!',
+        'buenas-tardes': '¡Buenas tardes!', 'buenas-noches': '¡Buenas noches!',
+        'que-tal': '¿Qué tal?', 'como-estas': '¿Cómo estás?',
+        'que': '¿Qué?', 'como': '¿Cómo?', 'por-que': '¿Por qué?',
+        'cuando': '¿Cuándo?', 'donde': '¿Dónde?', 'quien': '¿Quién?',
+        'eh': 'Eh...', 'este': 'Este...', 'bueno': 'Bueno...',
+        'pues': 'Pues...', 'entonces': 'Entonces...', 'o sea': 'O sea...',
+        'mira': 'Mira...', 'oye': 'Oye...',
+        'wow': '¡Wow!', 'genial': '¡Genial!', 'increible': '¡Increíble!',
+        'no-way': '¡No way!', 'que-loco': '¡Qué loco!', 'en-serio': '¿En serio?',
+        'risa': '[laugh]', 'suspiro': '[sigh]', 'grito': '[scream]',
+        'llanto': '[cry]', 'susurro': '[whisper]', 'enojado': '[angry]',
+        'feliz': '[happy]', 'triste': '[sad]', 'sorpresa': '[surprise]', 'miedo': '[fear]'
+    };
+    
+    const textoInsertar = expresionesMap[expresion];
+    if (!textoInsertar) return;
+    
+    const inicio = textarea.selectionStart;
+    const fin = textarea.selectionEnd;
+    textarea.value = textarea.value.substring(0, inicio) + textoInsertar + textarea.value.substring(fin);
+    
+    const nuevaPosicion = inicio + textoInsertar.length;
+    textarea.focus();
+    textarea.setSelectionRange(nuevaPosicion, nuevaPosicion);
+    
+    selector.value = '';
+    notificar('info', `Expresión "${textoInsertar}" insertada`);
+}
+
+// ==========================================
+// 9. ATAJOS E INICIALIZACIÓN
 // ==========================================
 document.addEventListener('keydown', (e) => {
     const target = e.target;
     if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
     
-    if (e.code === 'Space') {
-        e.preventDefault();
-        if (window.audioEditor && window.audioEditor.wavesurfer) window.audioEditor.playPause();
-    }
-    if (e.code === 'Delete' || e.code === 'Backspace') {
-        if (window.audioEditor) window.audioEditor.eliminarSeleccion();
-    }
-    if (e.ctrlKey && e.code === 'KeyZ') {
-        e.preventDefault();
-        if (window.audioEditor) window.audioEditor.deshacer();
-    }
-    if (e.ctrlKey && e.code === 'KeyY') {
-        e.preventDefault();
-        if (window.audioEditor) window.audioEditor.rehacer();
-    }
-    if (e.code === 'KeyM') {
-        if (window.audioEditor) window.audioEditor.mutear();
-    }
-    
-    // ✅ Cerrar modales con tecla ESC
-    if (e.code === 'Escape') {
-        cerrarAyuda();
-        cerrarVentanaTesters();
-    }
+    if (e.code === 'Space') { e.preventDefault(); if (window.audioEditor && window.audioEditor.wavesurfer) window.audioEditor.playPause(); }
+    if (e.code === 'Delete' || e.code === 'Backspace') { if (window.audioEditor) window.audioEditor.eliminarSeleccion(); }
+    if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); if (window.audioEditor) window.audioEditor.deshacer(); }
+    if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); if (window.audioEditor) window.audioEditor.rehacer(); }
+    if (e.code === 'KeyM') { if (window.audioEditor) window.audioEditor.mutear(); }
+    if (e.code === 'Escape') { cerrarAyuda(); cerrarVentanaTesters(); }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    // ✅ Verificación segura
     if (window.dictionaryEditor && typeof window.dictionaryEditor.loadAll === 'function') {
         window.dictionaryEditor.loadAll();
-    } else {
-        console.warn('⚠️ dictionaryEditor no está disponible');
     }
+    
+    document.querySelectorAll('textarea').forEach(ta => {
+        ta.setAttribute('spellcheck', 'false');
+    });
     
     const resultado = document.getElementById("resultado");
     asegurarEditable(resultado);
@@ -726,49 +844,58 @@ document.addEventListener('DOMContentLoaded', () => {
             resultado.addEventListener(evt, () => asegurarEditable(resultado));
         });
     }
-    console.log(' Loquendo Studio cargado y listo');
-    notificar('success', ' Loquendo Studio listo para usar');
+    
+    // ✅ CARGAR VOCES DINÁMICAMENTE
+    cargarVoces();
+    
+    // ✅ CONTADOR DE CARACTERES
+    const textoEntrada = document.getElementById('textoEntrada');
+    const contador = document.getElementById('contadorCaracteres');
+    if (textoEntrada && contador) {
+        contador.innerText = `Caracteres: ${textoEntrada.value.length}`;
+        textoEntrada.addEventListener('input', () => {
+            const longitud = textoEntrada.value.length;
+            contador.innerText = `Caracteres: ${longitud}`;
+            contador.style.color = longitud > 3000 ? '#e74c3c' : '#888';
+        });
+    }
+    
+    // Checkbox de Expresiones Rápidas
+    const chkExpresionesRapidas = document.getElementById('chkExpresionesRapidas');
+    const expresionesRapidasContainer = document.getElementById('expresionesRapidasContainer');
+    if (chkExpresionesRapidas && expresionesRapidasContainer) {
+        chkExpresionesRapidas.addEventListener('change', () => {
+            expresionesRapidasContainer.style.display = chkExpresionesRapidas.checked ? 'block' : 'none';
+        });
+    }
+    
+    console.log('✅ Loquendo Studio cargado y listo');
+    notificar('success', 'Loquendo Studio listo para usar');
 });
 
 // ==========================================
-// 8. MODALES Y VENTANA DE TESTERS
+// 10. MODALES
 // ==========================================
-
-// Abrir modal de testers
 function abrirVentanaTesters() {
     const modal = document.getElementById('modalTesters');
     if (modal) modal.style.display = 'flex';
 }
 
-// Cerrar modal de testers
 function cerrarVentanaTesters() {
     const modal = document.getElementById('modalTesters');
     if (modal) modal.style.display = 'none';
 }
 
-// Ver reporte de un tester
-function verReporteTester(id) {
-    notificar('info', `📋 Mostrando reporte del Tester ${id}...`);
-    // Aquí puedes cargar los reportes desde tu backend
-    // fetch(`${API_BASE}/api/testers/${id}/reportes`)
-    //     .then(res => res.json())
-    //     .then(data => {
-    //         console.log('Reporte del tester:', data);
-    //     });
-}
-
-// Cerrar modal al hacer clic fuera
 document.addEventListener('click', (e) => {
     const modalAyuda = document.getElementById('modalAyuda');
     const modalTesters = document.getElementById('modalTesters');
-    
     if (modalAyuda && e.target === modalAyuda) cerrarAyuda();
     if (modalTesters && e.target === modalTesters) cerrarVentanaTesters();
 });
 
 // ==========================================
-// 9. ✅ EXPOSICIÓN GLOBAL DE FUNCIONES (CRÍTICO PARA EL HTML)
-// =========================================
+// 11. EXPOSICIÓN GLOBAL
+// ==========================================
 window.cambiarTema = cambiarTema;
 window.cambiarDiseno = cambiarDiseno;
 window.abrirAyuda = abrirAyuda;
@@ -791,8 +918,10 @@ window.generarYDescargarSRT = generarYDescargarSRT;
 window.generarYDescargarASS = generarYDescargarASS;
 window.abrirVentanaTesters = abrirVentanaTesters;
 window.cerrarVentanaTesters = cerrarVentanaTesters;
-window.verReporteTester = verReporteTester;
-window.notificar = notificar;
 window.insertarEtiqueta = insertarEtiqueta;
+window.insertarExpresionRapida = insertarExpresionRapida;
+window.notificar = notificar;
+window.cargarVoces = cargarVoces;
+window.corregirTexto = corregirTexto;
 
-console.log('Funciones expuestas globalmente. ¡Listo para usar!');
+console.log('✅ Funciones expuestas globalmente. ¡Listo para usar!');

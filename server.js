@@ -4,7 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const { spawn } = require('child_process'); // ✅ Agregado para ejecutar Python
+const { spawn } = require('child_process');
 
 // ==========================================
 // 1. DETECCIÓN DE ENTORNO Y RUTAS BASE
@@ -14,13 +14,24 @@ try { electronApp = require('electron').app; } catch (e) { electronApp = null; }
 
 const isPackaged = electronApp ? electronApp.isPackaged : (process.env.NODE_ENV === 'production');
 const ROOT_DIR = __dirname;
-const BACKEND_DIR = isPackaged ? process.resourcesPath : path.join(ROOT_DIR, 'backend');
-const FRONTEND_DIR = path.join(ROOT_DIR, 'frontend');
+
+// ✅ RUTAS ARREGLADAS para producción
+const BACKEND_DIR = isPackaged 
+    ? path.join(process.resourcesPath, 'backend') 
+    : path.join(ROOT_DIR, 'backend');
+
+const FRONTEND_DIR = isPackaged
+    ? path.join(process.resourcesPath, 'app.asar', 'frontend')
+    : path.join(ROOT_DIR, 'frontend');
 
 console.log('\n========================================');
 console.log('🚀 LOQUENDO STUDIO - INICIANDO SERVIDOR');
 console.log('========================================');
 console.log(`[Server] Entorno: ${isPackaged ? 'PRODUCCIÓN' : 'DESARROLLO'}`);
+console.log(`[Server] ROOT_DIR: ${ROOT_DIR}`);
+console.log(`[Server] BACKEND_DIR: ${BACKEND_DIR}`);
+console.log(`[Server] FRONTEND_DIR: ${FRONTEND_DIR}`);
+console.log(`[Server] resourcesPath: ${process.resourcesPath || 'N/A'}`);
 
 // ==========================================
 // 2. RUTAS CRÍTICAS
@@ -33,12 +44,92 @@ const audioFolder = path.join(BACKEND_DIR, 'public', 'audios');
 const pngtuberFolder = path.join(BACKEND_DIR, 'public', 'pngtuber');
 const PUBLIC_FOLDER = path.join(BACKEND_DIR, 'public');
 
+// ✅ RUTAS DE LANGUAGETOOL
+const javaPath = path.join(BACKEND_DIR, 'bin', 'jre', 'bin', 'java.exe');
+const ltJar = path.join(BACKEND_DIR, 'bin', 'languagetool', 'languagetool-server.jar');
+const LT_PORT = 8011;
+
 [audioFolder, pngtuberFolder, dbFolder].forEach(folder => {
     if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
 });
 
 const bundledPython = path.join(BACKEND_DIR, 'python', 'python.exe');
 const pythonCmd = fs.existsSync(bundledPython) ? bundledPython : 'python';
+
+// ✅ LOGS DE DIAGNÓSTICO
+console.log('\n[Server] Rutas configuradas:');
+console.log('  - ffmpeg:', ffmpegPath, '| Existe:', fs.existsSync(ffmpegPath));
+console.log('  - pythonSRT:', pythonSRT, '| Existe:', fs.existsSync(pythonSRT));
+console.log('  - pythonASS:', pythonASS, '| Existe:', fs.existsSync(pythonASS));
+console.log('  - python:', pythonCmd, '| Existe:', fs.existsSync(pythonCmd));
+console.log('  - java:', javaPath, '| Existe:', fs.existsSync(javaPath));
+console.log('  - languagetool:', ltJar, '| Existe:', fs.existsSync(ltJar));
+console.log('  - dbFolder:', dbFolder);
+console.log('  - audioFolder:', audioFolder);
+
+// ==========================================
+// 2.5 LANZAR LANGUAGETOOL LOCAL
+// ==========================================
+let languageToolProcess = null;
+
+function iniciarLanguageTool() {
+    if (!fs.existsSync(javaPath)) {
+        console.warn('[LanguageTool] JRE no encontrado. Corrección ortográfica desactivada.');
+        return;
+    }
+    
+    if (!fs.existsSync(ltJar)) {
+        console.warn('[LanguageTool] JAR no encontrado. Corrección ortográfica desactivada.');
+        return;
+    }
+    
+    console.log('[LanguageTool] Iniciando servidor en puerto', LT_PORT);
+    
+    languageToolProcess = spawn(javaPath, [
+        '-Xmx512m',
+        '-cp', ltJar,
+        'org.languagetool.server.HTTPServer',
+        '--port', String(LT_PORT),
+        '--allow-origin', '*',
+        '--public'
+    ], { 
+        windowsHide: true,
+        cwd: path.dirname(ltJar)
+    });
+    
+    languageToolProcess.stdout.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.log('[LanguageTool]', msg);
+    });
+    
+    languageToolProcess.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.log('[LanguageTool]', msg);
+    });
+    
+    languageToolProcess.on('close', (code) => {
+        console.log(`[LanguageTool] Servidor cerrado (código ${code})`);
+    });
+    
+    languageToolProcess.on('error', (err) => {
+        console.error('[LanguageTool] Error:', err.message);
+    });
+    
+    console.log('[LanguageTool] Servidor iniciado en http://localhost:' + LT_PORT);
+}
+
+// Cerrar LanguageTool al salir
+process.on('exit', () => {
+    if (languageToolProcess) {
+        console.log('[LanguageTool] Cerrando...');
+        languageToolProcess.kill();
+    }
+});
+
+process.on('SIGINT', () => {
+    if (languageToolProcess) languageToolProcess.kill();
+    process.exit();
+});
 
 // ==========================================
 // 3. CONFIGURACIÓN MULTER & EXPRESS
@@ -132,12 +223,137 @@ appExpress.delete('/api/jergas/:word', (req, res) => { dictService.eliminarEntra
 appExpress.delete('/api/sinonimos/:word', (req, res) => { dictService.eliminarEntrada('sinonimos', req.params.word); res.json({ mensaje: 'Entrada eliminada' }); });
 appExpress.delete('/api/diccionario', (req, res) => { dictService.limpiarTodo(); res.json({ mensaje: 'Diccionarios limpiados' }); });
 
-// ✅ 1. GENERAR AUDIO (SOLO AUDIO, SIN SRT/ASS)
+// ✅ NUEVO: LISTAR VOCES DISPONIBLES EN EL SISTEMA
+appExpress.get('/api/voces', async (req, res) => {
+    try {
+        const scriptVoces = path.join(BACKEND_DIR, 'modules', 'listar_voces.py');
+        
+        // Crear script si no existe
+        if (!fs.existsSync(scriptVoces)) {
+            const scriptContent = `# -*- coding: utf-8 -*-
+import win32com.client
+import json
+import sys
+
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+
+try:
+    speaker = win32com.client.Dispatch("SAPI.SpVoice")
+    voces = speaker.GetVoices()
+    resultado = []
+    for i in range(voces.Count):
+        desc = voces.Item(i).GetDescription()
+        resultado.append({"id": desc, "nombre": desc})
+    print(json.dumps(resultado, ensure_ascii=False))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+    sys.exit(1)
+`;
+            fs.writeFileSync(scriptVoces, scriptContent, 'utf8');
+        }
+        
+        const resultado = await new Promise((resolve, reject) => {
+            const proceso = spawn(pythonCmd, [scriptVoces], { windowsHide: true });
+            let stdout = '';
+            let stderr = '';
+            
+            proceso.stdout.on('data', (data) => { stdout += data.toString(); });
+            proceso.stderr.on('data', (data) => { stderr += data.toString(); });
+            
+            proceso.on('close', (code) => {
+                if (code === 0 && stdout) {
+                    try {
+                        resolve(JSON.parse(stdout.trim()));
+                    } catch (e) {
+                        reject(new Error('Error parseando JSON: ' + stdout));
+                    }
+                } else {
+                    reject(new Error(stderr || 'Error ejecutando Python'));
+                }
+            });
+            
+            proceso.on('error', reject);
+        });
+        
+        if (resultado.error) {
+            return res.status(500).json({ error: resultado.error });
+        }
+        
+        res.json({ voces: resultado, total: resultado.length });
+        
+    } catch (error) {
+        console.error('❌ Error listando voces:', error.message);
+        res.status(500).json({ error: 'No se pudieron detectar las voces', detalles: error.message });
+    }
+});
+
+// ✅ NUEVO: CORREGIR TEXTO CON LANGUAGETOOL
+appExpress.post('/api/corregir-texto', async (req, res) => {
+    const { texto } = req.body;
+    
+    if (!texto || texto.trim() === '') {
+        return res.status(400).json({ error: 'Texto vacío' });
+    }
+    
+    try {
+        const response = await fetch(`http://localhost:${LT_PORT}/v2/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                text: texto,
+                language: 'es',
+                enabledOnly: 'false'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`LanguageTool respondió ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        let textoCorregido = texto;
+        const correcciones = [];
+        
+        const matches = [...data.matches].sort((a, b) => b.offset - a.offset);
+        
+        for (const match of matches) {
+            if (match.replacements && match.replacements.length > 0) {
+                const reemplazo = match.replacements[0].value;
+                textoCorregido = 
+                    textoCorregido.substring(0, match.offset) + 
+                    reemplazo + 
+                    textoCorregido.substring(match.offset + match.length);
+                
+                correcciones.push({
+                    original: match.context.text.substring(match.context.offset, match.context.offset + match.context.length),
+                    corregido: reemplazo,
+                    mensaje: match.message,
+                    tipo: match.rule.issueType
+                });
+            }
+        }
+        
+        res.json({
+            textoOriginal: texto,
+            textoCorregido,
+            correcciones,
+            totalCorrecciones: correcciones.length
+        });
+        
+    } catch (error) {
+        console.error('[LanguageTool] Error:', error.message);
+        res.status(500).json({ error: 'Error al corregir texto', detalles: error.message });
+    }
+});
+
+// ✅ 1. GENERAR AUDIO
 appExpress.post('/api/generar-audio', async (req, res) => {
-    const { texto, voz, modo, opciones } = req.body; // ✅ Agregamos opciones
+    const { texto, voz, modo, opciones } = req.body;
     if (!texto || texto.trim() === '') return res.status(400).json({ error: 'Texto vacío' });
     try {
-        // ✅ Pasamos las opciones al servicio de audio
         const resultado = await audioService.procesar(texto, voz, false, dictService, modo, opciones);
         res.json(resultado);
     } catch (error) {
@@ -146,17 +362,21 @@ appExpress.post('/api/generar-audio', async (req, res) => {
     }
 });
 
-// ✅ 2. GENERAR SRT BAJO DEMANDA
+// ✅ 2. GENERAR SRT
 appExpress.post('/api/generar-srt', async (req, res) => {
-    const { audioPath, textoOriginal } = req.body;
+    const { audioPath, textoOriginal, maxPalabras } = req.body;
     const audioLimpio = sanitizarRutaAudio(audioPath);
     if (!audioLimpio) return res.status(403).json({ error: 'Ruta de audio no permitida' });
 
     const nombreSRT = `subtitulos-${Date.now()}.srt`;
     const rutaSRT = path.join(audioFolder, nombreSRT);
     const audioAbsoluto = path.join(PUBLIC_FOLDER, audioLimpio);
+    const palabrasMax = parseInt(maxPalabras) || 7;
 
-    const proceso = spawn(pythonCmd, [pythonSRT, audioAbsoluto, rutaSRT, textoOriginal || ''], { windowsHide: true });
+    const proceso = spawn(pythonCmd, [
+        pythonSRT, audioAbsoluto, rutaSRT, textoOriginal || '', String(palabrasMax)
+    ], { windowsHide: true });
+    
     let stderr = '';
     proceso.stderr.on('data', (data) => { stderr += data.toString(); });
 
@@ -169,15 +389,16 @@ appExpress.post('/api/generar-srt', async (req, res) => {
     });
 });
 
-// ✅ 3. GENERAR ASS BAJO DEMANDA (Genera SRT primero si no se pasa uno)
+// ✅ 3. GENERAR ASS
 appExpress.post('/api/generar-ass', async (req, res) => {
-    const { audioPath, textoOriginal, modo, srtPath } = req.body;
+    const { audioPath, textoOriginal, modo, srtPath, maxPalabras } = req.body;
     const audioLimpio = sanitizarRutaAudio(audioPath);
     if (!audioLimpio) return res.status(403).json({ error: 'Ruta de audio no permitida' });
 
     const nombreASS = `subtitulos-${Date.now()}.ass`;
     const rutaASS = path.join(audioFolder, nombreASS);
     const audioAbsoluto = path.join(PUBLIC_FOLDER, audioLimpio);
+    const palabrasMax = parseInt(maxPalabras) || 7;
 
     let rutaSRTAbsoluta = null;
     let nombreSRTFinal = null;
@@ -211,20 +432,22 @@ appExpress.post('/api/generar-ass', async (req, res) => {
             nombreSRTFinal = srtLimpio.split('/').pop();
             ejecutarASS(rutaSRTAbsoluta);
         } else {
-            ejecutarASS(null); // Si la ruta SRT es inválida, que Whisper lo haga solo
+            ejecutarASS(null);
         }
     } else {
-        // Generar SRT primero
         const nombreSRTTemp = `subtitulos-temp-${Date.now()}.srt`;
         rutaSRTAbsoluta = path.join(audioFolder, nombreSRTTemp);
         nombreSRTFinal = nombreSRTTemp;
 
-        const procesoSRT = spawn(pythonCmd, [pythonSRT, audioAbsoluto, rutaSRTAbsoluta, textoOriginal || ''], { windowsHide: true });
+        const procesoSRT = spawn(pythonCmd, [
+            pythonSRT, audioAbsoluto, rutaSRTAbsoluta, textoOriginal || '', String(palabrasMax)
+        ], { windowsHide: true });
+        
         procesoSRT.on('close', (code) => {
             if (code === 0 && fs.existsSync(rutaSRTAbsoluta)) {
                 ejecutarASS(rutaSRTAbsoluta);
             } else {
-                ejecutarASS(null); // Fallback a Whisper directo
+                ejecutarASS(null);
             }
         });
     }
@@ -344,8 +567,16 @@ appExpress.use((err, req, res, next) => {
 // ==========================================
 function startServer(port = 3000) {
     const server = appExpress.listen(port, () => {
-        console.log(`✅ Servidor escuchando en: http://localhost:${port}`);
+        console.log(`\n✅ Servidor escuchando en: http://localhost:${port}`);
         console.log(`📁 ffmpeg: ${fs.existsSync(ffmpegPath) ? '✅' : '❌'}`);
+        console.log(`🐍 python: ${fs.existsSync(pythonCmd) ? '✅' : '❌'}`);
+        console.log(`☕ java: ${fs.existsSync(javaPath) ? '✅' : '❌'}`);
+        console.log(`📝 LanguageTool: ${fs.existsSync(ltJar) ? '✅' : '❌'}\n`);
+        
+        // Lanzar LanguageTool después de iniciar el servidor
+        setTimeout(() => {
+            iniciarLanguageTool();
+        }, 1500);
     }).on('error', (err) => {
         if (err.code === 'EADDRINUSE') startServer(port + 1);
         else { console.error('❌ Error del servidor:', err); process.exit(1); }

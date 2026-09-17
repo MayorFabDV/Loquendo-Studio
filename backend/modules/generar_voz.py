@@ -10,22 +10,102 @@ if sys.platform == "win32":
 
 
 def convertir_tags_textaloud_a_ssml(texto):
+    """
+    Convierte etiquetas de texto a SSML para SAPI.
+    
+    Etiquetas soportadas:
+    - [pause] / [pause:1000] - Pausa (ms)
+    - [slow]texto[/slow] / [slow:5]texto[/slow] - Lento (1-10)
+    - [fast]texto[/fast] / [fast:3]texto[/fast] - Rápido (1-10)
+    - [rate:+5]texto[/rate] - Velocidad personalizada (-10 a +10)
+    - [pitch:+5]texto[/pitch] - Tono personalizado (-10 a +10)
+    - [soft]texto[/soft] - Volumen bajo (25%)
+    - [loud]texto[/loud] - Volumen alto (100%)
+    - [vol:50]texto[/vol] - Volumen personalizado (0-100)
+    - [emphasis]texto[/emphasis] - Énfasis
+    - [spell]texto[/spell] - Deletrear
+    - [voz:nombre]texto[/voz] - Cambiar voz
+    - [laugh] / [sigh] / [scream] / [cry] / [whisper] - Expresiones
+    """
+    
+    # ============================================================
+    # PAUSAS
+    # ============================================================
     texto = re.sub(r'\[pause:(\d+)\]', r'<silence msec="\1"/>', texto)
     texto = re.sub(r'\[pause\]', r'<silence msec="500"/>', texto)
+    
+    # ============================================================
+    # VELOCIDAD (slow/fast/rate)
+    # ============================================================
+    texto = re.sub(
+        r'\[slow:(\d+)\](.*?)\[/slow\]',
+        lambda m: f'<rate speed="-{min(int(m.group(1)), 10)}">{m.group(2)}</rate>',
+        texto, flags=re.DOTALL
+    )
     texto = re.sub(r'\[slow\](.*?)\[/slow\]', r'<rate speed="-3">\1</rate>', texto, flags=re.DOTALL)
+    
+    texto = re.sub(
+        r'\[fast:(\d+)\](.*?)\[/fast\]',
+        lambda m: f'<rate speed="{min(int(m.group(1)), 10)}">{m.group(2)}</rate>',
+        texto, flags=re.DOTALL
+    )
     texto = re.sub(r'\[fast\](.*?)\[/fast\]', r'<rate speed="2">\1</rate>', texto, flags=re.DOTALL)
+    
+    texto = re.sub(
+        r'\[rate:([+-]?\d+)\](.*?)\[/rate\]',
+        lambda m: f'<rate speed="{max(-10, min(10, int(m.group(1))))}">{m.group(2)}</rate>',
+        texto, flags=re.DOTALL
+    )
+    
+    # ============================================================
+    # TONO (pitch)
+    # ============================================================
+    texto = re.sub(
+        r'\[pitch:([+-]?\d+)\](.*?)\[/pitch\]',
+        lambda m: f'<pitch middle="{max(-10, min(10, int(m.group(1))))}">{m.group(2)}</pitch>',
+        texto, flags=re.DOTALL
+    )
+    
+    # ============================================================
+    # VOLUMEN
+    # ============================================================
     texto = re.sub(r'\[soft\](.*?)\[/soft\]', r'<volume level="25">\1</volume>', texto, flags=re.DOTALL)
     texto = re.sub(r'\[loud\](.*?)\[/loud\]', r'<volume level="100">\1</volume>', texto, flags=re.DOTALL)
+    texto = re.sub(
+        r'\[vol:(\d+)\](.*?)\[/vol\]',
+        lambda m: f'<volume level="{max(0, min(100, int(m.group(1))))}">{m.group(2)}</volume>',
+        texto, flags=re.DOTALL
+    )
+    
+    # ============================================================
+    # ÉNFASIS Y DELETREO
+    # ============================================================
     texto = re.sub(r'\[emphasis\](.*?)\[/emphasis\]', r'<emph>\1</emph>', texto, flags=re.DOTALL)
     texto = re.sub(r'\[spell\](.*?)\[/spell\]', r'<spell>\1</spell>', texto, flags=re.DOTALL)
+    
+    # ============================================================
+    # EXPRESIONES
+    # ============================================================
+    texto = re.sub(r'\[laugh\](.*?)\[/laugh\]', r'<emph>\1</emph>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[sigh\](.*?)\[/sigh\]', r'<break time="500ms"/>\1', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[scream\](.*?)\[/scream\]', r'<volume level="100"><rate speed="3">\1</rate></volume>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[cry\](.*?)\[/cry\]', r'<volume level="40"><rate speed="-2">\1</rate></volume>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[whisper\](.*?)\[/whisper\]', r'<volume level="15">\1</volume>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[angry\](.*?)\[/angry\]', r'<volume level="90"><rate speed="2">\1</rate></volume>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[happy\](.*?)\[/happy\]', r'<rate speed="1"><pitch middle="2">\1</pitch></rate>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[sad\](.*?)\[/sad\]', r'<rate speed="-2"><pitch middle="-2">\1</pitch></rate>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[surprise\](.*?)\[/surprise\]', r'<rate speed="3"><pitch middle="3">\1</pitch></rate>', texto, flags=re.DOTALL)
+    texto = re.sub(r'\[fear\](.*?)\[/fear\]', r'<volume level="60"><rate speed="2"><pitch middle="2">\1</pitch></rate></volume>', texto, flags=re.DOTALL)
+    
     return texto
 
 
 def limpiar_tags_para_subtitulos(texto):
+    """Limpia todas las etiquetas para generar subtítulos limpios."""
     texto = re.sub(r'<[^>]+>', '', texto)
     texto = re.sub(r'\[pause(?::\d+)?\]', ' ', texto)
-    texto = re.sub(r'\[\/(?:slow|fast|soft|loud|emphasis|spell)\]', '', texto)
-    texto = re.sub(r'\[(?:slow|fast|soft|loud|emphasis|spell)\]', '', texto)
+    texto = re.sub(r'\[\/(?:slow|fast|soft|loud|emphasis|spell|rate|pitch|vol|laugh|sigh|scream|cry|whisper|angry|happy|sad|surprise|fear)\]', '', texto)
+    texto = re.sub(r'\[(?:slow|fast|soft|loud|emphasis|spell|rate|pitch|vol|laugh|sigh|scream|cry|whisper|angry|happy|sad|surprise|fear)(?::[+-]?\d+)?\]', '', texto)
     texto = re.sub(r'\[voz:[^\]]+\]', '', texto)
     texto = re.sub(r'\[\/voz\]', '', texto)
     texto = re.sub(r'\s+', ' ', texto).strip()
@@ -33,30 +113,50 @@ def limpiar_tags_para_subtitulos(texto):
 
 
 def parsear_segmentos_voz(texto):
-    patron = r'\[voz:([^\]]+)\](.*?)(?=\[voz:|$)'
-    matches = re.findall(patron, texto, re.DOTALL)
+    """Parsea el texto y devuelve una lista de segmentos (nombre_voz, texto)."""
+    patron = r'\[voz:([^\]]+)\](.*?)\[\/voz\]'
+    matches = list(re.finditer(patron, texto, re.DOTALL))
     
     if not matches:
-        texto_limpio = re.sub(r'\[/?voz:[^\]]+\]', '', texto)
+        texto_limpio = re.sub(r'\[voz:[^\]]+\]', '', texto)
+        texto_limpio = re.sub(r'\[\/voz\]', '', texto_limpio)
         return [(None, texto_limpio)]
     
     resultado = []
-    for nombre_voz, texto_segmento in matches:
-        texto_limpio = texto_segmento.replace('[/voz]', '').strip()
-        if texto_limpio:
-            resultado.append((nombre_voz.strip(), texto_limpio))
+    pos_actual = 0
+    
+    for match in matches:
+        texto_antes = texto[pos_actual:match.start()].strip()
+        if texto_antes:
+            resultado.append((None, texto_antes))
+        
+        nombre_voz = match.group(1).strip()
+        texto_segmento = match.group(2).strip()
+        if texto_segmento:
+            resultado.append((nombre_voz, texto_segmento))
+        
+        pos_actual = match.end()
+    
+    texto_despues = texto[pos_actual:].strip()
+    if texto_despues:
+        resultado.append((None, texto_despues))
     
     return resultado
 
 
 def buscar_voz(speaker, nombre_busqueda):
+    """Busca una voz por nombre exacto o parcial."""
     nombre_busqueda = nombre_busqueda.lower().strip()
     voces = speaker.GetVoices()
     
     for i in range(voces.Count):
         desc = voces.Item(i).GetDescription()
-        desc_lower = desc.lower()
-        if nombre_busqueda in desc_lower or desc_lower in nombre_busqueda:
+        if nombre_busqueda == desc.lower():
+            return voces.Item(i)
+    
+    for i in range(voces.Count):
+        desc = voces.Item(i).GetDescription()
+        if nombre_busqueda in desc.lower():
             return voces.Item(i)
     
     partes = nombre_busqueda.split()
@@ -94,21 +194,22 @@ def generar_audio_multivoz(texto_input, nombre_voz_default, ruta_salida_input):
             os.remove(ruta_absoluta)
             print("Archivo anterior eliminado")
         
-        # ============================================================
-        # FIX CRÍTICO: Setear voz ANTES de abrir el stream
-        # ============================================================
+        # VOZ POR DEFECTO
         voz_default = buscar_voz(speaker, nombre_voz_default)
         if voz_default:
             speaker.Voice = voz_default
             print(f"[OK] Voz por defecto: {voz_default.GetDescription()}")
         else:
-            print(f"[WARN] Voz '{nombre_voz_default}' no encontrada, usando predeterminada del sistema")
+            print(f"[WARN] Voz '{nombre_voz_default}' no encontrada, usando predeterminada")
+            voz_default = speaker.Voice
         
+        # Abrir stream
         stream = win32com.client.Dispatch("SAPI.SpFileStream")
         stream.Format.Type = 39  # 16kHz, 16-bit, mono
         stream.Open(ruta_absoluta, 3)
         speaker.AudioOutputStream = stream
         
+        # PROCESAR CADA SEGMENTO
         for i, (nombre_voz, texto_segmento) in enumerate(segmentos, 1):
             print(f"\n  Segmento {i}: voz='{nombre_voz or 'default'}'")
             
@@ -116,18 +217,25 @@ def generar_audio_multivoz(texto_input, nombre_voz_default, ruta_salida_input):
                 nueva_voz = buscar_voz(speaker, nombre_voz)
                 if nueva_voz:
                     speaker.Voice = nueva_voz
-                    print(f"  -> Cambiado a: {nueva_voz.GetDescription()}")
+                    print(f"  -> Voz cambiada a: {nueva_voz.GetDescription()}")
                 else:
-                    print(f"  [WARN] Voz '{nombre_voz}' no encontrada, usando actual")
+                    print(f"  [WARN] Voz '{nombre_voz}' no encontrada")
+            else:
+                if voz_default:
+                    speaker.Voice = voz_default
+                    print(f"  -> Voz restaurada a: {voz_default.GetDescription()}")
             
             texto_ssml = convertir_tags_textaloud_a_ssml(texto_segmento)
             tiene_xml = '<' in texto_ssml and '>' in texto_ssml
-            flags = 8 if tiene_xml else 0  # 8 = SVSFIsXML
+            flags = 8 if tiene_xml else 0
             
             if tiene_xml:
                 print(f"  [SSML] {texto_ssml[:80]}...")
             
             speaker.Speak(texto_ssml, flags)
+        
+        if voz_default:
+            speaker.Voice = voz_default
         
         stream.Close()
         pythoncom.CoUninitialize()

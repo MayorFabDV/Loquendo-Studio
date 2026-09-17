@@ -122,4 +122,4 @@ class TextProcessor {
 
 const textProcessor = new TextProcessor();
 window.textProcessor = textProcessor;
-console.log('📝 textProcessor.js cargado correctamente');
+console.log('textProcessor.js cargado correctamente');

@@ -5,12 +5,16 @@ const fs = require('fs');
 const http = require('http');
 
 // --- ARRANQUE DEL SERVIDOR EXPRESS ---
-// Requerir el servidor y obtener la instancia exportada para conocer el puerto real
 const serverModule = require('./server.js');
 
-// --- RUTAS DE CARPETAS (Corregido para Producción/Portable) ---
+// --- RUTAS DE CARPETAS (CORREGIDO) ---
 const isDev = !app.isPackaged;
-const __base = isDev ? __dirname : process.resourcesPath;
+
+// ✅ FIX: En producción, la base es resources/backend
+const __base = isDev 
+    ? __dirname 
+    : path.join(process.resourcesPath, 'backend');
+
 const audioFolder = path.join(__base, 'public', 'audios');
 const pngtuberFolder = path.join(__base, 'public', 'pngtuber');
 
@@ -20,8 +24,14 @@ const pngtuberFolder = path.join(__base, 'public', 'pngtuber');
 });
 
 // --- FUNCIÓN PARA ESPERAR AL SERVIDOR ---
-// Determinar puerto enlazado por el servidor (si está disponible)
-const BOUND_PORT = (serverModule && serverModule.server && serverModule.server.address && serverModule.server.address().port) || process.env.PORT || 3000;
+function getBoundPort() {
+    if (serverModule?.server?.address?.()) {
+        return serverModule.server.address().port;
+    }
+    return process.env.PORT || 3000;
+}
+
+let BOUND_PORT = getBoundPort();
 
 function waitForServer(maxAttempts = 20, delay = 500) {
     return new Promise((resolve, reject) => {
@@ -39,7 +49,14 @@ function waitForServer(maxAttempts = 20, delay = 500) {
                     setTimeout(check, delay);
                 }
             });
-            req.setTimeout(500, () => req.destroy());
+            req.setTimeout(500, () => {
+                req.destroy();
+                if (attempts >= maxAttempts) {
+                    reject(new Error('Timeout esperando al servidor'));
+                } else {
+                    setTimeout(check, delay);
+                }
+            });
         };
         check();
     });
@@ -49,13 +66,16 @@ function waitForServer(maxAttempts = 20, delay = 500) {
 let mainWindow;
 
 function createWindow() {
+    // ✅ FIX: El icono está dentro del asar, así que __dirname funciona
+    const iconPath = path.join(__dirname, 'frontend', 'img', 'logo.ico');
+    
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 900,
         minHeight: 600,
-        title: 'Loquendo Studio - Rango Leyenda',
-        icon: path.join(__base, 'img', 'logo.png'),
+        title: 'Loquendo Studio',
+        icon: fs.existsSync(iconPath) ? iconPath : undefined,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -86,7 +106,6 @@ function createWindow() {
 ipcMain.on('app-close', () => app.quit());
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 
-// ✅ NUEVO: Abrir enlaces en el navegador externo del sistema operativo (Para el botón de Ko-fi)
 ipcMain.on('abrir-enlace-externo', (event, url) => {
     shell.openExternal(url);
 });
@@ -95,6 +114,13 @@ ipcMain.on('abrir-enlace-externo', (event, url) => {
 app.whenReady().then(async () => {
     try {
         console.log('[MAIN] Esperando al servidor...');
+        
+        // ✅ FIX: Actualizar BOUND_PORT antes de esperar
+        setTimeout(() => {
+            BOUND_PORT = getBoundPort();
+            console.log(`[MAIN] Puerto detectado: ${BOUND_PORT}`);
+        }, 500);
+        
         await waitForServer();
         console.log('[MAIN] ✅ Backend listo, creando ventana...');
         createWindow();
@@ -114,13 +140,17 @@ app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-
-// --- LIMPIEZA TOTAL AL CERRAR ---
+// --- LIMPIEZA TOTAL AL CERRAR (CORREGIDO) ---
 app.on('before-quit', async () => {
     console.log('🧹 Limpiando caché de audio y PNGTuber...');
     
-    // ✅ FIX: Apuntar explícitamente a la carpeta backend/public
-    const backendPublic = path.join(__dirname, 'backend', 'public');
+    // ✅ FIX: En producción, apuntar a resources/backend/public
+    const backendPublic = isDev 
+        ? path.join(__dirname, 'backend', 'public')
+        : path.join(process.resourcesPath, 'backend', 'public');
+    
+    console.log(`[MAIN] Limpiando en: ${backendPublic}`);
+    
     const carpetasALimpiar = [
         { ruta: path.join(backendPublic, 'audios'), extensiones: /\.(wav|srt|ass|mp3|mp4)$/i },
         { ruta: path.join(backendPublic, 'pngtuber'), extensiones: /\.(png|jpg|jpeg)$/i }

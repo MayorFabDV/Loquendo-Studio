@@ -5,21 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loquendo Studio</title>
     
-    <!-- Archivos CSS -->
     <link rel="stylesheet" href="css/index.css">
     <link rel="stylesheet" href="css/output.css">
     
-    <!-- WaveSurfer.js -->
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/hover.min.js"></script>
+    <!-- WaveSurfer.js (LOCAL) -->
+    <script src="js/libs/wavesurfer.min.js"></script>
+    <script src="js/libs/regions.min.js"></script>
+    <script src="js/libs/timeline.min.js"></script>
+    <script src="js/libs/hover.min.js"></script>
 </head>
 <body>
     <!-- HEADER -->
     <header>
         <div class="brand-container">
-      <img src="img/logo.png" class="logo-top" alt="Loquendo Studio Logo" onclick="abrirVentanaTesters()" style="cursor: pointer;" title="Ver Testers">
+            <img src="img/logo.png" class="logo-top" alt="Loquendo Studio Logo" onclick="abrirVentanaTesters()" style="cursor: pointer;" title="Ver Testers">
             <div>
                 <h1>Loquendo Studio</h1>
                 <p class="subtitle"><a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@BafYamRevival')" style="color: var(--accent-color); text-decoration: none;">@BafYamRevival</a></p>
@@ -53,23 +52,60 @@
             <!-- Panel 1: Entrada de texto -->
             <section class="seccion-entrada">
                 <div class="textarea-wrapper">
-                    <textarea id="textoEntrada" placeholder="Escribe o pega aquí el guion que deseas sintetizar..."></textarea>
+                    <textarea id="textoEntrada" spellcheck="false" placeholder="Escribe o pega aquí el guion que deseas sintetizar..."></textarea>
                     <div class="textarea-footer">
                         <small id="contadorCaracteres">Caracteres: 0</small>
+                        
+                        <!-- Selector de etiquetas -->
                         <div class="tag-selector-container">
-    <select id="tagSelector" class="tag-selector" onchange="insertarEtiqueta()">
-        <option value="">Etiquetas</option>
-        <option value="pause"> Pausa breve [pause]</option>
-        <option value="pause:1000">Pausa 1s [pause:1000]</option>
-        <option value="slow">Hablar lento [slow]texto[/slow]</option>
-        <option value="fast"> Hablar rápido [fast]texto[/fast]</option>
-        <option value="soft">Hablar suave [soft]texto[/soft]</option>
-        <option value="loud">Hablar fuerte [loud]texto[/loud]</option>
-        <option value="emphasis">Énfasis [emphasis]texto[/emphasis]</option>
-        <option value="spell"> Deletrear [spell]texto[/spell]</option>
-        <option value="voz"> Cambiar voz [voz:nombre]texto[/voz]</option>
-    </select>
-</div>
+                            <select id="tagSelector" class="tag-selector" onchange="insertarEtiqueta()">
+                                <option value="">Insertar Etiqueta...</option>
+                                
+                                <optgroup label="Pausas">
+                                    <option value="pause">Pausa breve [pause]</option>
+                                    <option value="pause:500">Pausa 0.5s [pause:500]</option>
+                                    <option value="pause:1000">Pausa 1s [pause:1000]</option>
+                                    <option value="pause:2000">Pausa 2s [pause:2000]</option>
+                                    <option value="pause:3000">Pausa 3s [pause:3000]</option>
+                                </optgroup>
+                                
+                                <optgroup label="Velocidad">
+                                    <option value="slow">Lento [slow]texto[/slow]</option>
+                                    <option value="slow:3">Lento 3 [slow:3]texto[/slow]</option>
+                                    <option value="slow:5">Muy lento [slow:5]texto[/slow]</option>
+                                    <option value="slow:8">Extremo [slow:8]texto[/slow]</option>
+                                    <option value="fast">Rápido [fast]texto[/fast]</option>
+                                    <option value="fast:3">Rápido 3 [fast:3]texto[/fast]</option>
+                                    <option value="fast:5">Muy rápido [fast:5]texto[/fast]</option>
+                                    <option value="fast:8">Extremo [fast:8]texto[/fast]</option>
+                                    <option value="rate">Rate personalizado [rate:+5]texto[/rate]</option>
+                                </optgroup>
+                                
+                                <optgroup label="Tono">
+                                    <option value="pitch:+3">Tono agudo [pitch:+3]texto[/pitch]</option>
+                                    <option value="pitch:+5">Muy agudo [pitch:+5]texto[/pitch]</option>
+                                    <option value="pitch:-3">Tono grave [pitch:-3]texto[/pitch]</option>
+                                    <option value="pitch:-5">Muy grave [pitch:-5]texto[/pitch]</option>
+                                </optgroup>
+                                
+                                <optgroup label="Volumen">
+                                    <option value="soft">Suave [soft]texto[/soft]</option>
+                                    <option value="loud">Fuerte [loud]texto[/loud]</option>
+                                    <option value="vol:30">Volumen 30% [vol:30]texto[/vol]</option>
+                                    <option value="vol:50">Volumen 50% [vol:50]texto[/vol]</option>
+                                    <option value="vol:80">Volumen 80% [vol:80]texto[/vol]</option>
+                                </optgroup>
+                                
+                                <optgroup label="Expresiones">
+                                    <option value="emphasis">Énfasis [emphasis]texto[/emphasis]</option>
+                                    <option value="spell">Deletrear [spell]texto[/spell]</option>
+                                </optgroup>
+                                
+                                <optgroup label="Voces">
+                                    <option value="voz">Cambiar voz [voz:nombre]texto[/voz]</option>
+                                </optgroup>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -79,19 +115,19 @@
                         Motor de Voz
                     </div>
                     <select id="vozSeleccionada">
-                        <optgroup label=" Voces Loquendo Modernas">
+                        <optgroup label="Voces Loquendo Modernas">
                             <option value="Loquendo Jorge">Jorge (Clásico)</option>
                             <option value="Loquendo Carlos">Carlos</option>
                             <option value="Loquendo Carmen">Carmen</option>
                             <option value="Loquendo Diego">Diego</option>
                             <option value="Loquendo Ludoviko">Ludoviko</option>
                         </optgroup>
-                        <optgroup label=" Voces Acapella">
+                        <optgroup label="Voces Acapella">
                             <option value="Acapella Diego">Diego</option>
                             <option value="Acapella Carmen">Carmen</option>
                             <option value="Acapella Jorge">Jorge</option>
                         </optgroup>
-                        <optgroup label=" Voces Microsoft">
+                        <optgroup label="Voces Microsoft">
                             <option value="Microsoft Helena Desktop">Helena</option>
                             <option value="Microsoft Sabina Desktop">Sabina</option>
                         </optgroup>
@@ -115,7 +151,7 @@
             <!-- Panel 2: Salida editable -->
             <div class="salida-wrapper">
                 <div class="salida-header">Texto Optimizado (Editable)</div>
-                <textarea id="resultado" class="salida-editable" placeholder="El texto procesado aparecerá aquí..."></textarea>
+                <textarea id="resultado" spellcheck="false" class="salida-editable" placeholder="El texto procesado aparecerá aquí..."></textarea>
             </div>
 
             <!-- Panel 3: Video PNGTuber -->
@@ -187,16 +223,25 @@
                         <button type="button" onclick="editorZoomIn()" title="Acercar">+</button>
                     </div>
                     <div class="control-group">
-                        <button type="button" onclick="restartAudio()" title="Reiniciar">↺</button>
-                        <button type="button" onclick="togglePlay()" id="playBtn" class="btn-play-primary" title="Play/Pausa">▶</button>
-                        <button type="button" onclick="stopAudio()" title="Detener">⏹</button>
+                        <button type="button" onclick="restartAudio()" title="Reiniciar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        </button>
+                        <button type="button" onclick="togglePlay()" id="playBtn" class="btn-play-primary" title="Play/Pausa">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        </button>
+                        <button type="button" onclick="stopAudio()" title="Detener">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="6" y="6" rx="2"/></svg>
+                        </button>
                     </div>
                     <div class="control-group">
-                        <button type="button" onclick="eliminarSeleccion()" id="btnEliminar" class="btn-cut" title="Cortar" disabled>✂ Cortar</button>
+                        <button type="button" onclick="eliminarSeleccion()" id="btnEliminar" class="btn-cut" title="Cortar" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/></svg>
+                            Cortar
+                        </button>
                     </div>
                 </div>
 
-                <!-- Fade Controls -->
+                <!-- Fade Controls VOZ -->
                 <div class="fade-controls-compact">
                     <div class="fade-group">
                         <label>Fade In Voz: <span id="fadeInValue" class="fade-group-val">2s</span></label>
@@ -207,6 +252,19 @@
                         <label>Fade Out Voz: <span id="fadeOutValue" class="fade-group-val">2s</span></label>
                         <input type="range" id="fadeOutDuration" min="0.5" max="10" step="0.5" value="2" oninput="document.getElementById('fadeOutValue').innerText = this.value + 's'">
                         <button type="button" onclick="window.audioEditor.aplicarFadeOut(parseFloat(document.getElementById('fadeOutDuration').value))">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- Fade Controls MÚSICA (NUEVO) -->
+                <div class="fade-controls-compact" style="background: rgba(142, 68, 173, 0.05); border-color: rgba(142, 68, 173, 0.3);">
+                    <h4 style="margin: 0 0 10px 0; color: var(--purple-accent); font-size: 13px;">Fade Música (en Ducking)</h4>
+                    <div class="fade-group">
+                        <label>Fade In Música: <span id="fadeInMusicaValue" class="fade-group-val">2s</span></label>
+                        <input type="range" id="fadeInMusicaDuration" min="0.5" max="10" step="0.5" value="2" oninput="document.getElementById('fadeInMusicaValue').innerText = this.value + 's'">
+                    </div>
+                    <div class="fade-group">
+                        <label>Fade Out Música: <span id="fadeOutMusicaValue" class="fade-group-val">3s</span></label>
+                        <input type="range" id="fadeOutMusicaDuration" min="0.5" max="10" step="0.5" value="3" oninput="document.getElementById('fadeOutMusicaValue').innerText = this.value + 's'">
                     </div>
                 </div>
 
@@ -224,7 +282,7 @@
 
                 <!-- Panel Música -->
                 <div class="panel-musica">
-                    <h4>🎵 Mezcla con Música</h4>
+                    <h4>Mezcla con Música</h4>
                     <div class="inputs-musica">
                         <input type="file" id="backgroundMusicInput" accept="audio/*">
                         <button type="button" onclick="subirMusicaFondo()">Cargar Pista</button>
@@ -245,12 +303,47 @@
                     </div>
                 </div>
 
+                <!-- ✅ NUEVO: Panel de Subtítulos -->
+                <div class="panel-subtitulos">
+                    <h4>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        Subtítulos Dinámicos
+                    </h4>
+                    <div class="controls-subtitulos">
+                        <div class="fade-group">
+                            <label>Palabras por subtítulo: <span id="palabrasSubtituloValue" class="fade-group-val">7</span></label>
+                            <input type="range" id="palabrasSubtitulo" min="2" max="15" step="1" value="7" oninput="document.getElementById('palabrasSubtituloValue').innerText = this.value">
+                            <small style="color: var(--text-dim); font-size: 11px;">3-5: TikTok | 5-7: YouTube | 7-10: Tutorial</small>
+                        </div>
+                        
+                        <div class="fade-group">
+                            <label class="opcion-card">
+                                <input type="checkbox" id="chkSubtitulosDinamicos" checked>
+                                <span class="opcion-texto">Subtítulos dinámicos (cortos)</span>
+                            </label>
+                        </div>
+                        
+                        <div class="subtitulos-botones">
+                            <button type="button" id="btnGenerarSRT" onclick="generarYDescargarSRT()" class="btn-descarga">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Generar SRT
+                            </button>
+                            
+                            <button type="button" id="btnGenerarASS" onclick="generarYDescargarASS()" class="btn-descarga">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                                Generar ASS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Botones Exportación -->
                 <div class="player-controls">
                     <a id="btnDescargar" href="#" download="audio_loquendo.wav" class="btn-descarga">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Descargar WAV
                     </a>
+                    
                     <a id="btnDescargaSRT" href="#" download="subtitulos.srt" style="display: none;" class="btn-descarga">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                         Descargar SRT
@@ -273,7 +366,10 @@
         <aside class="columna-derecha">
             <!-- Panel Opciones -->
             <div class="panel-opciones">
-                <h4> Ajustes de Automatización</h4>
+                <h4>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Ajustes de Automatización
+                </h4>
                 <div class="opciones-grid">
                     <label class="opcion-card">
                         <input type="checkbox" id="chkComas">
@@ -282,6 +378,18 @@
                     <label class="opcion-card">
                         <input type="checkbox" id="chkPuntos">
                         <span class="opcion-texto">Auto-Puntos de Pausa</span>
+                    </label>
+                    <label class="opcion-card">
+                        <input type="checkbox" id="chkOrtografia">
+                        <span class="opcion-texto">Corrección Ortográfica</span>
+                    </label>
+                    <label class="opcion-card">
+                        <input type="checkbox" id="chkGramatica">
+                        <span class="opcion-texto">Corrección Gramatical</span>
+                    </label>
+                    <label class="opcion-card">
+                        <input type="checkbox" id="chkPuntuacion">
+                        <span class="opcion-texto">Puntuación Inteligente</span>
                     </label>
                     <label class="opcion-card">
                         <input type="checkbox" id="chkLoquendo">
@@ -302,10 +410,87 @@
                 </div>
             </div>
 
+            <!-- Panel de Expresiones Rápidas -->
+            <div class="panel-opciones">
+                <h4>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                    Expresiones Rápidas
+                </h4>
+                <div class="opciones-grid">
+                    <label class="opcion-card">
+                        <input type="checkbox" id="chkExpresionesRapidas">
+                        <span class="opcion-texto">Activar Expresiones Rápidas</span>
+                    </label>
+                </div>
+                <div id="expresionesRapidasContainer" style="display: none; margin-top: 12px;">
+                    <select id="expresionRapidaSelector" class="tag-selector" onchange="insertarExpresionRapida()" style="width: 100%;">
+                        <option value="">Insertar Expresión...</option>
+                        
+                        <optgroup label="Saludos">
+                            <option value="hola">Hola</option>
+                            <option value="hey">Hey!</option>
+                            <option value="buenos-dias">Buenos días</option>
+                            <option value="buenas-tardes">Buenas tardes</option>
+                            <option value="buenas-noches">Buenas noches</option>
+                            <option value="que-tal">¿Qué tal?</option>
+                            <option value="como-estas">¿Cómo estás?</option>
+                        </optgroup>
+                        
+                        <optgroup label="Preguntas">
+                            <option value="que">¿Qué?</option>
+                            <option value="como">¿Cómo?</option>
+                            <option value="por-que">¿Por qué?</option>
+                            <option value="cuando">¿Cuándo?</option>
+                            <option value="donde">¿Dónde?</option>
+                            <option value="quien">¿Quién?</option>
+                        </optgroup>
+                        
+                        <optgroup label="Muletillas">
+                            <option value="eh">Eh...</option>
+                            <option value="este">Este...</option>
+                            <option value="bueno">Bueno...</option>
+                            <option value="pues">Pues...</option>
+                            <option value="entonces">Entonces...</option>
+                            <option value="o sea">O sea...</option>
+                            <option value="mira">Mira...</option>
+                            <option value="oye">Oye...</option>
+                        </optgroup>
+                        
+                        <optgroup label="Reacciones">
+                            <option value="wow">¡Wow!</option>
+                            <option value="genial">¡Genial!</option>
+                            <option value="increible">¡Increíble!</option>
+                            <option value="no-way">¡No way!</option>
+                            <option value="que-loco">¡Qué loco!</option>
+                            <option value="en-serio">¿En serio?</option>
+                        </optgroup>
+                        
+                        <optgroup label="Emociones">
+                            <option value="risa">Risa</option>
+                            <option value="suspiro">Suspiro</option>
+                            <option value="grito">Grito</option>
+                            <option value="llanto">Llanto</option>
+                            <option value="susurro">Susurro</option>
+                            <option value="enojado">Enojado</option>
+                            <option value="feliz">Feliz</option>
+                            <option value="triste">Triste</option>
+                            <option value="sorpresa">Sorpresa</option>
+                            <option value="miedo">Miedo</option>
+                        </optgroup>
+                    </select>
+                    <small style="color: var(--text-dim); display: block; margin-top: 8px;">
+                        Inserta expresiones rápidas en el texto
+                    </small>
+                </div>
+            </div>
+
             <!-- Modo Narración -->
             <div class="panel-opciones">
                 <div class="selector-modo">
-                    <label for="modo"> Estilo de Narración:</label>
+                    <label for="modo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        Estilo de Narración:
+                    </label>
                     <select id="modo">
                         <option value="normal">Estándar / Neutral</option>
                         <option value="creepy">Creepypasta / MISTERIO</option>
@@ -317,7 +502,10 @@
 
             <!-- Dictionary Editor -->
             <div class="panel-opciones">
-                <h4>Diccionarios Personalizados</h4>
+                <h4>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                    Diccionarios Personalizados
+                </h4>
                 <div id="dictionaryEditor"></div>
             </div>
         </aside>
@@ -335,120 +523,120 @@
     <script src="js/services/audioPlayer.js"></script>
     <script src="js/services/audioActions.js"></script>
     <script src="js/services/videoProcessor.js"></script>
+    <script src="js/services/OrtografiaProcessor.js"></script>
     <script src="js/main.js"></script>
 
-   <!-- MODAL DE AYUDA -->
-<div id="modalAyuda" class="modal-overlay" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>❔ Ayuda Rápida</h3>
-            <button type="button" onclick="cerrarAyuda()" class="modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-            <!-- El contenido se actualizará dinámicamente desde main.js -->
+    <!-- MODAL DE AYUDA -->
+    <div id="modalAyuda" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ayuda Rápida</h3>
+                <button type="button" onclick="cerrarAyuda()" class="modal-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body"></div>
         </div>
     </div>
-</div>
 
-<!-- MODAL DE TESTERS -->
-<div id="modalTesters" class="modal-overlay" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Zona de Testers</h3>
-            <button type="button" onclick="cerrarVentanaTesters()" class="modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-            <div class="tester-list">
-                <!-- LautyKT -->
-                <div class="tester-card">
-                    <div class="tester-avatar">
-                        <img src="img/jc.gif" width="64" height="64" alt="LautyKT" class="tester-image">
+    <!-- MODAL DE TESTERS -->
+    <div id="modalTesters" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Zona de Testers</h3>
+                <button type="button" onclick="cerrarVentanaTesters()" class="modal-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tester-list">
+                    <!-- LautyKT -->
+                    <div class="tester-card">
+                        <div class="tester-avatar">
+                            <img src="img/jc.gif" width="64" height="64" alt="LautyKT" class="tester-image">
+                        </div>
+                        <div class="tester-info">
+                            <h4>LautyKT</h4>
+                            <p>Rol: <span style="color: var(--accent-color);">Tester</span></p>
+                            <p>Estado: <span class="badge-active">Aun traumado con el chavo y el perro</span></p>
+                        </div>
+                        <div class="tester-actions">
+                            <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@LautyKT')" class="btn-youtube">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                                Ver Canal
+                            </a>
+                        </div>
                     </div>
-                    <div class="tester-info">
-                        <h4>LautyKT</h4>
-                        <p>Rol: <span style="color: var(--accent-color);">Tester</span></p>
-                        <p>Estado: <span class="badge-active">Aun traumado con el chavo y el perro</span></p>
+                    
+                    <!-- Allstarz -->
+                    <div class="tester-card">
+                        <div class="tester-avatar">
+                            <img src="img/N.png" width="64" height="64" alt="Allstarz" class="tester-image">
+                        </div>
+                        <div class="tester-info">
+                            <h4>Allstarz</h4>
+                            <p>Rol: <span style="color: var(--purple-accent);">Tester</span></p>
+                            <p>Estado: <span class="badge-active">Principe detective</span></p>
+                        </div>
+                        <div class="tester-actions">
+                            <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@AllStarz007')" class="btn-youtube">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                                Ver Canal
+                            </a>
+                        </div>
                     </div>
-                    <div class="tester-actions">
-                        <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@LautyKT')" class="btn-youtube">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                            Ver Canal
-                        </a>
+                    
+                    <!-- DarkerGhost -->
+                    <div class="tester-card">
+                        <div class="tester-avatar">
+                            <img src="img/Dark.png" width="64" height="64" alt="DarkerGhost" class="tester-image">
+                        </div>
+                        <div class="tester-info">
+                            <h4>DarkerGhost</h4>
+                            <p>Rol: <span style="color: var(--green-accent);">Tester</span></p>
+                            <p>Estado: <span class="badge-pending">Saliendo de Mexico</span></p>
+                        </div>
+                        <div class="tester-actions">
+                            <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@DarkerGhost')" class="btn-youtube">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                                Ver Canal
+                            </a>
+                        </div>
                     </div>
-                </div>
-                
-                <!-- Allstarz -->
-                <div class="tester-card">
-                    <div class="tester-avatar">
-                        <img src="img/N.png" width="64" height="64" alt="Allstarz" class="tester-image">
+                    
+                    <!-- Leo -->
+                    <div class="tester-card">
+                        <div class="tester-avatar">
+                            <img src="img/gato.png" width="64" height="64" alt="Leo" class="tester-image">
+                        </div>
+                        <div class="tester-info">
+                            <h4>Leo</h4>
+                            <p>Rol: <span style="color: #f39c12;">Tester</span></p>
+                            <p>Estado: <span class="badge-active">Abriendo otro proyecto</span></p>
+                        </div>
+                        <div class="tester-actions"></div>
                     </div>
-                    <div class="tester-info">
-                        <h4>Allstarz</h4>
-                        <p>Rol: <span style="color: var(--purple-accent);">Tester</span></p>
-                        <p>Estado: <span class="badge-active">Principe detective</span></p>
-                    </div>
-                    <div class="tester-actions">
-                        <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@AllStarz007')" class="btn-youtube">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                            Ver Canal
-                        </a>
-                    </div>
-                </div>
-                
-                <!-- DarkerGhost -->
-                <div class="tester-card">
-                    <div class="tester-avatar">
-                        <img src="img/Dark.png" width="64" height="64" alt="DarkerGhost" class="tester-image">
-                    </div>
-                    <div class="tester-info">
-                        <h4>DarkerGhost</h4>
-                        <p>Rol: <span style="color: var(--green-accent);">Tester</span></p>
-                        <p>Estado: <span class="badge-pending">Saliendo de Mexico</span></p>
-                    </div>
-                    <div class="tester-actions">
-                        <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@DarkerGhost')" class="btn-youtube">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                            Ver Canal
-                        </a>
-                    </div>
-                </div>
-                
-                <!-- Gato -->
-                <div class="tester-card">
-                    <div class="tester-avatar">
-                        <img src="img/gato.png" width="64" height="64" alt="El Gato Gamer" class="tester-image">
-                    </div>
-                    <div class="tester-info">
-                        <h4>Leo</h4>
-                        <p>Rol: <span style="color: #f39c12;">Tester</span></p>
-                        <p>Estado: <span class="badge-active">Abriendo otro proyecto</span></p>
-                    </div>
-                    <div class="tester-actions">
-                        <!-- No tiene canal aún -->
-                    </div>
-                </div>
-                
-                <!-- CreepyMoxo -->
-                <div class="tester-card">
-                    <div class="tester-avatar">
-                        <img src="img/cm.jpeg" width="64" height="64" alt="CreepyMoxo" class="tester-image">
-                    </div>
-                    <div class="tester-info">
-                        <h4>CreepyMoxo</h4>
-                        <p>Rol: <span style="color: var(--accent-color);">Tester</span></p>
-                        <p>Estado: <span class="badge-pending">otro terremoto anomalo</span></p>
-                    </div>
-                    <div class="tester-actions">
-                        <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@Creepy_moxo')" class="btn-youtube">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                            Ver Canal
-                        </a>
+                    
+                    <!-- CreepyMoxo -->
+                    <div class="tester-card">
+                        <div class="tester-avatar">
+                            <img src="img/cm.jpeg" width="64" height="64" alt="CreepyMoxo" class="tester-image">
+                        </div>
+                        <div class="tester-info">
+                            <h4>CreepyMoxo</h4>
+                            <p>Rol: <span style="color: var(--accent-color);">Tester</span></p>
+                            <p>Estado: <span class="badge-pending">otro terremoto anomalo</span></p>
+                        </div>
+                        <div class="tester-actions">
+                            <a href="#" onclick="abrirEnlaceExterno('https://www.youtube.com/@Creepy_moxo')" class="btn-youtube">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                                Ver Canal
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
 </body>
 </html>

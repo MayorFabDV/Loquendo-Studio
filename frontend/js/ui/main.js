@@ -554,6 +554,27 @@ document.addEventListener('DOMContentLoaded', () => {
             resultado.addEventListener(evt, () => asegurarEditable(resultado));
         });
     }
+    const textoEntrada = document.getElementById('textoEntrada');
+    const contador = document.getElementById('contadorCaracteres');
+    
+    if (textoEntrada && contador) {
+        // Actualizar al cargar (por si ya hay texto)
+        contador.innerText = `Caracteres: ${textoEntrada.value.length}`;
+        
+        // Actualizar al escribir
+        textoEntrada.addEventListener('input', () => {
+            const longitud = textoEntrada.value.length;
+            contador.innerText = `Caracteres: ${longitud}`;
+            
+            // Cambiar color si es muy largo
+            if (longitud > 3000) {
+                contador.style.color = '#e74c3c';
+                contador.innerText += ' (Texto muy largo)';
+            } else {
+                contador.style.color = '#888';
+            }
+        });
+    }
     console.log('✅ Loquendo Studio cargado y listo');
 });
 

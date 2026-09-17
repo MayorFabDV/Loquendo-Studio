@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Generador de subtítulos SRT - VERSIÓN BULLETPROOF PARA ELECTRON.
-Busca ffmpeg.exe dinámicamente en rutas de desarrollo y producción.
-Incluye fixes para evitar bucles de Whisper y cortes al inicio.
+- Busca ffmpeg.exe dinámicamente
+- Anti-bucles de Whisper
+- Anti-alucinaciones
+- División configurable por palabras (2, 5, 7, etc.)
 """
 import os
 import sys
@@ -35,7 +37,7 @@ if ffmpeg_path:
     os.environ["PATH"] = os.path.dirname(ffmpeg_path) + os.pathsep + os.environ.get("PATH", "")
     print(f"[OK] FFmpeg encontrado en: {ffmpeg_path}")
 else:
-    print("[WARN] FFmpeg no encontrado en las rutas esperadas. Whisper podría fallar si necesita decodificar audio.")
+    print("[WARN] FFmpeg no encontrado en las rutas esperadas.")
 
 try:
     import whisper
@@ -44,6 +46,10 @@ except ImportError:
     WHISPER_DISPONIBLE = False
     print("[WARN] Módulo 'whisper' no instalado. Usando fallback matemático.")
 
+
+# ============================================================
+# FORMATEAR TIEMPO
+# ============================================================
 def formatear_tiempo(segundos):
     """Convierte segundos a formato SRT (HH:MM:SS,mmm)."""
     horas = int(segundos // 3600)
@@ -52,6 +58,50 @@ def formatear_tiempo(segundos):
     milisegundos = int((segundos % 1) * 1000)
     return f"{horas:02d}:{minutos:02d}:{segs:02d},{milisegundos:03d}"
 
+
+# ============================================================
+# NUEVO: DIVIDIR POR PALABRAS
+# ============================================================
+def dividir_por_palabras(texto, max_palabras=7):
+    """
+    Divide un texto en fragmentos de máximo N palabras.
+    
+    Args:
+        texto (str): Texto a dividir
+        max_palabras (int): Máximo de palabras por fragmento (2-20)
+    
+    Returns:
+        list: Lista de fragmentos (strings)
+    """
+    if not texto or texto.strip() == '':
+        return []
+    
+    # Validar rango
+    max_palabras = max(2, min(20, int(max_palabras)))
+    
+    # Separar por oraciones primero
+    oraciones = re.split(r'(?<=[.!?])\s+', texto.strip())
+    
+    fragmentos = []
+    for oracion in oraciones:
+        palabras = oracion.strip().split()
+        
+        if len(palabras) <= max_palabras:
+            if palabras:
+                fragmentos.append(' '.join(palabras))
+        else:
+            # Dividir en bloques
+            for i in range(0, len(palabras), max_palabras):
+                bloque = palabras[i:i + max_palabras]
+                if bloque:
+                    fragmentos.append(' '.join(bloque))
+    
+    return fragmentos
+
+
+# ============================================================
+# EXTRAER VOCABULARIO DEL GUION
+# ============================================================
 def extraer_vocabulario_guion(texto_original):
     if not texto_original:
         return {}
@@ -70,6 +120,10 @@ def extraer_vocabulario_guion(texto_original):
         vocabulario[palabra.lower()] = palabra
     return vocabulario
 
+
+# ============================================================
+# LIMPIAR REPETICIONES DE WHISPER
+# ============================================================
 def limpiar_repeticiones_whisper(texto):
     if not texto:
         return texto
@@ -102,6 +156,10 @@ def limpiar_repeticiones_whisper(texto):
             texto_limpio = ' '.join(resultado)
     return re.sub(r'\s+', ' ', texto_limpio).strip()
 
+
+# ============================================================
+# CORREGIR POR SIMILITUD FONÉTICA
+# ============================================================
 def corregir_por_similitud_fonetica(texto, vocabulario_guion, umbral=0.75):
     if not vocabulario_guion or not texto:
         return texto
@@ -129,6 +187,10 @@ def corregir_por_similitud_fonetica(texto, vocabulario_guion, umbral=0.75):
             resultado.append(palabra)
     return ' '.join(resultado)
 
+
+# ============================================================
+# CORREGIR ALUCINACIONES
+# ============================================================
 def corregir_alucinaciones_universal(texto, texto_original=None):
     if not texto:
         return texto
@@ -138,6 +200,10 @@ def corregir_alucinaciones_universal(texto, texto_original=None):
         texto = corregir_por_similitud_fonetica(texto, vocabulario)
     return texto.strip()
 
+
+# ============================================================
+# DEDUPLICAR SEGMENTOS REPETIDOS
+# ============================================================
 def deduplicar_segmentos_repetidos(segmentos, texto_original=None):
     resultado = []
     for seg in segmentos:
@@ -148,7 +214,7 @@ def deduplicar_segmentos_repetidos(segmentos, texto_original=None):
         if len(texto_final.split()) < 2:
             continue
 
-        # ✅ FIX: Detección de duplicados "casi idénticos" (Bucle de Whisper)
+        # Detección de duplicados
         es_duplicado = False
         if resultado:
             ultimo_texto = resultado[-1]['text'].lower()
@@ -156,12 +222,10 @@ def deduplicar_segmentos_repetidos(segmentos, texto_original=None):
             palabras_actuales = set(actual_texto.split())
             palabras_anteriores = set(ultimo_texto.split())
             
-            # Si más del 60% de las palabras se repiten, es un bucle de Whisper
             if len(palabras_actuales) > 0:
                 similitud = len(palabras_actuales.intersection(palabras_anteriores)) / len(palabras_actuales)
                 if similitud > 0.6:
                     es_duplicado = True
-                    # Extender el tiempo del segmento anterior en lugar de crear uno nuevo
                     resultado[-1]['end'] = max(resultado[-1]['end'], float(seg.get('end', 0) or 0))
 
         if not es_duplicado:
@@ -172,64 +236,101 @@ def deduplicar_segmentos_repetidos(segmentos, texto_original=None):
             })
     return resultado
 
-def generar_srt_fallback(texto_original, duracion_total, ruta_salida):
-    print("[FALLBACK] Generando SRT con método matemático...")
+
+# ============================================================
+# FALLBACK MATEMÁTICO CON DIVISIÓN POR PALABRAS
+# ============================================================
+def generar_srt_fallback(texto_original, duracion_total, ruta_salida, max_palabras=7):
+    """Fallback matemático con división por palabras."""
+    print(f"[FALLBACK] Generando SRT con {max_palabras} palabras máximo...")
+    
     if not texto_original or not texto_original.strip():
-         with open(ruta_salida, "w", encoding="utf-8") as f:
-             f.write("1\n00:00:00,000 --> 00:00:05,000\n[Transcripción no disponible]\n\n")
-         return
-    oraciones = re.split(r'(?<=[.!?])\s+', texto_original.strip())
-    oraciones = [o.strip() for o in oraciones if o.strip()]
-    if not oraciones:
+        with open(ruta_salida, "w", encoding="utf-8") as f:
+            f.write("1\n00:00:00,000 --> 00:00:05,000\n[Transcripción no disponible]\n\n")
+        return
+    
+    # ✅ Usar la nueva función de división por palabras
+    fragmentos = dividir_por_palabras(texto_original, max_palabras)
+    
+    if not fragmentos:
         with open(ruta_salida, "w", encoding="utf-8") as f:
             f.write("1\n00:00:00,000 --> 00:00:05,000\n[Texto no válido]\n\n")
         return
-    duracion_por_oracion = duracion_total / max(len(oraciones), 1)
+    
+    # Calcular tiempos
+    total_palabras = sum(len(f.split()) for f in fragmentos)
+    if total_palabras == 0:
+        return
+    
+    tiempo_total_gaps = len(fragmentos) * 0.15
+    tiempo_disponible = max(0, duracion_total - tiempo_total_gaps)
+    tiempo_por_palabra = max(0.05, tiempo_disponible / total_palabras)
+    
     with open(ruta_salida, "w", encoding="utf-8") as f:
-        for i, oracion in enumerate(oraciones, 1):
-            inicio = (i - 1) * duracion_por_oracion
-            fin = i * duracion_por_oracion
-            if i == len(oraciones):
-                fin = duracion_total
-            inicio_str = formatear_tiempo(inicio)
-            fin_str = formatear_tiempo(fin)
-            f.write(f"{i}\n{inicio_str} --> {fin_str}\n{oracion}\n\n")
-    print(f"[FALLBACK] SRT generado: {ruta_salida}")
+        tiempo_actual = 0.0
+        for i, fragmento in enumerate(fragmentos, 1):
+            palabras_fragmento = len(fragmento.split())
+            duracion_fragmento = min(palabras_fragmento * tiempo_por_palabra, 7.0)
+            
+            if tiempo_actual + duracion_fragmento > duracion_total:
+                duracion_fragmento = duracion_total - tiempo_actual
+            
+            if duracion_fragmento <= 0:
+                duracion_fragmento = 0.5
+            
+            inicio_str = formatear_tiempo(tiempo_actual)
+            tiempo_actual += duracion_fragmento
+            fin_str = formatear_tiempo(tiempo_actual)
+            
+            f.write(f"{i}\n{inicio_str} --> {fin_str}\n{fragmento}\n\n")
+            tiempo_actual += 0.15
+    
+    print(f"[FALLBACK] SRT generado: {ruta_salida} ({len(fragmentos)} subtítulos)")
 
+
+# ============================================================
+# OBTENER DURACIÓN DEL AUDIO
+# ============================================================
 def obtener_duracion_audio(ruta_audio):
     try:
-        cmd = [ffmpeg_path if ffmpeg_path else 'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+        cmd = [ffmpeg_path if ffmpeg_path else 'ffprobe', '-v', 'error',
+               '-show_entries', 'format=duration',
                '-of', 'default=noprint_wrappers=1:nokey=1', ruta_audio]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return float(result.stdout.strip())
     except Exception:
         return 0
 
-def generar_srt(ruta_audio, ruta_salida, texto_original=None):
+
+# ============================================================
+# GENERAR SRT PRINCIPAL (WHISPER + DIVISIÓN POR PALABRAS)
+# ============================================================
+def generar_srt(ruta_audio, ruta_salida, texto_original=None, max_palabras=7):
+    """Genera SRT usando Whisper con división configurable por palabras."""
     print(f"[IA] Analizando audio: {os.path.basename(ruta_audio)}")
+    print(f"[IA] Max palabras por subtítulo: {max_palabras}")
+    
     tamano = os.path.getsize(ruta_audio)
     if tamano < 1000:
         print("[ERROR] Audio demasiado pequeño, usando fallback")
-        duracion = 5
-        generar_srt_fallback(texto_original, duracion, ruta_salida)
+        generar_srt_fallback(texto_original, 5, ruta_salida, max_palabras)
         return
 
     try:
         if not WHISPER_DISPONIBLE:
             raise ImportError("Whisper no disponible")
 
-        # --- TRUCO: INYECTAR 0.5s DE SILENCIO AL INICIO ---
+        # Inyectar 0.5s de silencio al inicio
         ruta_temporal = ruta_audio.replace('.wav', '_temp_silence.wav')
         audio_a_transcribir = ruta_audio
         
         if ffmpeg_path and os.path.exists(ffmpeg_path):
-            print("[IA] Inyectando 0.5s de silencio para alinear Whisper...")
+            print("[IA] Inyectando 0.5s de silencio...")
             cmd = [ffmpeg_path, '-y', '-i', ruta_audio, '-af', 'adelay=500|500:all=1', ruta_temporal]
             subprocess.run(cmd, capture_output=True, text=True)
             
             if os.path.exists(ruta_temporal):
                 audio_a_transcribir = ruta_temporal
-        # -------------------------------------------------
 
         modelo_nombre = os.environ.get("WHISPER_MODEL", "small")
         print(f"[IA] Cargando modelo Whisper ({modelo_nombre})...")
@@ -244,7 +345,7 @@ def generar_srt(ruta_audio, ruta_salida, texto_original=None):
             "no_speech_threshold": 0.5,
         }
         
-        # ✅ FIX: Solo pasar nombres propios como guía (no el texto completo)
+        # Pasar nombres propios como guía
         if texto_original and len(texto_original.strip()) > 0:
             nombres_propios = re.findall(r'\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\b', texto_original)
             vocabulario = " ".join(sorted(set(nombres_propios)))[:200]
@@ -254,23 +355,58 @@ def generar_srt(ruta_audio, ruta_salida, texto_original=None):
         print("[IA] Transcribiendo...")
         result = model.transcribe(audio_a_transcribir, **opciones)
 
-        # --- RESTAR 0.5s A LOS TIMESTAMPS ---
+        # Restar 0.5s a los timestamps
         for seg in result.get("segments", []):
             seg['start'] = max(0.0, seg['start'] - 0.5)
             seg['end'] = max(0.0, seg['end'] - 0.5)
-        # ------------------------------------
 
         if not result.get("segments"):
             print("[ADVERTENCIA] Whisper no detectó segmentos. Usando fallback.")
             duracion = obtener_duracion_audio(ruta_audio) or 60
-            generar_srt_fallback(texto_original, duracion, ruta_salida)
+            generar_srt_fallback(texto_original, duracion, ruta_salida, max_palabras)
             return
 
         segmentos_limpios = deduplicar_segmentos_repetidos(result.get("segments", []), texto_original)
-        print(f"[OK] {len(segmentos_limpios)} segmento(s) válidos tras limpiar repeticiones")
-        
+        print(f"[OK] {len(segmentos_limpios)} segmento(s) válidos")
+
+        # ✅ NUEVO: Dividir cada segmento por max_palabras
+        segmentos_finales = []
+        for seg in segmentos_limpios:
+            texto_seg = seg['text'].strip()
+            inicio = seg['start']
+            fin = seg['end']
+            
+            fragmentos = dividir_por_palabras(texto_seg, max_palabras)
+            
+            if len(fragmentos) <= 1:
+                # Un solo fragmento
+                segmentos_finales.append({
+                    'start': inicio,
+                    'end': fin,
+                    'text': texto_seg
+                })
+            else:
+                # Múltiples fragmentos: dividir el tiempo proporcionalmente
+                duracion_total = fin - inicio
+                total_palabras = sum(len(f.split()) for f in fragmentos)
+                
+                tiempo_actual = inicio
+                for frag in fragmentos:
+                    palabras = len(frag.split())
+                    duracion_frag = (palabras / total_palabras) * duracion_total
+                    
+                    segmentos_finales.append({
+                        'start': tiempo_actual,
+                        'end': tiempo_actual + duracion_frag,
+                        'text': frag
+                    })
+                    tiempo_actual += duracion_frag
+
+        print(f"[OK] {len(segmentos_finales)} subtítulos finales (divididos por {max_palabras} palabras)")
+
+        # Escribir SRT
         with open(ruta_salida, "w", encoding="utf-8") as f:
-            for i, segment in enumerate(segmentos_limpios, 1):
+            for i, segment in enumerate(segmentos_finales, 1):
                 inicio = formatear_tiempo(segment['start'])
                 fin = formatear_tiempo(segment['end'])
                 texto_final = segment['text'].strip()
@@ -290,18 +426,23 @@ def generar_srt(ruta_audio, ruta_salida, texto_original=None):
         traceback.print_exc()
         print("[INFO] Cambiando a fallback matemático...")
         duracion = obtener_duracion_audio(ruta_audio) or 60
-        generar_srt_fallback(texto_original, duracion, ruta_salida)
+        generar_srt_fallback(texto_original, duracion, ruta_salida, max_palabras)
 
+
+# ============================================================
+# PUNTO DE ENTRADA
+# ============================================================
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("ERROR: Uso -> python generar_srt.py <ruta_audio.wav> <ruta_salida.srt> [texto_original]")
+        print("ERROR: Uso -> python generar_srt.py <ruta_audio.wav> <ruta_salida.srt> [texto_original] [max_palabras]")
         if len(sys.argv) >= 2:
             ruta_salida = sys.argv[2] if len(sys.argv) > 2 else "fallback.srt"
-            generar_srt_fallback(None, 5, ruta_salida)
+            generar_srt_fallback(None, 5, ruta_salida, 7)
         sys.exit(0)
     
     ruta_audio = sys.argv[1]
     ruta_salida = sys.argv[2]
     texto_original = sys.argv[3] if len(sys.argv) > 3 else None
+    max_palabras = int(sys.argv[4]) if len(sys.argv) > 4 else 7  # ✅ NUEVO
     
-    generar_srt(ruta_audio, ruta_salida, texto_original)
+    generar_srt(ruta_audio, ruta_salida, texto_original, max_palabras)

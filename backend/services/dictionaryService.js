@@ -198,13 +198,13 @@ class DictionaryService {
 
         if (aprendioAlgo) {
             fs.writeFileSync(this.paths.perfil, JSON.stringify(perfil, null, 4));
-            console.log(`🧠 Perfil actualizado con seguridad. Nuevas reglas:`, perfil);
+            console.log(` Perfil actualizado con seguridad. Nuevas reglas:`, perfil);
         }
         return aprendioAlgo;
     }
 
     limpiarTodo() {
-        // ✅ Agregado 'fonetica' a la limpieza
+        //  Agregado 'fonetica' a la limpieza
         ['perfil', 'jergas', 'sinonimos', 'loquendo', 'fonetica'].forEach(tipo => {
             fs.writeFileSync(this.paths[tipo], JSON.stringify({}, null, 4));
         });

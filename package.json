@@ -1,7 +1,7 @@
 {
-  "name": "loquendo-Studio",
+  "name": "loquendo-studio",
   "version": "1.0.0",
-  "description": "Loquendo Studio",
+  "description": "Loquendo Studio - Herramienta profesional de automatización de voz y edición multimedia",
   "main": "main-electron.js",
   "author": "BafYam",
   "license": "ISC",
@@ -11,13 +11,14 @@
     "clean": "rmdir /s /q dist 2>nul & echo Limpiado",
     "build": "npm run clean && electron-builder",
     "build:safe": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build_safe.ps1",
-    "build:dir": "electron-builder --win dir"
+    "build:dir": "electron-builder --win dir",
+    "build:portable": "electron-builder --win portable",
+    "build:nsis": "electron-builder --win nsis"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1",
-    "wavesurfer.js": "^7.8.0"
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "electron": "^28.3.3",
@@ -26,40 +27,64 @@
   "build": {
     "appId": "com.bafyam.loquendo",
     "productName": "Loquendo Studio",
-    "files": [
-      "main-electron.js",
-      "server.js",
-      "index.html",
-      "css/**/*",
-      "js/**/*",
-      "img/**/*",
-      "services/**/*",
-      "!**/*.map",
-      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
-      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-      "!**/node_modules/.bin/*",
-      "!**/*.{o,hprof,orig,pyc,pyo,rbc}",
-      "!**/._*",
-      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
-      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}"
-    ],
-    "asarUnpack": [
-      "bin/**/*",
-      "modules/**/*",
-      "services/**/*"
-    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+"files": [
+  "main-electron.js",
+  "server.js",
+  "frontend/**/*",
+  "backend/services/**/*",
+  "backend/db/**/*",
+  "!backend/public/audios/*",
+  "!backend/public/pngtuber/*",
+  "!backend/db/*.json",
+  "!backend/bin/**/*",
+  "!backend/python/**/*",
+  "!backend/modules/**/*",
+  "!**/*.map",
+  "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+  "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+  "!**/node_modules/.bin/*",
+  "!**/*.{o,hprof,orig,pyc,pyo,rbc}",
+  "!**/._*",
+  "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+  "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}"
+],
+"asarUnpack": [
+  "backend/bin/**/*",
+  "backend/modules/**/*",
+  "backend/python/**/*",
+  "backend/services/**/*",
+  "backend/db/**/*"
+],
     "extraResources": [
-      { "from": "bin/", "to": "bin/" },
-      { "from": "modules/", "to": "modules/" },
-      { "from": "public/", "to": "public/" },
-      { "from": "db/", "to": "db/" },
-      { "from": "python/", "to": "python/" }
+      { "from": "backend/bin/", "to": "backend/bin/" },
+      { "from": "backend/modules/", "to": "backend/modules/" },
+      { "from": "backend/public/", "to": "backend/public/" },
+      { "from": "backend/db/", "to": "backend/db/" },
+      { "from": "backend/python/", "to": "backend/python/" }
     ],
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
-      "icon": "img/logo.png",
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "frontend/img/logo.ico",
       "requestedExecutionLevel": "asInvoker"
     },
-    "portable": { "requestExecutionLevel": "user" }
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Loquendo Studio",
+      "installerIcon": "frontend/img/logo.ico",
+      "uninstallerIcon": "frontend/img/logo.ico"
+    },
+    "portable": {
+      "artifactName": "LoquendoStudio-Portable-${version}.exe"
+    }
   }
 }
