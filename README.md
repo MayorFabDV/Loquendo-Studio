@@ -1,4 +1,3 @@
-<div align="center">
 
 # 🎙️ Loquendo Studio
 
@@ -17,7 +16,7 @@
 [Roadmap](#-roadmap) •
 [Licencia](#-licencia)
 
-</div>
+
 
 ---
 
@@ -296,7 +295,7 @@ Electron por el framework
 
 Mis testers por el feedback
 
-<div align="center">
+
 Creado con ❤️ por BafYam
 
 https://img.shields.io/badge/YouTube-BafYamRevival-red?style=for-the-badge&logo=youtube
@@ -304,4 +303,3 @@ https://img.shields.io/badge/Ko--fi-Apoyar-FF5E5B?style=for-the-badge&logo=ko-fi
 
 ⭐ Si te gusta el proyecto, dale una estrella ⭐
 
-</div> ```
