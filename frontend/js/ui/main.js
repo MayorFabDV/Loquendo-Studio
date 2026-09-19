@@ -12,6 +12,15 @@ let voiceAudioOriginalPath = null;
 let pngtuberIdlePath = null;
 let pngtuberTalkingPath = null;
 
+// ✅ Función auxiliar para notificaciones
+function notificar(tipo, mensaje, duracion) {
+    if (window.notifications && typeof window.notifications[tipo] === 'function') {
+        window.notifications[tipo](mensaje, duracion);
+    } else {
+        console.log(`[${tipo.toUpperCase()}] ${mensaje}`);
+    }
+}
+
 function asegurarEditable(elemento) {
     if (!elemento) return;
     try {
@@ -30,17 +39,19 @@ function asegurarEditable(elemento) {
 function cambiarTema() {
     const h = document.documentElement;
     h.setAttribute("data-theme", h.getAttribute("data-theme") === "light" ? "dark" : "light");
+    notificar('info', 'Tema cambiado');
 }
 
 function cambiarDiseno() {
     document.querySelector('.contenedor-flexible')?.classList.toggle('modo-columnas');
+    notificar('info', 'Vista cambiada');
 }
 
 function abrirEnlaceExterno(url) {
     if (typeof require !== 'undefined') {
         try {
-            const { ipcRenderer } = require('electron');
-            ipcRenderer.send('abrir-enlace-externo', url);
+            const { shell } = require('electron');
+            shell.openExternal(url);
         } catch (e) {
             window.open(url, '_blank');
         }
@@ -50,16 +61,123 @@ function abrirEnlaceExterno(url) {
 }
 
 function abrirAyuda() {
-        const mensaje = " Ayuda Rápida:\n\n" +
-                   "1. Escribe o pega tu texto\n" +
-                   "2. Selecciona el modo y opciones\n" +
-                   "3. Haz clic en 'Generar Audio'\n" +
-                   "4. Usa el editor para cortar/normalizar\n" +
-                   "5. Genera el video PNGTuber\n" +
-                   "6. Desliza para escuchar y ajustar la música\n" +
-                     "7. Descarga subtítulos SRT/ASS si quieres\n\n" +
-                     "¡Listo! Disfruta de tu audio y video.";
-    alert(mensaje);
+    const modal = document.getElementById('modalAyuda');
+    if (modal) {
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.innerHTML = `
+                <pre style="font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.8; color: var(--text-color); background: rgba(0, 0, 0, 0.3); padding: 16px; border-radius: 8px; white-space: pre-wrap; margin: 0;">${mensajeAyuda}</pre>
+            `;
+        }
+        modal.style.display = 'flex';
+    }
+}
+
+const mensajeAyuda = " Ayuda Rápida:\n\n" +
+           "1. Escribe o pega tu texto\n" +
+           "2. Selecciona el modo y opciones\n" +
+           "3. Haz clic en 'Generar Audio'\n" +
+           "4. Usa el editor para cortar/normalizar\n" +
+           "5. Genera el video PNGTuber\n" +
+           "6. Desliza para escuchar y ajustar la música\n" +
+           "7. Descarga subtítulos SRT/ASS si quieres\n\n" +
+           "¡Listo! Disfruta de tu audio y video.";
+
+function cerrarAyuda() {
+    const modal = document.getElementById('modalAyuda');
+    if (modal) modal.style.display = 'none';
+}
+
+// ==========================================
+// 1.5 CORREGIR TEXTO CON LANGUAGETOOL
+// ==========================================
+async function corregirTexto() {
+    const textarea = document.getElementById('resultado');
+    const textoOriginal = textarea?.value || '';
+    
+    if (!textoOriginal.trim()) {
+        notificar('warning', 'Primero escribe algo en el texto');
+        return;
+    }
+    
+    const btn = document.getElementById('btnCorregirTexto');
+    const textoBtnOriginal = btn ? btn.innerHTML : 'Corregir Texto';
+    
+    if (btn) { 
+        btn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Corrigiendo...
+        `; 
+        btn.disabled = true; 
+    }
+    
+    try {
+        notificar('info', 'Analizando ortografía y gramática...');
+        
+        const res = await fetch(`${API_BASE}/api/corregir-texto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto: textoOriginal })
+        });
+        
+        const data = await res.json();
+        
+        if (data.error) {
+            notificar('error', 'Error: ' + data.error);
+            return;
+        }
+        
+        // Actualizar el textarea con el texto corregido
+        if (textarea) {
+            textarea.value = data.textoCorregido;
+        }
+        
+        // Mostrar detalles de corrección
+        const divResultado = document.getElementById('resultadoCorreccion');
+        const detalles = document.getElementById('detallesCorreccion');
+        
+        if (divResultado && detalles) {
+            if (data.totalCorrecciones > 0) {
+                divResultado.style.display = 'block';
+                
+                let listaCorrecciones = data.correcciones
+                    .slice(0, 5)
+                    .map(c => `<li><strong>${c.original}</strong> → ${c.corregido}</li>`)
+                    .join('');
+                
+                if (data.correcciones.length > 5) {
+                    listaCorrecciones += `<li>... y ${data.correcciones.length - 5} más</li>`;
+                }
+                
+                detalles.innerHTML = `
+                    <strong>✅ ${data.totalCorrecciones} correcciones aplicadas:</strong>
+                    <ul style="margin: 6px 0 0 0; padding-left: 20px;">${listaCorrecciones}</ul>
+                `;
+                
+                notificar('success', `✅ ${data.totalCorrecciones} correcciones aplicadas`);
+            } else {
+                divResultado.style.display = 'block';
+                detalles.innerHTML = '<strong>✅ No se encontraron errores</strong>';
+                notificar('success', '✅ No se encontraron errores');
+            }
+            
+            // Ocultar después de 8 segundos
+            setTimeout(() => {
+                divResultado.style.display = 'none';
+            }, 8000);
+        }
+        
+        console.log('Correcciones:', data.correcciones);
+        
+    } catch (error) {
+        console.error('Error corrigiendo texto:', error);
+        notificar('error', 'Error de conexión con LanguageTool');
+    } finally {
+        if (btn) { 
+            btn.innerHTML = textoBtnOriginal; 
+            btn.disabled = false; 
+        }
+    }
 }
 
 // ==========================================
@@ -71,18 +189,20 @@ function optimizar() {
     const salida = document.getElementById("resultado");
     
     if (!entradaInput || !entradaInput.value.trim()) {
-        alert("Escribe algo en el cuadro de texto primero.");
+        notificar('warning', 'Escribe algo en el cuadro de texto primero.');
         return;
     }
     
     let texto = entradaInput.value.trim();
     const modo = modoSelect?.value || "normal";
     
-    if (window.dictionaryEditor) {
+    if (window.dictionaryEditor && typeof window.dictionaryEditor.applyToText === 'function') {
         const opciones = {
             fonetica: document.getElementById("chkLoquendo")?.checked || false,
             jergas: document.getElementById("chkNeutro")?.checked || false,
-            sinonimos: document.getElementById("chkSinonimos")?.checked || false
+            sinonimos: document.getElementById("chkSinonimos")?.checked || false,
+            ortografia: document.getElementById("chkOrtografia")?.checked || false,
+            gramatica: document.getElementById("chkGramatica")?.checked || false
         };
         texto = window.dictionaryEditor.applyToText(texto, opciones);
     }
@@ -119,6 +239,7 @@ function optimizar() {
         asegurarEditable(salida);
     }
     console.log(`✅ Texto optimizado. Modo: ${modo}`);
+    notificar('success', 'Texto optimizado correctamente');
 }
 
 // ==========================================
@@ -135,21 +256,31 @@ async function generarAudio(event) {
     const textoFinal = resultado ? resultado.value : "";
 
     if (!textoFinal || textoFinal === "El texto aparecerá aquí...") {
-        alert("¡Asu! Primero debes automatizar un texto.");
+        notificar('warning', 'Primero debes automatizar un texto.');
         return;
     }
 
-    if (btn) { btn.innerText = "Procesando Pipeline... ⏳"; btn.disabled = true; }
+    if (btn) { btn.innerText = "Procesando Pipeline..."; btn.disabled = true; }
 
     try {
+        const opciones = {
+            jergas: document.getElementById("chkNeutro")?.checked || false,
+            fonetica: document.getElementById("chkLoquendo")?.checked || false,
+            sinonimos: document.getElementById("chkSinonimos")?.checked || false,
+            maxPalabras: parseInt(document.getElementById('palabrasSubtitulo')?.value || 7)
+        };
+
+        notificar('info', 'Generando audio...');
+
         const respuesta = await fetch(`${API_BASE}/api/generar-audio`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 texto: textoFinal,
-                voz: vozSelect?.value || 'Loquendo Jorge',
+                voz: vozSelect?.value || 'Jorge',
                 usarIA: chkSRT?.checked || false,
-                modo: modoSelect?.value || 'normal'
+                modo: modoSelect?.value || 'normal',
+                opciones: opciones
             })
         });
 
@@ -162,15 +293,16 @@ async function generarAudio(event) {
             if (typeof window.cargarYReproducir === 'function') {
                 window.cargarYReproducir(data.url, data.srt, data.ass);
             }
+            notificar('success', 'Audio generado correctamente');
         } else {
             const errorData = await respuesta.json();
-            alert("¡Asu! Error: " + (errorData.error || "El servidor falló"));
+            notificar('error', 'Error: ' + (errorData.error || 'El servidor falló'));
         }
     } catch (error) {
         console.error("Error fatal en red:", error);
-        alert("¿Prendiste el servidor? No hay conexión con la API.");
+        notificar('error', 'No hay conexión con la API. ¿Prendiste el servidor?');
     } finally {
-        if (btn) { btn.innerText = "🎙️ Generar Audio Loquendo"; btn.disabled = false; }
+        if (btn) { btn.innerText = "Generar Audio Loquendo"; btn.disabled = false; }
         asegurarEditable(resultado);
         asegurarEditable(textoEntrada);
         if (resultado) resultado.focus();
@@ -178,6 +310,7 @@ async function generarAudio(event) {
 }
 
 async function automatizarTodo() {
+    notificar('info', 'Iniciando proceso maestro...');
     optimizar();
     await new Promise(resolve => setTimeout(resolve, 100));
     await generarAudio();
@@ -189,16 +322,22 @@ async function automatizarTodo() {
 async function generarYDescargarSRT() {
     const audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
     const textoOriginal = document.getElementById('resultado')?.value || '';
-    if (!audioPath) { alert("Genera un audio primero."); return; }
+    const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
+
+    if (!audioPath) { 
+        notificar('warning', 'Genera un audio primero.');
+        return; 
+    }
 
     const btn = document.getElementById('btnGenerarSRT');
-    if (btn) { btn.innerText = "⏳ Generando SRT..."; btn.disabled = true; }
+    if (btn) { btn.innerText = "Generando SRT..."; btn.disabled = true; }
 
     try {
+        notificar('info', `Generando SRT con ${maxPalabras} palabras por subtítulo...`);
         const res = await fetch(`${API_BASE}/api/generar-srt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audioPath, textoOriginal })
+            body: JSON.stringify({ audioPath, textoOriginal, maxPalabras: parseInt(maxPalabras) })
         });
         const data = await res.json();
         if (res.ok) {
@@ -209,14 +348,14 @@ async function generarYDescargarSRT() {
                 link.style.display = 'inline-flex';
                 link.click();
             }
-            alert("✅ SRT generado y descargado");
+            notificar('success', 'SRT generado y descargado');
         } else {
-            alert("Error: " + data.error);
+            notificar('error', 'Error: ' + data.error);
         }
     } catch (error) {
-        alert("Error de conexión al generar SRT");
+        notificar('error', 'Error de conexión al generar SRT');
     } finally {
-        if (btn) { btn.innerText = "📝 Generar y Descargar SRT"; btn.disabled = false; }
+        if (btn) { btn.innerText = "Generar SRT"; btn.disabled = false; }
     }
 }
 
@@ -224,20 +363,25 @@ async function generarYDescargarASS() {
     const audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
     const textoOriginal = document.getElementById('resultado')?.value || '';
     const modo = document.getElementById('modo')?.value || 'normal';
+    const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
     const linkSRT = document.getElementById('btnDescargaSRT');
     const srtPath = (linkSRT && linkSRT.href && !linkSRT.href.startsWith('blob:')) 
                     ? linkSRT.href.replace(API_BASE, '').split('?')[0] : null;
 
-    if (!audioPath) { alert("Genera un audio primero."); return; }
+    if (!audioPath) { 
+        notificar('warning', 'Genera un audio primero.');
+        return; 
+    }
 
     const btn = document.getElementById('btnGenerarASS');
-    if (btn) { btn.innerText = "⏳ Generando ASS..."; btn.disabled = true; }
+    if (btn) { btn.innerText = "Generando ASS..."; btn.disabled = true; }
 
     try {
+        notificar('info', `Generando ASS con ${maxPalabras} palabras...`);
         const res = await fetch(`${API_BASE}/api/generar-ass`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audioPath, textoOriginal, modo, srtPath })
+            body: JSON.stringify({ audioPath, textoOriginal, modo, srtPath, maxPalabras: parseInt(maxPalabras) })
         });
         const data = await res.json();
         if (res.ok) {
@@ -248,14 +392,14 @@ async function generarYDescargarASS() {
                 link.style.display = 'inline-flex';
                 link.click();
             }
-            alert("✅ ASS generado y descargado");
+            notificar('success', 'ASS generado y descargado');
         } else {
-            alert("Error: " + data.error);
+            notificar('error', 'Error: ' + data.error);
         }
     } catch (error) {
-        alert("Error de conexión al generar ASS");
+        notificar('error', 'Error de conexión al generar ASS');
     } finally {
-        if (btn) { btn.innerText = "🎨 Generar y Descargar ASS"; btn.disabled = false; }
+        if (btn) { btn.innerText = "Generar ASS"; btn.disabled = false; }
     }
 }
 
@@ -267,7 +411,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
     const input = document.getElementById(inputId);
     
     if (!input || !input.files || input.files.length === 0) {
-        alert(`Selecciona una imagen ${tipo} antes de subirla.`);
+        notificar('warning', `Selecciona una imagen ${tipo} antes de subirla.`);
         return;
     }
     
@@ -275,6 +419,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
     formData.append(tipo, input.files[0]);
     
     try {
+        notificar('info', `Subiendo imagen ${tipo}...`);
         const res = await fetch(`${API_BASE}/api/upload-pngtuber`, { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al subir');
@@ -282,10 +427,10 @@ async function subirImagenPNGTuber(tipo = 'idle') {
         if (tipo === 'talking') pngtuberTalkingPath = data.url;
         else pngtuberIdlePath = data.url;
         
-        alert(`✅ Imagen ${tipo} cargada correctamente.`);
+        notificar('success', `Imagen ${tipo} cargada correctamente.`);
     } catch (error) {
         console.error(error);
-        alert('❌ Error al subir la imagen PNGTuber');
+        notificar('error', 'Error al subir la imagen PNGTuber');
     } finally {
         ['resultado', 'textoEntrada'].forEach(id => {
             const el = document.getElementById(id);
@@ -298,7 +443,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
 async function generarVideoPNGTuber() {
     let audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
     if (!audioPath || audioPath.startsWith('blob:')) {
-        alert('⚠️ Primero genera un audio válido (no ediciones temporales).');
+        notificar('warning', 'Primero genera un audio válido (no ediciones temporales).');
         return;
     }
     
@@ -307,11 +452,12 @@ async function generarVideoPNGTuber() {
     const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Generar Video PNGTuber';
     
     if (btnVideo) {
-        btnVideo.innerText = '⏳ Procesando video...';
+        btnVideo.innerText = 'Procesando video...';
         btnVideo.disabled = true;
     }
     
     try {
+        notificar('info', 'Procesando video...');
         const res = await fetch(`${API_BASE}/api/generar-video-pngtuber`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -323,7 +469,7 @@ async function generarVideoPNGTuber() {
         });
         const data = await res.json();
         if (res.ok) {
-            alert('✅ ¡Video PNGTuber generado con éxito!');
+            notificar('success', '¡Video PNGTuber generado con éxito!');
             const link = document.createElement('a');
             link.href = `${API_BASE}${data.video}`;
             link.download = 'video_pngtuber.mp4';
@@ -331,11 +477,11 @@ async function generarVideoPNGTuber() {
             link.click();
             document.body.removeChild(link);
         } else {
-            alert('❌ Error: ' + (data.error || 'Desconocido'));
+            notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     } catch (error) {
         console.error('Error generando video:', error);
-        alert('Error de conexión al generar video.');
+        notificar('error', 'Error de conexión al generar video.');
     } finally {
         if (btnVideo) {
             btnVideo.innerText = textoOriginalBtn;
@@ -350,12 +496,14 @@ async function generarVideoPNGTuber() {
 function subirMusicaFondo() {
     const input = document.getElementById('backgroundMusicInput');
     if (!input || !input.files || input.files.length === 0) {
-        alert('Selecciona un archivo de audio primero.');
+        notificar('warning', 'Selecciona un archivo de audio primero.');
         return;
     }
     
     const formData = new FormData();
     formData.append('music', input.files[0]);
+    
+    notificar('info', 'Subiendo música...');
     
     fetch(`${API_BASE}/api/upload-music`, { method: 'POST', body: formData })
     .then(response => response.json())
@@ -365,12 +513,12 @@ function subirMusicaFondo() {
             if (window.audioEditor && typeof window.audioEditor.cargarMusica === 'function') {
                 window.audioEditor.cargarMusica(`${API_BASE}${data.url}`);
             }
-            alert('✅ Música de fondo subida');
+            notificar('success', 'Música de fondo subida');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error al subir música');
+        notificar('error', 'Error al subir música');
     });
 }
 
@@ -379,15 +527,15 @@ function aplicarDucking() {
     const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || (btnDescargar ? btnDescargar.href : '') || '';
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
-        alert('Primero genera un audio de voz.');
+        notificar('warning', 'Primero genera un audio de voz.');
         return;
     }
     if (voiceAudioPath.startsWith('blob:')) {
-        alert('⚠️ El audio actual es una versión editada temporal. Genera uno nuevo primero.');
+        notificar('warning', 'El audio actual es una versión editada temporal. Genera uno nuevo primero.');
         return;
     }
     if (!musicaFondoPath) {
-        alert('Primero sube una música de fondo.');
+        notificar('warning', 'Primero sube una música de fondo.');
         return;
     }
     
@@ -416,6 +564,8 @@ function aplicarDucking() {
         fadeOutMusic: parseFloat(fadeOutInput?.value || '3') || 3
     };
     
+    notificar('info', 'Aplicando Ducking...');
+    
     fetch(`${API_BASE}/api/audio/apply-ducking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -425,6 +575,8 @@ function aplicarDucking() {
     .then((data) => {
         if (data.url) {
             voiceAudioRealPath = data.url;
+            window.voiceAudioRealPath = data.url;
+            
             if (btnDescargar) {
                 btnDescargar.href = `${API_BASE}${data.url}`;
                 btnDescargar.setAttribute('download', `audio_con_ducking_${Date.now()}.wav`);
@@ -434,17 +586,38 @@ function aplicarDucking() {
             const btnMP3 = document.getElementById('btnExportarMP3');
             if (btnMP3) btnMP3.style.display = 'inline-block';
             
+            // ✅ Ocultar waveform de música y detenerla
+            const waveformMusica = document.getElementById('waveform-musica');
+            if (waveformMusica) {
+                waveformMusica.style.display = 'none';
+            }
+            
+            if (window.audioEditor && window.audioEditor.wavesurferMusica) {
+                window.audioEditor.wavesurferMusica.pause();
+                window.audioEditor.wavesurferMusica.seekTo(0);
+                window.audioEditor.musicaCargada = false;
+            }
+            
+            const inputMusica = document.getElementById('backgroundMusicInput');
+            if (inputMusica) inputMusica.value = '';
+            
+            musicaFondoPath = null;
+            window.musicaFondoPath = null;
+            
+            const displayVolumen = document.getElementById('musicaVolumeDisplay');
+            if (displayVolumen) displayVolumen.innerText = 'Volumen: 50%';
+            
             if (typeof window.cargarYReproducir === 'function') {
                 window.cargarYReproducir(data.url);
             }
-            alert('✅ Ducking aplicado.');
+            notificar('success', 'Ducking aplicado correctamente.');
         } else {
-            alert('Error: ' + (data.error || 'Desconocido'));
+            notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error de conexión al aplicar ducking');
+        notificar('error', 'Error de conexión al aplicar ducking');
     });
 }
 
@@ -458,19 +631,20 @@ async function exportarAMp3() {
     const voiceAudioPath = (btnDescargar ? btnDescargar.href : '') || voiceAudioRealPath || '';
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
-        alert('Primero genera un audio válido.');
+        notificar('warning', 'Primero genera un audio válido.');
         return;
     }
     if (voiceAudioPath.startsWith('blob:')) {
-        alert('⚠️ El audio actual es temporal. Genera uno nuevo primero.');
+        notificar('warning', 'El audio actual es temporal. Genera uno nuevo primero.');
         return;
     }
     
     const btnMP3 = document.getElementById('btnExportarMP3');
     const textoOriginal = btnMP3 ? btnMP3.innerText : ' Exportar a MP3';
-    if (btnMP3) { btnMP3.innerText = '⏳ Convirtiendo...'; btnMP3.disabled = true; }
+    if (btnMP3) { btnMP3.innerText = 'Convirtiendo...'; btnMP3.disabled = true; }
     
     try {
+        notificar('info', 'Convirtiendo a MP3...');
         const rutaLimpia = voiceAudioPath.replace(API_BASE, '').split('?')[0];
         const originalLimpia = voiceAudioOriginalPath ? voiceAudioOriginalPath.replace(API_BASE, '').split('?')[0] : null;
         
@@ -484,7 +658,7 @@ async function exportarAMp3() {
         if (respuesta.ok) {
             const urls = data.urls || (data.url ? [data.url] : []);
             if (urls.length === 0) {
-                alert('❌ Error: ' + (data.error || 'Desconocido'));
+                notificar('error', 'Error: ' + (data.error || 'Desconocido'));
             } else {
                 urls.forEach(item => {
                     const u = typeof item === 'string' ? item : item.url;
@@ -496,14 +670,14 @@ async function exportarAMp3() {
                     link.click();
                     document.body.removeChild(link);
                 });
-                alert('✅ Exportado a MP3' + (urls.length > 1 ? ' (ambas versiones)' : ''));
+                notificar('success', 'Exportado a MP3 correctamente');
             }
         } else {
-            alert('❌ Error: ' + (data.error || 'Desconocido'));
+            notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error de conexión al exportar');
+        notificar('error', 'Error de conexión al exportar');
     } finally {
         if (btnMP3) { btnMP3.innerText = textoOriginal; btnMP3.disabled = false; }
     }
@@ -534,6 +708,10 @@ document.addEventListener('keydown', (e) => {
     if (e.code === 'KeyM') {
         if (window.audioEditor) window.audioEditor.mutear();
     }
+    if (e.code === 'Escape') {
+        cerrarAyuda();
+        cerrarVentanaTesters();
+    }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -554,19 +732,17 @@ document.addEventListener('DOMContentLoaded', () => {
             resultado.addEventListener(evt, () => asegurarEditable(resultado));
         });
     }
+    
     const textoEntrada = document.getElementById('textoEntrada');
     const contador = document.getElementById('contadorCaracteres');
     
     if (textoEntrada && contador) {
-        // Actualizar al cargar (por si ya hay texto)
         contador.innerText = `Caracteres: ${textoEntrada.value.length}`;
         
-        // Actualizar al escribir
         textoEntrada.addEventListener('input', () => {
             const longitud = textoEntrada.value.length;
             contador.innerText = `Caracteres: ${longitud}`;
             
-            // Cambiar color si es muy largo
             if (longitud > 3000) {
                 contador.style.color = '#e74c3c';
                 contador.innerText += ' (Texto muy largo)';
@@ -575,15 +751,66 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    
+    // ==========================================
+    // ✅ VIGILANTE DE TEXTAREAS
+    // ==========================================
+    const vigilarTextareas = () => {
+        const resultado = document.getElementById('resultado');
+        const textoEntrada = document.getElementById('textoEntrada');
+        
+        if (resultado && (resultado.disabled || resultado.readOnly)) {
+            console.warn('⚠️ Reactivando textarea resultado');
+            asegurarEditable(resultado);
+        }
+        
+        if (textoEntrada && (textoEntrada.disabled || textoEntrada.readOnly)) {
+            console.warn('⚠️ Reactivando textarea textoEntrada');
+            asegurarEditable(textoEntrada);
+        }
+    };
+    
+    setInterval(vigilarTextareas, 1000);
+    window.addEventListener('focus', vigilarTextareas);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) vigilarTextareas();
+    });
+    document.addEventListener('click', vigilarTextareas);
+    document.addEventListener('keydown', vigilarTextareas);
+    
+    console.log('Vigilante de textareas activado');
     console.log('✅ Loquendo Studio cargado y listo');
+    notificar('success', 'Loquendo Studio listo para usar');
 });
 
 // ==========================================
-// 8. ✅ EXPOSICIÓN GLOBAL DE FUNCIONES (CRÍTICO PARA EL HTML)
+// 10. MODALES Y VENTANA DE TESTERS
+// ==========================================
+function abrirVentanaTesters() {
+    const modal = document.getElementById('modalTesters');
+    if (modal) modal.style.display = 'flex';
+}
+
+function cerrarVentanaTesters() {
+    const modal = document.getElementById('modalTesters');
+    if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+    const modalAyuda = document.getElementById('modalAyuda');
+    const modalTesters = document.getElementById('modalTesters');
+    
+    if (modalAyuda && e.target === modalAyuda) cerrarAyuda();
+    if (modalTesters && e.target === modalTesters) cerrarVentanaTesters();
+});
+
+// ==========================================
+// 11. EXPOSICIÓN GLOBAL
 // ==========================================
 window.cambiarTema = cambiarTema;
 window.cambiarDiseno = cambiarDiseno;
 window.abrirAyuda = abrirAyuda;
+window.cerrarAyuda = cerrarAyuda;
 window.abrirEnlaceExterno = abrirEnlaceExterno;
 window.optimizar = optimizar;
 window.generarAudio = generarAudio;
@@ -599,5 +826,9 @@ window.mutearMusica = mutearMusica;
 window.cambiarVolumenMusica = cambiarVolumenMusica;
 window.generarYDescargarSRT = generarYDescargarSRT;
 window.generarYDescargarASS = generarYDescargarASS;
+window.abrirVentanaTesters = abrirVentanaTesters;
+window.cerrarVentanaTesters = cerrarVentanaTesters;
+window.notificar = notificar;
+window.corregirTexto = corregirTexto;
 
 console.log('✅ Funciones expuestas globalmente. ¡Listo para usar!');

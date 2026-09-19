@@ -15,7 +15,6 @@ try { electronApp = require('electron').app; } catch (e) { electronApp = null; }
 const isPackaged = electronApp ? electronApp.isPackaged : (process.env.NODE_ENV === 'production');
 const ROOT_DIR = __dirname;
 
-// ✅ RUTAS ARREGLADAS para producción
 const BACKEND_DIR = isPackaged 
     ? path.join(process.resourcesPath, 'backend') 
     : path.join(ROOT_DIR, 'backend');
@@ -25,7 +24,7 @@ const FRONTEND_DIR = isPackaged
     : path.join(ROOT_DIR, 'frontend');
 
 console.log('\n========================================');
-console.log('🚀 LOQUENDO STUDIO - INICIANDO SERVIDOR');
+console.log(' LOQUENDO STUDIO - INICIANDO SERVIDOR');
 console.log('========================================');
 console.log(`[Server] Entorno: ${isPackaged ? 'PRODUCCIÓN' : 'DESARROLLO'}`);
 console.log(`[Server] ROOT_DIR: ${ROOT_DIR}`);
@@ -44,7 +43,6 @@ const audioFolder = path.join(BACKEND_DIR, 'public', 'audios');
 const pngtuberFolder = path.join(BACKEND_DIR, 'public', 'pngtuber');
 const PUBLIC_FOLDER = path.join(BACKEND_DIR, 'public');
 
-// ✅ RUTAS DE LANGUAGETOOL
 const javaPath = path.join(BACKEND_DIR, 'bin', 'jre', 'bin', 'java.exe');
 const ltJar = path.join(BACKEND_DIR, 'bin', 'languagetool', 'languagetool-server.jar');
 const LT_PORT = 8011;
@@ -56,7 +54,6 @@ const LT_PORT = 8011;
 const bundledPython = path.join(BACKEND_DIR, 'python', 'python.exe');
 const pythonCmd = fs.existsSync(bundledPython) ? bundledPython : 'python';
 
-// ✅ LOGS DE DIAGNÓSTICO
 console.log('\n[Server] Rutas configuradas:');
 console.log('  - ffmpeg:', ffmpegPath, '| Existe:', fs.existsSync(ffmpegPath));
 console.log('  - pythonSRT:', pythonSRT, '| Existe:', fs.existsSync(pythonSRT));
@@ -64,8 +61,6 @@ console.log('  - pythonASS:', pythonASS, '| Existe:', fs.existsSync(pythonASS));
 console.log('  - python:', pythonCmd, '| Existe:', fs.existsSync(pythonCmd));
 console.log('  - java:', javaPath, '| Existe:', fs.existsSync(javaPath));
 console.log('  - languagetool:', ltJar, '| Existe:', fs.existsSync(ltJar));
-console.log('  - dbFolder:', dbFolder);
-console.log('  - audioFolder:', audioFolder);
 
 // ==========================================
 // 2.5 LANZAR LANGUAGETOOL LOCAL
@@ -73,13 +68,8 @@ console.log('  - audioFolder:', audioFolder);
 let languageToolProcess = null;
 
 function iniciarLanguageTool() {
-    if (!fs.existsSync(javaPath)) {
-        console.warn('[LanguageTool] JRE no encontrado. Corrección ortográfica desactivada.');
-        return;
-    }
-    
-    if (!fs.existsSync(ltJar)) {
-        console.warn('[LanguageTool] JAR no encontrado. Corrección ortográfica desactivada.');
+    if (!fs.existsSync(javaPath) || !fs.existsSync(ltJar)) {
+        console.warn('[LanguageTool] No disponible. Corrección ortográfica desactivada.');
         return;
     }
     
@@ -118,7 +108,6 @@ function iniciarLanguageTool() {
     console.log('[LanguageTool] Servidor iniciado en http://localhost:' + LT_PORT);
 }
 
-// Cerrar LanguageTool al salir
 process.on('exit', () => {
     if (languageToolProcess) {
         console.log('[LanguageTool] Cerrando...');
@@ -219,25 +208,58 @@ appExpress.post('/api/sinonimos', (req, res) => {
     dictService.guardarDiccionario('sinonimos', original, reemplazo);
     res.json({ mensaje: 'Sinónimo guardado' });
 });
+// Ortografía
+appExpress.get('/api/ortografia', (req, res) => { 
+    try { res.json(dictService.getDiccionario('ortografia')); } 
+    catch (err) { res.status(500).json({ error: err.message }); } 
+});
+
+appExpress.post('/api/ortografia', (req, res) => {
+    const { original, reemplazo } = req.body;
+    if (typeof original !== 'string') return res.status(400).json({ error: 'Datos inválidos' });
+    dictService.guardarDiccionario('ortografia', original, reemplazo);
+    res.json({ mensaje: 'Ortografía guardada' });
+});
+
+appExpress.delete('/api/ortografia/:word', (req, res) => { 
+    dictService.eliminarEntrada('ortografia', req.params.word); 
+    res.json({ mensaje: 'Entrada eliminada' }); 
+});
+
+// Gramática
+appExpress.get('/api/gramatica', (req, res) => { 
+    try { res.json(dictService.getDiccionario('gramatica')); } 
+    catch (err) { res.status(500).json({ error: err.message }); } 
+});
+
+appExpress.post('/api/gramatica', (req, res) => {
+    const { original, reemplazo } = req.body;
+    if (typeof original !== 'string') return res.status(400).json({ error: 'Datos inválidos' });
+    dictService.guardarDiccionario('gramatica', original, reemplazo);
+    res.json({ mensaje: 'Gramática guardada' });
+});
+
+appExpress.delete('/api/gramatica/:word', (req, res) => { 
+    dictService.eliminarEntrada('gramatica', req.params.word); 
+    res.json({ mensaje: 'Entrada eliminada' }); 
+});
+appExpress.delete('/api/ortografia/:word', (req, res) => { dictService.eliminarEntrada('ortografia', req.params.word); res.json({ mensaje: 'Entrada eliminada' }); });
 appExpress.delete('/api/jergas/:word', (req, res) => { dictService.eliminarEntrada('jergas', req.params.word); res.json({ mensaje: 'Entrada eliminada' }); });
 appExpress.delete('/api/sinonimos/:word', (req, res) => { dictService.eliminarEntrada('sinonimos', req.params.word); res.json({ mensaje: 'Entrada eliminada' }); });
+appExpress.delete('/api/gramatica/:word', (req, res) => { dictService.eliminarEntrada('gramatica', req.params.word); res.json({ mensaje: 'Entrada eliminada' }); });
+appExpress.delete('/api/ortografia/:word', (req, res) => { dictService.eliminarEntrada('ortografia', req.params.word); res.json({ mensaje: 'Entrada eliminada' }); });
 appExpress.delete('/api/diccionario', (req, res) => { dictService.limpiarTodo(); res.json({ mensaje: 'Diccionarios limpiados' }); });
 
-// ✅ NUEVO: LISTAR VOCES DISPONIBLES EN EL SISTEMA
+// ✅ LISTAR VOCES
 appExpress.get('/api/voces', async (req, res) => {
     try {
         const scriptVoces = path.join(BACKEND_DIR, 'modules', 'listar_voces.py');
         
-        // Crear script si no existe
         if (!fs.existsSync(scriptVoces)) {
             const scriptContent = `# -*- coding: utf-8 -*-
 import win32com.client
 import json
 import sys
-
-if sys.platform == "win32":
-    import codecs
-    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 try:
     speaker = win32com.client.Dispatch("SAPI.SpVoice")
@@ -289,7 +311,7 @@ except Exception as e:
     }
 });
 
-// ✅ NUEVO: CORREGIR TEXTO CON LANGUAGETOOL
+// ✅ CORREGIR TEXTO CON LANGUAGETOOL
 appExpress.post('/api/corregir-texto', async (req, res) => {
     const { texto } = req.body;
     
@@ -349,12 +371,19 @@ appExpress.post('/api/corregir-texto', async (req, res) => {
     }
 });
 
-// ✅ 1. GENERAR AUDIO
+// ✅ 1. GENERAR AUDIO (CON maxPalabras)
 appExpress.post('/api/generar-audio', async (req, res) => {
     const { texto, voz, modo, opciones } = req.body;
     if (!texto || texto.trim() === '') return res.status(400).json({ error: 'Texto vacío' });
+    
+    // ✅ Agregar maxPalabras
+    const opcionesConMax = {
+        ...opciones,
+        maxPalabras: opciones?.maxPalabras || 7
+    };
+    
     try {
-        const resultado = await audioService.procesar(texto, voz, false, dictService, modo, opciones);
+        const resultado = await audioService.procesar(texto, voz, false, dictService, modo, opcionesConMax);
         res.json(resultado);
     } catch (error) {
         console.error('❌ Error generar-audio:', error.message);
@@ -362,7 +391,7 @@ appExpress.post('/api/generar-audio', async (req, res) => {
     }
 });
 
-// ✅ 2. GENERAR SRT
+// ✅ 2. GENERAR SRT (Whisper.cpp + fallback Python)
 appExpress.post('/api/generar-srt', async (req, res) => {
     const { audioPath, textoOriginal, maxPalabras } = req.body;
     const audioLimpio = sanitizarRutaAudio(audioPath);
@@ -373,6 +402,25 @@ appExpress.post('/api/generar-srt', async (req, res) => {
     const audioAbsoluto = path.join(PUBLIC_FOLDER, audioLimpio);
     const palabrasMax = parseInt(maxPalabras) || 7;
 
+    // ✅ INTENTO 1: Whisper.cpp
+    try {
+        console.log('[SRT] Intentando con Whisper.cpp...');
+        await audioService.generarSRTWhisperCpp(audioAbsoluto, rutaSRT, palabrasMax);
+        
+        if (fs.existsSync(rutaSRT)) {
+            console.log('[SRT] ✅ Whisper.cpp exitoso');
+            return res.json({ 
+                srtUrl: `/audios/${nombreSRT}`, 
+                mensaje: 'SRT generado con Whisper.cpp',
+                metodo: 'whispercpp'
+            });
+        }
+    } catch (error) {
+        console.warn('[SRT] Whisper.cpp falló:', error.message);
+        console.log('[SRT] Usando fallback Python...');
+    }
+
+    // ✅ INTENTO 2: Python (fallback)
     const proceso = spawn(pythonCmd, [
         pythonSRT, audioAbsoluto, rutaSRT, textoOriginal || '', String(palabrasMax)
     ], { windowsHide: true });
@@ -382,14 +430,19 @@ appExpress.post('/api/generar-srt', async (req, res) => {
 
     proceso.on('close', (code) => {
         if (code === 0 && fs.existsSync(rutaSRT)) {
-            res.json({ srtUrl: `/audios/${nombreSRT}`, mensaje: 'SRT generado' });
+            console.log('[SRT] ✅ Python exitoso');
+            res.json({ 
+                srtUrl: `/audios/${nombreSRT}`, 
+                mensaje: 'SRT generado con Python',
+                metodo: 'python'
+            });
         } else {
             res.status(500).json({ error: 'Error al generar SRT: ' + stderr });
         }
     });
 });
 
-// ✅ 3. GENERAR ASS
+// ✅ 3. GENERAR ASS (Whisper.cpp + fallback Python)
 appExpress.post('/api/generar-ass', async (req, res) => {
     const { audioPath, textoOriginal, modo, srtPath, maxPalabras } = req.body;
     const audioLimpio = sanitizarRutaAudio(audioPath);
@@ -439,6 +492,18 @@ appExpress.post('/api/generar-ass', async (req, res) => {
         rutaSRTAbsoluta = path.join(audioFolder, nombreSRTTemp);
         nombreSRTFinal = nombreSRTTemp;
 
+        // ✅ Intentar con Whisper.cpp primero
+        try {
+            console.log('[ASS] Generando SRT con Whisper.cpp...');
+            await audioService.generarSRTWhisperCpp(audioAbsoluto, rutaSRTAbsoluta, palabrasMax);
+            if (fs.existsSync(rutaSRTAbsoluta)) {
+                return ejecutarASS(rutaSRTAbsoluta);
+            }
+        } catch (error) {
+            console.warn('[ASS] Whisper.cpp falló, usando Python...');
+        }
+
+        // Fallback a Python
         const procesoSRT = spawn(pythonCmd, [
             pythonSRT, audioAbsoluto, rutaSRTAbsoluta, textoOriginal || '', String(palabrasMax)
         ], { windowsHide: true });
@@ -567,13 +632,14 @@ appExpress.use((err, req, res, next) => {
 // ==========================================
 function startServer(port = 3000) {
     const server = appExpress.listen(port, () => {
-        console.log(`\n✅ Servidor escuchando en: http://localhost:${port}`);
-        console.log(`📁 ffmpeg: ${fs.existsSync(ffmpegPath) ? '✅' : '❌'}`);
-        console.log(`🐍 python: ${fs.existsSync(pythonCmd) ? '✅' : '❌'}`);
-        console.log(`☕ java: ${fs.existsSync(javaPath) ? '✅' : '❌'}`);
-        console.log(`📝 LanguageTool: ${fs.existsSync(ltJar) ? '✅' : '❌'}\n`);
+        console.log(`\nServidor escuchando en: http://localhost:${port}`);
+        console.log(`ffmpeg: ${fs.existsSync(ffmpegPath) ? '✅' : '❌'}`);
+        console.log(` python: ${fs.existsSync(pythonCmd) ? '✅' : '❌'}`);
+        console.log(` java: ${fs.existsSync(javaPath) ? '✅' : '❌'}`);
+        console.log(`LanguageTool: ${fs.existsSync(ltJar) ? '✅' : '❌'}`);
+        console.log(` Whisper.cpp: ${fs.existsSync(path.join(BACKEND_DIR, 'bin', 'whisper-cli.exe')) ? '✅' : '❌'}`);
+        console.log(`Modelo: ${fs.existsSync(path.join(BACKEND_DIR, 'bin', 'ggml-small.bin')) ? '✅' : '❌'}\n`);
         
-        // Lanzar LanguageTool después de iniciar el servidor
         setTimeout(() => {
             iniciarLanguageTool();
         }, 1500);

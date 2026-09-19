@@ -9,6 +9,10 @@ class AudioService {
         this.vozExe32 = path.join(path.dirname(ffmpegPath || '.'), '..', 'bin', 'generar_voz.exe');
         this.assScript = pythonScript ? path.join(path.dirname(pythonScript), 'generar_ass.py') : null;
 
+        // ✅ RUTAS DE WHISPER.CPP
+        this.whisperExe = path.join(path.dirname(ffmpegPath || '.'), 'whisper-cli.exe');
+        this.whisperModel = path.join(path.dirname(ffmpegPath || '.'), 'ggml-small.bin');
+
         this.pythonScript = pythonScript;
         this.audioFolder = audioFolder;
         this.ffmpegPath = ffmpegPath;
@@ -18,10 +22,12 @@ class AudioService {
             fs.mkdirSync(this.audioFolder, { recursive: true });
         }
 
-        console.log('[AudioService] Rutas inicializadas:');
-        console.log('  - vozExe32:', this.vozExe32, '| Existe:', fs.existsSync(this.vozExe32));
-        console.log('  - ffmpegPath:', this.ffmpegPath, '| Existe:', fs.existsSync(this.ffmpegPath));
-        console.log('  - audioFolder:', this.audioFolder);
+        console.log('\n[AudioService] Rutas inicializadas:');
+        console.log('   vozExe32:', this.vozExe32, '| Existe:', fs.existsSync(this.vozExe32));
+        console.log('    ffmpegPath:', this.ffmpegPath, '| Existe:', fs.existsSync(this.ffmpegPath));
+        console.log('   whisperExe:', this.whisperExe, '| Existe:', fs.existsSync(this.whisperExe));
+        console.log('   whisperModel:', this.whisperModel, '| Existe:', fs.existsSync(this.whisperModel));
+        console.log('   audioFolder:', this.audioFolder);
     }
 
     limpiarTagsParaSubtitulos(texto) {
@@ -52,7 +58,7 @@ class AudioService {
             if (byteRate === 0) return Math.max(0, (buffer.length - 44) / 32000);
             return dataSize / byteRate;
         } catch (e) {
-            console.error('[DURACION] Error:', e);
+            console.error('❌ [DURACION] Error:', e);
             return 60;
         }
     }
@@ -82,13 +88,33 @@ class AudioService {
         return fragmentos;
     }
 
+    // ==========================================
+    // ✅ SRT MATEMÁTICO (FALLBACK)
+    // ==========================================
     generarSRTMatematico(texto, rutaAudio, rutaSRT) {
         try {
+            console.log('\n [SRT Matemático] Iniciando generación...');
+            
+            texto = texto.replace(/\[pause(?::\d+)?\]/g, ' ');
+            texto = texto.replace(/\[(?:slow|fast|soft|loud|emphasis|spell)\]/g, '');
+            texto = texto.replace(/\[\/(?:slow|fast|soft|loud|emphasis|spell)\]/g, '');
+            texto = texto.replace(/\[voz:[^\]]+\]/g, '');
+            texto = texto.replace(/\[\/voz\]/g, '');
+            texto = texto.replace(/\s+/g, ' ').trim();
+
             const duracionTotal = this.obtenerDuracionAudio(rutaAudio);
-            if (duracionTotal <= 0) return null;
+            if (duracionTotal <= 0) {
+                console.error('❌ [SRT Matemático] Duración inválida');
+                return null;
+            }
+            
+            console.log(`    Duración del audio: ${duracionTotal.toFixed(2)}s`);
             
             let oraciones = texto.split(/(?<=[.!?\u00A1\u00BF])\s+/).filter(o => o.trim().length > 0);
-            if (oraciones.length === 0) return null;
+            if (oraciones.length === 0) {
+                console.error('❌ [SRT Matemático] No hay oraciones');
+                return null;
+            }
             
             let fragmentos = [];
             for (const oracion of oraciones) {
@@ -97,7 +123,12 @@ class AudioService {
             }
             
             const totalPalabras = fragmentos.reduce((sum, f) => sum + f.split(/\s+/).length, 0);
-            if (totalPalabras === 0) return null;
+            if (totalPalabras === 0) {
+                console.error('❌ [SRT Matemático] No hay palabras');
+                return null;
+            }
+            
+            console.log(`    Fragmentos: ${fragmentos.length} | Palabras: ${totalPalabras}`);
             
             const tiempoTotalGaps = fragmentos.length * 0.15;
             const tiempoDisponible = Math.max(0, duracionTotal - tiempoTotalGaps);
@@ -129,25 +160,117 @@ class AudioService {
             }
             
             fs.writeFileSync(rutaSRT, srtContent, 'utf8');
-            console.log(`[SRT Matematico] ${fragmentos.length} lineas, ${duracionTotal.toFixed(1)}s`);
+            console.log(`    [SRT Matemático] Generado: ${fragmentos.length} líneas, ${duracionTotal.toFixed(1)}s\n`);
             return true;
         } catch (e) {
-            console.error('Error SRT matematico:', e);
+            console.error('❌ [SRT Matemático] Error:', e);
             return null;
         }
     }
 
+    // ==========================================
+    // ✅ WHISPER.CPP (PRIORIDAD)
+    // ==========================================
+    async generarSRTWhisperCpp(audioAbsoluto, rutaSRT, maxPalabras = 7) {
+        return new Promise((resolve, reject) => {
+            console.log('\n  [Whisper.cpp] Iniciando transcripción...');
+            
+            if (!fs.existsSync(this.whisperExe)) {
+                console.error('❌ [Whisper.cpp] No encontrado:', this.whisperExe);
+                return reject(new Error('whisper-cli.exe no encontrado: ' + this.whisperExe));
+            }
+            
+            if (!fs.existsSync(this.whisperModel)) {
+                console.error('❌ [Whisper.cpp] Modelo no encontrado:', this.whisperModel);
+                return reject(new Error('ggml-small.bin no encontrado: ' + this.whisperModel));
+            }
+            
+            const maxLenChars = Math.max(12, maxPalabras * 6);
+            const rutaSinExt = rutaSRT.replace(/\.srt$/i, '');
+            
+            console.log(`   Audio: ${path.basename(audioAbsoluto)}`);
+            console.log(`    Modelo: ${path.basename(this.whisperModel)}`);
+            console.log(`    Max palabras: ${maxPalabras} | Max chars: ${maxLenChars}`);
+            
+            const args = [
+                '-m', this.whisperModel,
+                '-f', audioAbsoluto,
+                '-osrt',
+                '-of', rutaSinExt,
+                '-l', 'es',
+                '-ml', String(maxLenChars),
+                '-pp'
+            ];
+            
+            const proceso = spawn(this.whisperExe, args, { 
+                windowsHide: true,
+                cwd: path.dirname(this.whisperExe)
+            });
+            
+            let stdout = '';
+            let stderr = '';
+            
+            proceso.stdout.on('data', (data) => {
+                const msg = data.toString();
+                stdout += msg;
+                if (msg.includes('whisper_full')) {
+                    console.log('   ⏳ [Whisper.cpp] Procesando...');
+                }
+            });
+            
+            proceso.stderr.on('data', (data) => {
+                const msg = data.toString();
+                stderr += msg;
+            });
+            
+            proceso.on('close', (code) => {
+                const rutaGenerada = rutaSinExt + '.srt';
+                
+                if (code === 0 && fs.existsSync(rutaGenerada)) {
+                    console.log(`   ✅ [Whisper.cpp] SRT generado correctamente\n`);
+                    resolve(rutaGenerada);
+                } else {
+                    console.error(`   ❌ [Whisper.cpp] Falló (código ${code})\n`);
+                    reject(new Error('Whisper.cpp falló (código ' + code + '): ' + stderr));
+                }
+            });
+            
+            proceso.on('error', (err) => {
+                console.error('❌ [Whisper.cpp] Error:', err.message);
+                reject(new Error('Error ejecutando Whisper.cpp: ' + err.message));
+            });
+        });
+    }
+
+    // ==========================================
+    // ✅ PROCESAR AUDIO
+    // ==========================================
     procesar(texto, voz, usarIA, dictionaryService, modo = 'normal', opciones = {}) {
         return new Promise((resolve, reject) => {
+            console.log('\n════════════════════════════════════════');
+            console.log('🎬 [AudioService] INICIANDO PROCESAMIENTO');
+            console.log('════════════════════════════════════════');
+            
             const nombreArchivo = `audio-${Date.now()}.wav`;
             const rutaArchivo = path.join(this.audioFolder, nombreArchivo);
             const vozFinal = voz || 'Loquendo Jorge';
             
-            // ✅ FIX: Usar aplicarConOpciones() que solo aplica los diccionarios activados
+            console.log(`  Voz seleccionada: ${vozFinal}`);
+            console.log(` Texto recibido: ${texto.substring(0, 80)}...`);
+            
             const textoConDiccionarios = dictionaryService.aplicarConOpciones(texto, opciones || {});
             
             const textoParaVoz = textoConDiccionarios.replace(/[\r\n]+/g, ' ').replace(/"/g, "'");
             const textoParaSubtitulos = this.limpiarTagsParaSubtitulos(textoConDiccionarios);
+            
+            const textoParaSubtitulosLimpio = textoParaSubtitulos
+                .replace(/\[pause(?::\d+)?\]/g, ' ')
+                .replace(/\[(?:slow|fast|soft|loud|emphasis|spell)\]/g, '')
+                .replace(/\[\/(?:slow|fast|soft|loud|emphasis|spell)\]/g, '')
+                .replace(/\[voz:[^\]]+\]/g, '')
+                .replace(/\[\/voz\]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
 
             const tieneTags = /\[voz:|\/voz\]|\[pause|\[slow|\[fast|\[soft|\[loud|\[emphasis|\[spell/i.test(textoParaVoz);
 
@@ -160,12 +283,12 @@ class AudioService {
             const usarPython = !exeExiste;
 
             if (usarPython && tieneTags) {
-                console.log('[INFO] Tags detectados, usando Python 64-bit');
+                console.log(' [INFO] Tags detectados, usando Python 64-bit');
             } else if (!usarPython) {
-                console.log('[INFO] Sin tags, usando .exe 32-bit');
+                console.log(' [INFO] Sin tags, usando .exe 32-bit');
             }
 
-            console.log('Generando voz: ' + vozFinal);
+            console.log(` Generando voz: ${vozFinal}`);
             let proceso;
 
             if (usarPython) {
@@ -173,23 +296,24 @@ class AudioService {
                 try {
                     const check = spawnSync(pythonCmd, ['--version'], { encoding: 'utf8' });
                     if (check.error || check.status !== 0) {
+                        console.error('❌ Python no encontrado');
                         return reject(new Error('Python no encontrado. Instale Python 3 o incluya python/ en el paquete.'));
                     }
                 } catch (e) {
+                    console.error('❌ Python no disponible:', e.message);
                     return reject(new Error('Python no disponible: ' + e.message));
                 }
 
                 if (!fs.existsSync(this.vozScript)) {
+                    console.error('❌ Script de voz no encontrado:', this.vozScript);
                     return reject(new Error(`Script de voz no encontrado: ${this.vozScript}`));
                 }
-
-                console.log('[DEBUG] vozScript:', this.vozScript);
-                console.log('[DEBUG] pythonCmd:', pythonCmd);
 
                 const argsVoz = [this.vozScript, textoParaVoz, vozFinal, rutaArchivo];
                 proceso = spawn(pythonCmd, argsVoz, { windowsHide: true, shell: false });
             } else {
                 if (!fs.existsSync(this.vozExe32)) {
+                    console.error('❌ generar_voz.exe no encontrado:', this.vozExe32);
                     return reject(new Error('generar_voz.exe no encontrado: ' + this.vozExe32));
                 }
                 const argsVoz = [textoParaVoz, vozFinal, rutaArchivo];
@@ -203,39 +327,46 @@ class AudioService {
 
             proceso.on('close', (code) => {
                 if (!fs.existsSync(rutaArchivo) || (!stdout.includes('EXITO') && code !== 0)) {
+                    console.error('❌ Error al generar voz:', stderr || stdout);
                     return reject(new Error('Error al generar voz: ' + (stderr || stdout)));
                 }
 
                 const stats = fs.statSync(rutaArchivo);
                 if (stats.size < 2000) {
                     try { fs.unlinkSync(rutaArchivo); } catch (e) {}
+                    console.error(`❌ Audio vacío (${stats.size} bytes)`);
                     return reject(new Error('Audio vacio (' + stats.size + ' bytes)'));
                 }
 
-                // ✅ FIX CRÍTICO: Si usarIA es false, NO generamos SRT ni ASS. 
+                console.log(`Voz generada: ${nombreArchivo} (${(stats.size / 1024).toFixed(2)} KB)`);
+
                 if (usarIA === false || usarIA === 'solo_audio') {
-                    console.log('[AudioService] ✅ Generando SOLO audio (sin subtítulos)');
+                    console.log('[AudioService] Generando SOLO audio (sin subtítulos)\n');
                     return resolve({
                         url: '/audios/' + nombreArchivo,
                         srt: null,
                         ass: null,
-                        textoLimpio: textoParaSubtitulos,
+                        textoLimpio: textoParaSubtitulosLimpio,
                         stats
                     });
                 }
+                
                 const nombreSRT = `subtitulos-${Date.now()}.srt`;
                 const rutaSRT = path.join(this.audioFolder, nombreSRT);
                 let srtUrl = null;
 
-                const usarPythonSRT = usarIA !== false && this.pythonScript && fs.existsSync(this.pythonScript);
+                const usarWhisperCpp = fs.existsSync(this.whisperExe) && fs.existsSync(this.whisperModel);
+                const usarPythonSRT = !usarWhisperCpp && this.pythonScript && fs.existsSync(this.pythonScript);
 
                 const generarASS = () => {
                     return new Promise((resolveASS) => {
+                        console.log('\n[ASS] Generando subtítulos ASS...');
+                        
                         const nombreASS = `subtitulos-${Date.now()}.ass`;
                         const rutaASS = path.join(this.audioFolder, nombreASS);
 
                         if (!fs.existsSync(this.assScript)) {
-                            console.warn('ASS script no encontrado:', this.assScript);
+                            console.warn('[ASS] Script no encontrado:', this.assScript);
                             return resolveASS(null);
                         }
 
@@ -243,10 +374,9 @@ class AudioService {
                         if (rutaSRT && fs.existsSync(rutaSRT)) {
                             assArgs.push(rutaSRT);
                         }
-                        assArgs.push(textoParaSubtitulos);
+                        assArgs.push(textoParaSubtitulosLimpio);
 
                         const pythonCmd = this.pythonBin || 'python';
-                        console.log('[DEBUG] assScript:', this.assScript);
 
                         const assProcess = spawn(pythonCmd, assArgs, { windowsHide: true, shell: false });
                         let assOut = '', assErr = '';
@@ -255,16 +385,16 @@ class AudioService {
 
                         assProcess.on('close', (c) => {
                             if (c === 0 && fs.existsSync(rutaASS)) {
-                                console.log('ASS generado: ' + nombreASS);
+                                console.log(`[ASS] Generado: ${nombreASS}\n`);
                                 resolveASS('/audios/' + nombreASS);
                             } else {
-                                console.warn('ASS fallo:', assErr || assOut);
+                                console.warn(' [ASS] Falló:', assErr || assOut);
                                 resolveASS(null);
                             }
                         });
 
                         assProcess.on('error', (err) => {
-                            console.warn('Error ASS:', err.message);
+                            console.warn('⚠️  [ASS] Error:', err.message);
                             resolveASS(null);
                         });
                     });
@@ -272,51 +402,78 @@ class AudioService {
 
                 const finalizar = async () => {
                     const assUrl = await generarASS();
-                    console.log('Audio: ' + nombreArchivo + ' (' + (stats.size / 1024).toFixed(2) + ' KB)');
+                    console.log('════════════════════════════════════════');
+                    console.log(` [AudioService] COMPLETADO: ${nombreArchivo}`);
+                    console.log(`    Audio: ${(stats.size / 1024).toFixed(2)} KB`);
+                    console.log(`   SRT: ${srtUrl ? '✅' : '❌'}`);
+                    console.log(`    ASS: ${assUrl ? '✅' : '❌'}`);
+                    console.log('════════════════════════════════════════\n');
+                    
                     resolve({
                         url: '/audios/' + nombreArchivo,
                         srt: srtUrl,
                         ass: assUrl,
-                        textoLimpio: textoParaSubtitulos,
+                        textoLimpio: textoParaSubtitulosLimpio,
                         stats
                     });
                 };
 
-                if (usarPythonSRT) {
-                    console.log('Generando SRT con Whisper...');
+                // ✅ WHISPER.CPP TIENE PRIORIDAD
+                if (usarWhisperCpp) {
+                    console.log('\n [SRT] Estrategia: Whisper.cpp (prioridad)');
+                    
+                    const maxPalabras = opciones.maxPalabras || 7;
+                    
+                    this.generarSRTWhisperCpp(rutaArchivo, rutaSRT, maxPalabras)
+                        .then(() => {
+                            if (fs.existsSync(rutaSRT)) {
+                                srtUrl = '/audios/' + nombreSRT;
+                                console.log(' [SRT] Whisper.cpp exitoso\n');
+                            }
+                            finalizar();
+                        })
+                        .catch((err) => {
+                            console.warn(' [SRT] Whisper.cpp falló:', err.message);
+                            console.log(' [SRT] Usando fallback matemático...');
+                            if (this.generarSRTMatematico(textoParaSubtitulosLimpio, rutaArchivo, rutaSRT)) {
+                                srtUrl = '/audios/' + nombreSRT;
+                            }
+                            finalizar();
+                        });
+                } else if (usarPythonSRT) {
+                    console.log('\n [SRT] Estrategia: Whisper (Python)');
                     const pythonCmd = this.pythonBin || 'python';
-                    console.log('[DEBUG] pythonSRT:', this.pythonScript);
 
                     const pythonProcess = spawn(pythonCmd, [
-                        this.pythonScript, rutaArchivo, rutaSRT, textoParaSubtitulos
+                        this.pythonScript, rutaArchivo, rutaSRT, textoParaSubtitulosLimpio
                     ]);
 
                     let pyStdout = '', pyStderr = '';
                     pythonProcess.stdout.on('data', (data) => {
                         pyStdout += data.toString();
-                        console.log('[Whisper] ' + data.toString().trim());
+                        console.log('   [Whisper]', data.toString().trim());
                     });
                     pythonProcess.stderr.on('data', (data) => {
                         pyStderr += data.toString();
-                        console.error('[Whisper ERR] ' + data.toString().trim());
+                        console.error('   [Whisper ERR]', data.toString().trim());
                     });
 
                     pythonProcess.on('close', (pythonCode) => {
-                        console.log('[Whisper] Codigo: ' + pythonCode);
                         if (pythonCode === 0 && fs.existsSync(rutaSRT)) {
                             srtUrl = '/audios/' + nombreSRT;
-                            console.log('SRT generado con IA');
+                            console.log('[SRT] Whisper Python exitoso\n');
                         } else {
-                            console.warn('Whisper fallo, usando fallback...');
-                            if (this.generarSRTMatematico(textoParaSubtitulos, rutaArchivo, rutaSRT)) {
+                            console.warn(' [SRT] Whisper Python falló');
+                            console.log(' [SRT] Usando fallback matemático...');
+                            if (this.generarSRTMatematico(textoParaSubtitulosLimpio, rutaArchivo, rutaSRT)) {
                                 srtUrl = '/audios/' + nombreSRT;
                             }
                         }
                         finalizar();
                     });
                 } else {
-                    console.log('Generando SRT matematico...');
-                    if (this.generarSRTMatematico(textoParaSubtitulos, rutaArchivo, rutaSRT)) {
+                    console.log('\n [SRT] Estrategia: Matemático');
+                    if (this.generarSRTMatematico(textoParaSubtitulosLimpio, rutaArchivo, rutaSRT)) {
                         srtUrl = '/audios/' + nombreSRT;
                     }
                     finalizar();
@@ -324,13 +481,21 @@ class AudioService {
             });
 
             proceso.on('error', (err) => {
+                console.error('❌ Error generador voz:', err.message);
                 reject(new Error('Error generador voz: ' + err.message));
             });
         });
     }
 
+    // ==========================================
+    // ✅ DUCKING
+    // ==========================================
     async aplicarDucking(voiceAudioPathAbsoluta, musicPathAbsoluta, options = {}) {
         return new Promise((resolve, reject) => {
+            console.log('\n════════════════════════════════════════');
+            console.log(' [Ducking] INICIANDO MEZCLA');
+            console.log('════════════════════════════════════════');
+            
             const {
                 musicVolume = 0.5,
                 loopMusic = false,
@@ -348,14 +513,18 @@ class AudioService {
             const voiceAudioCompleto = voiceAudioPathAbsoluta;
             const musicCompleto = musicPathAbsoluta;
 
-            console.log('Aplicando Ducking Real (Sidechain)...');
-            console.log('  - Voz:', voiceAudioCompleto, '| Existe:', fs.existsSync(voiceAudioCompleto));
-            console.log('  - Musica:', musicCompleto, '| Existe:', fs.existsSync(musicCompleto));
+            console.log(`   Voz: ${path.basename(voiceAudioCompleto)} | Existe: ${fs.existsSync(voiceAudioCompleto)}`);
+            console.log(`    Música: ${path.basename(musicCompleto)} | Existe: ${fs.existsSync(musicCompleto)}`);
+            console.log(`   Volumen música: ${musicVolume}`);
+            console.log(`   Loop: ${loopMusic}`);
+            console.log(`   Fade In: ${fadeInMusic}s | Fade Out: ${fadeOutMusic}s`);
 
             if (!fs.existsSync(voiceAudioCompleto)) {
+                console.error('❌ Audio de voz no encontrado');
                 return reject(new Error('Audio de voz no encontrado: ' + voiceAudioCompleto));
             }
             if (!fs.existsSync(musicCompleto)) {
+                console.error('❌ Música no encontrada');
                 return reject(new Error('Musica no encontrada: ' + musicCompleto));
             }
 
@@ -378,12 +547,13 @@ class AudioService {
                 if (isNaN(duracionVoz) || duracionVoz <= 0) {
                     duracionVoz = this.obtenerDuracionAudio(voiceAudioCompleto);
                     if (duracionVoz <= 0) {
+                        console.error('❌ No se pudo obtener la duración');
                         return reject(new Error('No se pudo obtener la duracion del audio'));
                     }
                 }
 
                 const fadeOutStart = Math.max(0, duracionVoz - fadeOutMusic);
-                console.log(`Voz: ${duracionVoz.toFixed(1)}s | Fade out: ${fadeOutStart.toFixed(1)}s | Vol musica: ${musicVolume}`);
+                console.log(`  Voz: ${duracionVoz.toFixed(1)}s | Fade out: ${fadeOutStart.toFixed(1)}s`);
 
                 const ffmpegArgs = ['-i', voiceAudioCompleto];
                 if (loopMusic) {
@@ -419,42 +589,51 @@ class AudioService {
                     if (code === 0 && fs.existsSync(rutaSalida)) {
                         const outStats = fs.statSync(rutaSalida);
                         if (outStats.size < 2000) {
+                            console.error('❌ Ducking generó archivo vacío');
                             return reject(new Error('Ducking genero archivo vacio'));
                         }
-                        console.log('Ducking aplicado: ' + nombreSalida);
+                        console.log(`[Ducking] Aplicado: ${nombreSalida} (${(outStats.size / 1024).toFixed(2)} KB)\n`);
                         resolve({
                             url: '/audios/' + nombreSalida,
                             mensaje: 'Ducking aplicado correctamente'
                         });
                     } else {
-                        console.error('FFmpeg Ducking Error:', stderr);
+                        console.error('❌ [Ducking] FFmpeg Error:', stderr);
                         reject(new Error('Ducking fallo: ' + stderr.substring(0, 500)));
                     }
                 });
 
                 ffmpegProcess.on('error', (err) => {
+                    console.error('❌ [Ducking] FFmpeg error:', err.message);
                     reject(new Error('FFmpeg error: ' + err.message));
                 });
             });
 
             ffmpegInfo.on('error', (err) => {
+                console.error('❌ [Ducking] Error obteniendo duración:', err.message);
                 reject(new Error('Error obteniendo duracion: ' + err.message));
             });
         });
     }
 
+    // ==========================================
+    // ✅ CONVERTIR A MP3
+    // ==========================================
     async convertirAMp3(wavPathAbsoluta, outputFolder) {
         return new Promise((resolve, reject) => {
+            console.log('\n🎵 [MP3] Iniciando conversión...');
+            
             const wavCompleto = wavPathAbsoluta;
 
             if (!fs.existsSync(wavCompleto)) {
+                console.error('❌ WAV no existe:', wavCompleto);
                 return reject(new Error('WAV no existe: ' + wavCompleto));
             }
 
             const nombreMp3 = `export-${Date.now()}.mp3`;
             const rutaMp3 = path.join(outputFolder || this.audioFolder, nombreMp3);
 
-            console.log('MP3: ' + wavCompleto);
+            console.log(`  WAV: ${path.basename(wavCompleto)}`);
 
             const ffmpegArgs = [
                 '-i', wavCompleto,
@@ -473,18 +652,20 @@ class AudioService {
 
             ffmpegProcess.on('close', (code) => {
                 if (code === 0 && fs.existsSync(rutaMp3)) {
-                    console.log('MP3: ' + nombreMp3);
+                    const stats = fs.statSync(rutaMp3);
+                    console.log(`✅ [MP3] Convertido: ${nombreMp3} (${(stats.size / 1024).toFixed(2)} KB)\n`);
                     resolve({
                         url: '/audios/' + nombreMp3,
                         mensaje: 'MP3 listo'
                     });
                 } else {
-                    console.error('MP3:', stderr);
+                    console.error('❌ [MP3] Error:', stderr);
                     reject(new Error('MP3 fallo: ' + stderr));
                 }
             });
 
             ffmpegProcess.on('error', (err) => {
+                console.error('❌ [MP3] FFmpeg error:', err.message);
                 reject(new Error('FFmpeg: ' + err.message));
             });
         });

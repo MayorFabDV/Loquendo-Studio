@@ -7,12 +7,14 @@ class DictionaryService {
     constructor(dbFolder) {
         this.dbFolder = dbFolder;
         this.paths = {
-            perfil: path.join(dbFolder, 'perfil_usuario.json'),
-            jergas: path.join(dbFolder, 'diccionario_jergas.json'),
-            sinonimos: path.join(dbFolder, 'diccionario_sinonimos.json'),
-            loquendo: path.join(dbFolder, 'diccionario_loquendo.json'),
-            fonetica: path.join(dbFolder, 'diccionario_fonetica.json') // ✅ Agregado
-        };
+    perfil: path.join(dbFolder, 'perfil_usuario.json'),
+    jergas: path.join(dbFolder, 'diccionario_jergas.json'),
+    sinonimos: path.join(dbFolder, 'diccionario_sinonimos.json'),
+    loquendo: path.join(dbFolder, 'diccionario_loquendo.json'),
+    fonetica: path.join(dbFolder, 'diccionario_fonetica.json'),
+    ortografia: path.join(dbFolder, 'diccionario_ortografia.json'),  
+    gramatica: path.join(dbFolder, 'diccionario_gramatica.json')     
+};
         
         // Crear carpeta si no existe
         if (!fs.existsSync(this.dbFolder)) {
@@ -134,6 +136,45 @@ class DictionaryService {
         }
         return texto;
     }
+    
+    
+// ✅ Aplicar solo ortografía
+aplicarSoloOrtografia(textoOriginal) {
+    let texto = textoOriginal;
+    try {
+        const ruta = this.paths.ortografia;
+        if (fs.existsSync(ruta)) {
+            const data = JSON.parse(fs.readFileSync(ruta, 'utf8') || '{}');
+            for (const [original, reemplazo] of Object.entries(data)) {
+                const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+                texto = texto.replace(regex, this.elegirReemplazo(reemplazo));
+            }
+        }
+    } catch (err) {
+        console.error("❌ Error al aplicar ortografía:", err);
+    }
+    return texto;
+}
+
+// ✅ Aplicar solo gramática
+aplicarSoloGramatica(textoOriginal) {
+    let texto = textoOriginal;
+    try {
+        const ruta = this.paths.gramatica;
+        if (fs.existsSync(ruta)) {
+            const data = JSON.parse(fs.readFileSync(ruta, 'utf8') || '{}');
+            for (const [original, reemplazo] of Object.entries(data)) {
+                const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+                texto = texto.replace(regex, this.elegirReemplazo(reemplazo));
+            }
+        }
+    } catch (err) {
+        console.error("❌ Error al aplicar gramática:", err);
+    }
+    return texto;
+}
 
     // ✅ NUEVO: Aplicar selección según opciones
     aplicarConOpciones(textoOriginal, opciones = {}) {
@@ -152,9 +193,15 @@ class DictionaryService {
         if (opciones.perfil) {
             texto = this.aplicarSoloPerfil(texto);
         }
+        if (opciones.ortografia) {
+            texto = this.aplicarSoloOrtografia(texto);
+        }
+        if (opciones.gramatica) {
+            texto = this.aplicarSoloGramatica(texto);
+        }
         
         // Si ninguna opción está activada, devolver el texto original
-        if (!opciones.jergas && !opciones.fonetica && !opciones.sinonimos && !opciones.perfil) {
+        if (!opciones.jergas && !opciones.fonetica && !opciones.sinonimos && !opciones.perfil && !opciones.ortografia && !opciones.gramatica) {
             return textoOriginal;
         }
         
@@ -205,7 +252,7 @@ class DictionaryService {
 
     limpiarTodo() {
         //  Agregado 'fonetica' a la limpieza
-        ['perfil', 'jergas', 'sinonimos', 'loquendo', 'fonetica'].forEach(tipo => {
+        ['perfil', 'jergas', 'sinonimos', 'loquendo', 'fonetica', 'ortografia', 'gramatica'].forEach(tipo => {
             fs.writeFileSync(this.paths[tipo], JSON.stringify({}, null, 4));
         });
     }

@@ -4,10 +4,13 @@ import os
 import argparse
 import re
 
-if sys.platform == "win32":
-    import codecs
-    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-
+# ✅ FIX: Solo redirigir stdout si existe (no es --noconsole)
+if sys.platform == "win32" and sys.stdout is not None:
+    try:
+        import codecs
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+    except (AttributeError, OSError):
+        pass  # Sin consola, ignorar
 
 def convertir_tags_textaloud_a_ssml(texto):
     """

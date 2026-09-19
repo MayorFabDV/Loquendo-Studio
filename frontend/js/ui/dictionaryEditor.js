@@ -4,7 +4,9 @@ class DictionaryEditor {
         this.dictionaries = {
             jergas: {},
             sinonimos: {},
-            fonetica: {}
+            fonetica: {},
+            ortografia: {},
+            gramatica: {}
         };
         this.currentTab = 'jergas';
         this.searchTerm = '';
@@ -12,13 +14,17 @@ class DictionaryEditor {
 
     async loadAll() {
         try {
-            const [resJer, resSin] = await Promise.all([
+            const [resJer, resSin, resOrt, resGram] = await Promise.all([
                 fetch('http://localhost:3000/api/jergas'),
-                fetch('http://localhost:3000/api/sinonimos')
+                fetch('http://localhost:3000/api/sinonimos'),
+                fetch('http://localhost:3000/api/ortografia'),
+                fetch('http://localhost:3000/api/gramatica')
             ]);
 
             if (resJer.ok) this.dictionaries.jergas = await resJer.json();
             if (resSin.ok) this.dictionaries.sinonimos = await resSin.json();
+            if (resOrt.ok) this.dictionaries.ortografia = await resOrt.json();
+            if (resGram.ok) this.dictionaries.gramatica = await resGram.json();
 
             const foneticaLocal = localStorage.getItem('diccionarioFonetica');
             if (foneticaLocal) {
@@ -48,11 +54,11 @@ class DictionaryEditor {
         container.innerHTML = `
             <div class="dictionary-tabs">
                 <button class="tab-btn ${this.currentTab === 'jergas' ? 'active' : ''}" 
-                        onclick="window.dictionaryEditor.switchTab('jergas')">🌎 Jergas</button>
+                        onclick="window.dictionaryEditor.switchTab('jergas')">Jergas</button>
                 <button class="tab-btn ${this.currentTab === 'sinonimos' ? 'active' : ''}" 
-                        onclick="window.dictionaryEditor.switchTab('sinonimos')">🧠 Sinónimos</button>
+                        onclick="window.dictionaryEditor.switchTab('sinonimos')">Sinónimos</button>
                 <button class="tab-btn ${this.currentTab === 'fonetica' ? 'active' : ''}" 
-                        onclick="window.dictionaryEditor.switchTab('fonetica')">🗣️ Fonética</button>
+                        onclick="window.dictionaryEditor.switchTab('fonetica')"> Fonética</button>
             </div>
             <div class="dictionary-content">
                 <div class="dictionary-header">
@@ -64,7 +70,7 @@ class DictionaryEditor {
                 <div class="dictionary-add-form">
                     <input type="text" id="newWord" placeholder="Palabra original">
                     <input type="text" id="newReplacement" placeholder="${this.getPlaceholder()}">
-                    <button onclick="window.dictionaryEditor.addEntry()">➕ Agregar</button>
+                    <button onclick="window.dictionaryEditor.addEntry()"> Agregar</button>
                 </div>
                 <div class="dictionary-list" id="dictionaryList">
                     ${this.renderEntries()}
@@ -81,9 +87,9 @@ class DictionaryEditor {
 
     getTabTitle() {
         const titles = {
-            jergas: '🌎 Jergas y Regionalismos',
-            sinonimos: '🧠 Sinónimos (variaciones aleatorias)',
-            fonetica: '🗣️ Fonética Loquendo'
+            jergas: ' Jergas y Regionalismos',
+            sinonimos: ' Sinónimos (variaciones aleatorias)',
+            fonetica: ' Fonética Loquendo'
         };
         return titles[this.currentTab];
     }
@@ -185,7 +191,17 @@ class DictionaryEditor {
 
         // opciones = { fonetica: true, jergas: true, sinonimos: true }
         // Si no se pasa nada, no aplica nada (seguro por defecto)
+    if (opciones.ortografia) {
+        for (let [original, reemplazo] of Object.entries(this.dictionaries.ortografia || {})) {
+            resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
+        }
+    }
 
+    if (opciones.gramatica) {
+        for (let [original, reemplazo] of Object.entries(this.dictionaries.gramatica || {})) {
+            resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
+        }
+    }
         if (opciones.fonetica) {
             for (let [original, reemplazo] of Object.entries(this.dictionaries.fonetica)) {
                 resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
