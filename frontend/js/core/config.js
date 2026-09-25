@@ -1,6 +1,19 @@
+// ✅ FIX #17: derivar la base del origen real (respeta puerto 3000/3001 del fallback)
+const _apiBaseDerivada = (() => {
+    try {
+        if (window.location && window.location.origin && window.location.origin.startsWith('http')) {
+            return window.location.origin;
+        }
+        if (window.location && window.location.port) {
+            return `http://localhost:${window.location.port}`;
+        }
+    } catch (e) { /* ignorar */ }
+    return 'http://localhost:3000';
+})();
+
 const CONFIG = {
-    API_BASE_URL: 'http://localhost:3000',
-    API_BASE: 'http://localhost:3000',
+    API_BASE_URL: _apiBaseDerivada,
+    API_BASE: _apiBaseDerivada,
     
     AUDIO: {
         MAX_HISTORY: 20,

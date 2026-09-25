@@ -18,11 +18,12 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "sql.js": "^1.14.2"
   },
   "devDependencies": {
-    "electron": "^28.3.3",
-    "electron-builder": "^24.13.3"
+    "electron": "^37.10.3",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.bafyam.loquendo",
@@ -31,45 +32,71 @@
       "output": "dist",
       "buildResources": "build"
     },
-"files": [
-  "main-electron.js",
-  "server.js",
-  "frontend/**/*",
-  "backend/services/**/*",
-  "backend/db/**/*",
-  "!backend/public/audios/*",
-  "!backend/public/pngtuber/*",
-  "!backend/db/*.json",
-  "!backend/bin/**/*",
-  "!backend/python/**/*",
-  "!backend/modules/**/*",
-  "!**/*.map",
-  "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
-  "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-  "!**/node_modules/.bin/*",
-  "!**/*.{o,hprof,orig,pyc,pyo,rbc}",
-  "!**/._*",
-  "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
-  "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}"
-],
-"asarUnpack": [
-  "backend/bin/**/*",
-  "backend/modules/**/*",
-  "backend/python/**/*",
-  "backend/services/**/*",
-  "backend/db/**/*"
-],
+    "files": [
+      "main-electron.js",
+      "preload.js",
+      "server.js",
+      "frontend/**/*",
+      "backend/services/**/*",
+      "backend/db/**/*",
+      "!backend/public/audios/*",
+      "!backend/public/pngtuber/*",
+      "!backend/db/*.json",
+      "!backend/bin/**/*",
+      "!backend/python/**/*",
+      "!backend/modules/**/*",
+      "!**/*.map",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/.bin/*",
+      "!**/*.{o,hprof,orig,pyc,pyo,rbc}",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}"
+    ],
+    "asarUnpack": [
+      "backend/bin/**/*",
+      "backend/modules/**/*",
+      "backend/python/**/*",
+      "backend/services/**/*",
+      "backend/db/**/*"
+    ],
     "extraResources": [
-      { "from": "backend/bin/", "to": "backend/bin/" },
-      { "from": "backend/modules/", "to": "backend/modules/" },
-      { "from": "backend/public/", "to": "backend/public/" },
-      { "from": "backend/db/", "to": "backend/db/" },
-      { "from": "backend/python/", "to": "backend/python/" }
+      {
+        "from": "backend/bin/",
+        "to": "backend/bin/"
+      },
+      {
+        "from": "backend/modules/",
+        "to": "backend/modules/"
+      },
+      {
+        "from": "backend/public/",
+        "to": "backend/public/"
+      },
+      {
+        "from": "backend/db/",
+        "to": "backend/db/"
+      },
+      {
+        "from": "backend/python/",
+        "to": "backend/python/"
+      }
     ],
     "win": {
       "target": [
-        { "target": "portable", "arch": ["x64"] },
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "frontend/img/logo.ico",
       "requestedExecutionLevel": "asInvoker"

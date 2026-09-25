@@ -30,6 +30,6 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 .env.local
-
+*.md
 *.bat
 !compilar.bat

@@ -6,6 +6,7 @@ if (typeof API_BASE === 'undefined') {
     window.API_BASE = API_BASE;
 }
 
+
 let textoBaseParaAprender = "";
 let musicaFondoPath = null;
 let voiceAudioRealPath = null;
@@ -49,15 +50,10 @@ function cambiarDiseno() {
 }
 
 function abrirEnlaceExterno(url) {
-    if (typeof require !== 'undefined') {
-        try {
-            const { shell } = require('electron');
-            shell.openExternal(url);
-        } catch (e) {
-            window.open(url, '_blank');
-        }
+    if (window.electronAPI && window.electronAPI.openExternal) {
+        window.electronAPI.openExternal(url);
     } else {
-        window.open(url, '_blank');
+        console.warn('electronAPI no disponible, no se puede abrir el enlace:', url);
     }
 }
 
@@ -88,7 +84,137 @@ function cerrarAyuda() {
     const modal = document.getElementById('modalAyuda');
     if (modal) modal.style.display = 'none';
 }
+// ==========================================
+// FUNCIÓN AUXILIAR: APLICAR COMAS (LÓGICA NATURAL)
+// ==========================================
+function aplicarComas(texto) {
+    let resultado = texto;
+    
+    // 1. Limpieza base: quitar espacios antes de signos y comas múltiples
+    resultado = resultado.replace(/\s+([,.!?])/g, "$1");
+    resultado = resultado.replace(/,+/g, ",");
+    
+    // 2. Comas después de saludos o muletillas al inicio de la oración
+    const saludos = ['Hola', 'Bueno', 'Pues', 'Entonces', 'Así que', 'Oye', 'Mira', 'Escucha', 'Buenas', 'Hey'];
+    saludos.forEach(saludo => {
+        const regex = new RegExp(`(^|[.!?]\\s+)(${saludo})\\b`, 'gi');
+        resultado = resultado.replace(regex, "$1$2,");
+    });
+    
+    // 3. Comas ANTES de conectores de contraste o causa
+    const conectoresAntes = [
+        'pero', 'aunque', 'sin embargo', 'no obstante', 'mas', 'sino',
+        'porque', 'ya que', 'puesto que', 'pues',
+        'mientras', 'donde', 'cuando'
+    ];
+    conectoresAntes.forEach(conector => {
+        const regex = new RegExp(`([^,.!?\\n])\\s+\\b(${conector})\\b`, "gi");
+        resultado = resultado.replace(regex, "$1, $2");
+    });
+    
+    // 4. Comas DESPUÉS de conectores que inician una nueva idea
+    const conectoresDespues = [
+        'Sin embargo', 'No obstante', 'Además', 'También', 'Asimismo',
+        'Por lo tanto', 'Por consiguiente', 'En conclusión', 'Finalmente',
+        'Es decir', 'O sea', 'Mejor dicho', 'Por ejemplo', 'En resumen',
+        'Primero', 'Segundo', 'Tercero', 'Por último'
+    ];
+    conectoresDespues.forEach(conector => {
+        const regex = new RegExp(`\\b(${conector})\\b(?![,])`, "gi");
+        resultado = resultado.replace(regex, "$1,");
+    });
+    
+    // 5. Limpieza final de puntuación
+    resultado = resultado.replace(/,\s*([.!?])/g, "$1");
+    resultado = resultado.replace(/,([^\s])/g, ", $1");
+    resultado = resultado.replace(/\s+/g, ' ');
+    
+    return resultado;
+}
 
+// ==========================================
+// FUNCIÓN AUXILIAR: APLICAR COMAS (CONSCIENTE DEL MODO)
+// ==========================================
+function aplicarComas(texto, modo = 'normal') {
+    let resultado = texto;
+    
+    // 1. Limpieza base: quitar espacios antes de signos y comas múltiples
+    resultado = resultado.replace(/\s+([,.!?])/g, "$1");
+    resultado = resultado.replace(/,+/g, ",");
+    
+    // 2. Comas después de saludos o muletillas al inicio de la oración
+    const saludos = ['Hola', 'Bueno', 'Pues', 'Entonces', 'Así que', 'Oye', 'Mira', 'Escucha', 'Buenas', 'Hey'];
+    saludos.forEach(saludo => {
+        const regex = new RegExp(`(^|[.!?]\\s+)(${saludo})\\b`, 'gi');
+        resultado = resultado.replace(regex, "$1$2,");
+    });
+    
+    // 3. Comas ANTES de conectores de contraste o causa
+    const conectoresAntes = [
+        'pero', 'aunque', 'sin embargo', 'no obstante', 'mas', 'sino',
+        'porque', 'ya que', 'puesto que', 'pues', 'mientras', 'donde', 'cuando'
+    ];
+    conectoresAntes.forEach(conector => {
+        const regex = new RegExp(`([^,.!?\\n])\\s+\\b(${conector})\\b`, "gi");
+        resultado = resultado.replace(regex, "$1, $2");
+    });
+    
+    // 4. Comas DESPUÉS de conectores que inician una nueva idea
+    const conectoresDespues = [
+        'Sin embargo', 'No obstante', 'Además', 'También', 'Asimismo',
+        'Por lo tanto', 'Por consiguiente', 'En conclusión', 'Finalmente',
+        'Es decir', 'O sea', 'Mejor dicho', 'Por ejemplo', 'En resumen',
+        'Primero', 'Segundo', 'Tercero', 'Por último'
+    ];
+    conectoresDespues.forEach(conector => {
+        const regex = new RegExp(`\\b(${conector})\\b(?![,])`, "gi");
+        resultado = resultado.replace(regex, "$1,");
+    });
+    
+    // 5. Limpieza final de puntuación (Adaptada al modo)
+    resultado = resultado.replace(/,\s*([.!?])/g, "$1");
+    
+    if (modo !== 'creepy' && modo !== 'creepypasta') {
+        resultado = resultado.replace(/,([^\s])/g, ", $1");
+    }
+    
+    resultado = resultado.replace(/\s+/g, ' ');
+    
+    return resultado;
+}
+
+// ==========================================
+// FUNCIÓN AUXILIAR: APLICAR PUNTOS (CONSCIENTE DEL MODO)
+// ==========================================
+function aplicarPuntos(texto, modo = 'normal') {
+    let resultado = texto;
+    
+    // 1. Asegurar espacio después de cada punto
+    if (modo !== 'creepy' && modo !== 'creepypasta') {
+        resultado = resultado.replace(/\.([^\s.])/g, ". $1");
+    } else {
+        resultado = resultado.replace(/(?<!\.)\.([^\s.])/g, ". $1");
+    }
+    
+    // 2. Capitalizar la primera letra después de un punto, signo de exclamación o interrogación
+    resultado = resultado.replace(/(^\s*\w|[.!?]\s+\w)/g, function(match) {
+        return match.toUpperCase();
+    });
+    
+    // 3. Asegurar que el texto termine con un signo de puntuación fuerte
+    const ultimoCaracter = resultado.trim().slice(-1);
+    if (!['.', '!', '?', '…'].includes(ultimoCaracter)) {
+        resultado = resultado.trim() + ".";
+    }
+    
+    // 4. Limpieza de puntos duplicados (solo si NO es creepypasta)
+    if (modo !== 'creepy' && modo !== 'creepypasta') {
+        resultado = resultado.replace(/\.{2,}/g, '.');
+        resultado = resultado.replace(/\.\s*\./g, '.');
+    }
+    
+    return resultado;
+}
 // ==========================================
 // 1.5 CARGAR VOCES DISPONIBLES DINÁMICAMENTE
 // ==========================================
@@ -235,7 +361,6 @@ async function corregirTexto() {
         if (btn) { btn.innerText = textoBtnOriginal; btn.disabled = false; }
     }
 }
-
 // ==========================================
 // 2. PROCESAMIENTO DE TEXTO
 // ==========================================
@@ -252,39 +377,68 @@ function optimizar() {
     let texto = entradaInput.value.trim();
     const modo = modoSelect?.value || "normal";
     
+    console.log('📝 [Optimizar] Texto original:', texto.substring(0, 100));
+    console.log('🎭 [Optimizar] Modo:', modo);
+    
+    // ============================================================
+    // 1. DICCIONARIOS
+    // ============================================================
     if (window.dictionaryEditor && typeof window.dictionaryEditor.applyToText === 'function') {
         const opciones = {
+            ortografia: document.getElementById("chkOrtografia")?.checked || false,
+            gramatica: document.getElementById("chkGramatica")?.checked || false,
             fonetica: document.getElementById("chkLoquendo")?.checked || false,
             jergas: document.getElementById("chkNeutro")?.checked || false,
             sinonimos: document.getElementById("chkSinonimos")?.checked || false
         };
+        
+        console.log('📚 [Optimizar] Opciones diccionarios:', opciones);
         texto = window.dictionaryEditor.applyToText(texto, opciones);
+        console.log('📚 [Optimizar] Después de diccionarios:', texto.substring(0, 100));
     }
     
+    // ============================================================
+    // 2. MODO DE NARRACIÓN
+    // ============================================================
     if (window.NarrationModes) {
         texto = window.NarrationModes.aplicar(texto, modo);
+        console.log(`🎭 [Optimizar] Después de modo "${modo}":`, texto.substring(0, 100));
     }
     
+    // ============================================================
+    // 3. ORTOGRAFÍA Y GRAMÁTICA
+    // ============================================================
+    if (window.ortografiaProcessor) {
+        const opcionesOrtografia = {
+            ortografia: document.getElementById("chkOrtografia")?.checked || false,
+            gramatica: document.getElementById("chkGramatica")?.checked || false,
+            puntuacion: document.getElementById("chkPuntuacion")?.checked || false
+        };
+        texto = window.ortografiaProcessor.procesar(texto, opcionesOrtografia);
+        console.log('📝 [Optimizar] Después de ortografía:', texto.substring(0, 100));
+    }
+    
+    // ============================================================
+    // 4. COMAS INTELIGENTES (CONSCIENTES DEL MODO)
+    // ============================================================
     const chkComas = document.getElementById("chkComas");
     if (chkComas?.checked) {
-        texto = texto.replace(/\s+([,.!?])/g, "$1");
-        texto = texto.replace(/^(Hola|Bueno|Pues|Entonces|Así que|Oye)\b/gi, "$1,");
-        const conectores = ["pero", "aunque", "sin embargo", "además", "entonces", "no obstante", "mientras", "donde", "porque", "ya que"];
-        conectores.forEach(conector => {
-            const regex = new RegExp(`([^,.\\n])\\s+\\b(${conector})\\b`, "gi");
-            texto = texto.replace(regex, "$1, $2");
-        });
-        texto = texto.replace(/\b(he|de|la|el|un|una|se|me|te|lo|le|y|o|a|en|por)\s*,\s*/gi, "$1 ");
-        texto = texto.replace(/,+/g, ",");
-        texto = texto.replace(/,([^\s])/g, ", $1");
+        texto = aplicarComas(texto, modo);
+        console.log('📝 [Optimizar] Después de comas:', texto.substring(0, 100));
     }
     
+    // ============================================================
+    // 5. PUNTOS INTELIGENTES (CONSCIENTES DEL MODO)
+    // ============================================================
     const chkPuntos = document.getElementById("chkPuntos");
     if (chkPuntos?.checked) {
-        texto = texto.replace(/\.([^\s])/g, ". $1");
-        if (!/[.!?…]$/.test(texto)) texto += ".";
+        texto = aplicarPuntos(texto, modo);
+        console.log('📝 [Optimizar] Después de puntos:', texto.substring(0, 100));
     }
     
+    // ============================================================
+    // 6. CAPITALIZAR PRIMERA LETRA DEL TEXTO COMPLETO
+    // ============================================================
     const textoFinal = texto.charAt(0).toUpperCase() + texto.slice(1);
     textoBaseParaAprender = textoFinal;
     
@@ -292,10 +446,10 @@ function optimizar() {
         salida.value = textoFinal;
         asegurarEditable(salida);
     }
-    console.log(`Texto optimizado. Modo: ${modo}`);
-    notificar('success', 'Texto optimizado correctamente');
+    
+    console.log('✅ [Optimizar] Texto final:', textoFinal.substring(0, 100));
+    notificar('success', `Texto optimizado (modo: ${modo})`);
 }
-
 // ==========================================
 // 3. GENERACIÓN DE AUDIO
 // ==========================================
@@ -322,6 +476,11 @@ async function generarAudio(event) {
             fonetica: document.getElementById("chkLoquendo")?.checked || false,
             sinonimos: document.getElementById("chkSinonimos")?.checked || false
         };
+
+        const calidadSel = document.getElementById('calidadSeleccionada');
+        if (calidadSel && calidadSel.value !== '48k') {
+            opciones.calidad = calidadSel.value;
+        }
 
         notificar('info', 'Generando audio...');
 

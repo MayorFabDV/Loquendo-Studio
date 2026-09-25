@@ -25,26 +25,52 @@ const pngtuberFolder = path.join(__base, 'public', 'pngtuber');
 
 // --- FUNCIÓN PARA ESPERAR AL SERVIDOR ---
 function getBoundPort() {
-    if (serverModule?.server?.address?.()) {
-        return serverModule.server.address().port;
-    }
-    return process.env.PORT || 3000;
+    const port = (serverModule.getPort && serverModule.getPort()) || Number(process.env.PORT) || 3000;
+    return port;
 }
 
 let BOUND_PORT = getBoundPort();
+
+function esperarPuertoLigado(maxAttempts = 40, delay = 250) {
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const check = () => {
+            const port = getBoundPort();
+            if (port) return resolve(port);
+            attempts++;
+            if (attempts >= maxAttempts) return resolve(BOUND_PORT);
+            setTimeout(check, delay);
+        };
+        check();
+    });
+}
 
 function waitForServer(maxAttempts = 20, delay = 500) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const check = () => {
             attempts++;
-            const req = http.get(`http://localhost:${BOUND_PORT}`, (res) => {
-                console.log(`[MAIN] ✅ Servidor listo después de ${attempts} intentos`);
-                resolve();
+            const req = http.get(`http://localhost:${BOUND_PORT}/api/health`, (res) => {
+                let body = '';
+                res.on('data', (d) => { body += d.toString(); });
+                res.on('end', () => {
+                    try {
+                        const data = JSON.parse(body);
+                        if (data && data.status === 'ok') {
+                            console.log(`[MAIN] ✅ Servidor (API Loquendo) listo después de ${attempts} intentos`);
+                            resolve();
+                        } else {
+                            throw new Error('Respuesta inesperada del health check');
+                        }
+                    } catch (e) {
+                        console.error(`[MAIN] ⚠️ Puerto ${BOUND_PORT} responde pero NO es nuestro server (${e.message})`);
+                        reject(new Error(`El puerto ${BOUND_PORT} está ocupado por otra aplicación`));
+                    }
+                });
             });
             req.on('error', () => {
                 if (attempts >= maxAttempts) {
-                    reject(new Error('El servidor no arrancó después de ' + (maxAttempts * delay) + 'ms'));
+                    reject(new Error(`El servidor no arrancó después de ${(maxAttempts * delay)}ms`));
                 } else {
                     setTimeout(check, delay);
                 }
@@ -62,6 +88,29 @@ function waitForServer(maxAttempts = 20, delay = 500) {
     });
 }
 
+// --- ENLACES EXTERNOS ---
+// El renderer se sirve desde http://localhost:<puerto real>. Todo lo que no sea
+// ese origen (http/https) se manda al navegador del sistema, nunca a una ventana
+// de Electron. NO usar un puerto fijo: server.js incrementa si 3000 está ocupado.
+function appOrigin() {
+    return `http://localhost:${BOUND_PORT}`;
+}
+
+function abrirEnNavegador(url) {
+    if (typeof url !== 'string') return;
+    if (!/^https?:\/\//i.test(url)) return;
+    shell.openExternal(url);
+}
+
+function urlEsInterna(url) {
+    if (url === 'about:blank') return true;
+    try {
+        return new URL(url).origin === appOrigin();
+    } catch (e) {
+        return false;
+    }
+}
+
 // --- VENTANA PRINCIPAL ---
 let mainWindow;
 
@@ -77,10 +126,30 @@ function createWindow() {
         title: 'Loquendo Studio',
         icon: fs.existsSync(iconPath) ? iconPath : undefined,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            webSecurity: false
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            // ✅ contextIsolation:true habilitado de nuevo. El crash 0xC0000005 de
+            // decodeAudioData() era un bug de Electron 28.3.3 (issue #42271),
+            // arreglado en versiones ≥29. Ahora estamos en 37.10.3.
+            contextIsolation: true,
+            webSecurity: true,
+            sandbox: false
         }
+    });
+
+    // ✅ FIX enlaces externos: única barrera que impide abrir ventanas de Electron.
+    // Cubre window.open() y target="_blank" desde cualquier frame. No afecta
+    // fetch/XHR ni la navegación interna, así que los diccionarios siguen igual.
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        abrirEnNavegador(url);
+        return { action: 'deny' };
+    });
+
+    // Navegación de la ventana principal hacia fuera (link sin target, location.href...)
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (urlEsInterna(url)) return;
+        event.preventDefault();
+        abrirEnNavegador(url);
     });
 
     mainWindow.loadURL(`http://localhost:${BOUND_PORT}`);
@@ -107,19 +176,30 @@ ipcMain.on('app-close', () => app.quit());
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 
 ipcMain.on('abrir-enlace-externo', (event, url) => {
-    shell.openExternal(url);
+    abrirEnNavegador(url);
 });
 
 // --- CICLO DE VIDA ---
+const tieneInstanciaUnica = app.requestSingleInstanceLock();
+
+if (!tieneInstanciaUnica) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
+
 app.whenReady().then(async () => {
     try {
         console.log('[MAIN] Esperando al servidor...');
         
-        // ✅ FIX: Actualizar BOUND_PORT antes de esperar
-        setTimeout(() => {
-            BOUND_PORT = getBoundPort();
-            console.log(`[MAIN] Puerto detectado: ${BOUND_PORT}`);
-        }, 500);
+        // Espera a que Express haya ligado realmente un puerto (puede ser != 3000)
+        BOUND_PORT = await esperarPuertoLigado();
+        console.log(`[MAIN] Puerto detectado: ${BOUND_PORT}`);
         
         await waitForServer();
         console.log('[MAIN] ✅ Backend listo, creando ventana...');

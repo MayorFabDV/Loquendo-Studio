@@ -103,6 +103,42 @@ def convertir_tags_textaloud_a_ssml(texto):
     return texto
 
 
+def preparar_ssml(texto_segmento):
+    """Convierte tags TextAloud a SSML y decide si SAPI debe hablar en modo XML.
+
+    Devuelve (texto_ssml, usar_xml):
+    - Si el texto NO contenía tags (ni '[' ni '<'), se habla como texto plano
+      (flags=0) y cualquier '<'/'&' del usuario se pronuncia literalmente.
+    - Si contenía tags, se construye SSML válido escapando el contenido libre
+      (&, <, >) para que el usuario pueda incluir comparaciones/ampersands
+      sin romper el parseo XML.
+    """
+    texto_ssml = convertir_tags_textaloud_a_ssml(texto_segmento)
+
+    if '<' not in texto_segmento and '[' not in texto_segmento:
+        return texto_ssml, False
+
+    etiquetas = []
+
+    def guardar_etiqueta(m):
+        etiquetas.append(m.group(0))
+        return f"\x00TAG{len(etiquetas) - 1}\x00"
+
+    con_placeholders = re.sub(r'<[^<>]*>', guardar_etiqueta, texto_ssml)
+    con_placeholders = (
+        con_placeholders.replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+    )
+
+    def restaurar_etiqueta(m):
+        return etiquetas[int(m.group(1))]
+
+    xml_seguro = re.sub(r'\x00TAG(\d+)\x00', restaurar_etiqueta, con_placeholders)
+
+    return xml_seguro, True
+
+
 def limpiar_tags_para_subtitulos(texto):
     """Limpia todas las etiquetas para generar subtítulos limpios."""
     texto = re.sub(r'<[^>]+>', '', texto)
@@ -172,76 +208,91 @@ def buscar_voz(speaker, nombre_busqueda):
     return None
 
 
+def _procesar_audio_voz(win32com_client, pythoncom, texto_input, nombre_voz_default, ruta_salida_input):
+    speaker = win32com_client.Dispatch("SAPI.SpVoice")
+    voces = speaker.GetVoices()
+    print(f"Voces disponibles: {voces.Count}")
+
+    for i in range(voces.Count):
+        print(f"  {i}: {voces.Item(i).GetDescription()}")
+
+    segmentos = parsear_segmentos_voz(texto_input)
+    print(f"[OK] {len(segmentos)} segmento(s) de voz detectados")
+
+    ruta_absoluta = os.path.abspath(ruta_salida_input)
+    directorio = os.path.dirname(ruta_absoluta)
+    if not os.path.exists(directorio):
+        os.makedirs(directorio)
+
+    if os.path.exists(ruta_absoluta):
+        os.remove(ruta_absoluta)
+        print("Archivo anterior eliminado")
+
+    # VOZ POR DEFECTO
+    voz_default = buscar_voz(speaker, nombre_voz_default)
+    if voz_default:
+        speaker.Voice = voz_default
+        print(f"[OK] Voz por defecto: {voz_default.GetDescription()}")
+    else:
+        print(f"[WARN] Voz '{nombre_voz_default}' no encontrada, usando predeterminada")
+        voz_default = speaker.Voice
+
+    # Abrir stream
+    stream = win32com_client.Dispatch("SAPI.SpFileStream")
+    stream.Format.Type = 39  # 16kHz, 16-bit, mono
+    stream.Open(ruta_absoluta, 3)
+    speaker.AudioOutputStream = stream
+
+    # PROCESAR CADA SEGMENTO
+    for i, (nombre_voz, texto_segmento) in enumerate(segmentos, 1):
+        print(f"\n  Segmento {i}: voz='{nombre_voz or 'default'}'")
+
+        if nombre_voz:
+            nueva_voz = buscar_voz(speaker, nombre_voz)
+            if nueva_voz:
+                speaker.Voice = nueva_voz
+                print(f"  -> Voz cambiada a: {nueva_voz.GetDescription()}")
+            else:
+                print(f"  [WARN] Voz '{nombre_voz}' no encontrada")
+        else:
+            if voz_default:
+                speaker.Voice = voz_default
+                print(f"  -> Voz restaurada a: {voz_default.GetDescription()}")
+
+        texto_ssml, usar_xml = preparar_ssml(texto_segmento)
+        flags = 8 if usar_xml else 0
+
+        if usar_xml:
+            print(f"  [SSML] {texto_ssml[:80]}...")
+
+        speaker.Speak(texto_ssml, flags)
+
+    if voz_default:
+        speaker.Voice = voz_default
+
+    stream.Close()
+    speaker.AudioOutputStream = None
+
+    return ruta_absoluta
+
+
 def generar_audio_multivoz(texto_input, nombre_voz_default, ruta_salida_input):
     try:
         import win32com.client
         import pythoncom
-        
+
         pythoncom.CoInitialize()
-        speaker = win32com.client.Dispatch("SAPI.SpVoice")
-        voces = speaker.GetVoices()
-        print(f"Voces disponibles: {voces.Count}")
-        
-        for i in range(voces.Count):
-            print(f"  {i}: {voces.Item(i).GetDescription()}")
-        
-        segmentos = parsear_segmentos_voz(texto_input)
-        print(f"[OK] {len(segmentos)} segmento(s) de voz detectados")
-        
-        ruta_absoluta = os.path.abspath(ruta_salida_input)
-        directorio = os.path.dirname(ruta_absoluta)
-        if not os.path.exists(directorio):
-            os.makedirs(directorio)
-        
-        if os.path.exists(ruta_absoluta):
-            os.remove(ruta_absoluta)
-            print("Archivo anterior eliminado")
-        
-        # VOZ POR DEFECTO
-        voz_default = buscar_voz(speaker, nombre_voz_default)
-        if voz_default:
-            speaker.Voice = voz_default
-            print(f"[OK] Voz por defecto: {voz_default.GetDescription()}")
-        else:
-            print(f"[WARN] Voz '{nombre_voz_default}' no encontrada, usando predeterminada")
-            voz_default = speaker.Voice
-        
-        # Abrir stream
-        stream = win32com.client.Dispatch("SAPI.SpFileStream")
-        stream.Format.Type = 39  # 16kHz, 16-bit, mono
-        stream.Open(ruta_absoluta, 3)
-        speaker.AudioOutputStream = stream
-        
-        # PROCESAR CADA SEGMENTO
-        for i, (nombre_voz, texto_segmento) in enumerate(segmentos, 1):
-            print(f"\n  Segmento {i}: voz='{nombre_voz or 'default'}'")
-            
-            if nombre_voz:
-                nueva_voz = buscar_voz(speaker, nombre_voz)
-                if nueva_voz:
-                    speaker.Voice = nueva_voz
-                    print(f"  -> Voz cambiada a: {nueva_voz.GetDescription()}")
-                else:
-                    print(f"  [WARN] Voz '{nombre_voz}' no encontrada")
-            else:
-                if voz_default:
-                    speaker.Voice = voz_default
-                    print(f"  -> Voz restaurada a: {voz_default.GetDescription()}")
-            
-            texto_ssml = convertir_tags_textaloud_a_ssml(texto_segmento)
-            tiene_xml = '<' in texto_ssml and '>' in texto_ssml
-            flags = 8 if tiene_xml else 0
-            
-            if tiene_xml:
-                print(f"  [SSML] {texto_ssml[:80]}...")
-            
-            speaker.Speak(texto_ssml, flags)
-        
-        if voz_default:
-            speaker.Voice = voz_default
-        
-        stream.Close()
-        pythoncom.CoUninitialize()
+        try:
+            ruta_absoluta = _procesar_audio_voz(
+                win32com.client, pythoncom, texto_input, nombre_voz_default, ruta_salida_input
+            )
+        finally:
+            # Liberar objetos COM antes de CoUninitialize para evitar
+            # "Win32 exception occurred releasing IUnknown"
+            import gc
+            gc.collect()
+            pythoncom.CoUninitialize()
+
         print("\nEXITO")
         return ruta_absoluta
         

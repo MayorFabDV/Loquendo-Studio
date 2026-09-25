@@ -292,7 +292,24 @@ class OrtografiaProcessor {
         });
         
         // 3. Punto después de oraciones largas
-        resultado = resultado.replace(/([a-záéíóúñ])\s+([A-ZÁÉÍÓÚÑ])/g, '$1. $2');
+        // Conservador: solo cuando la cláusula canónica precedente tiene >= 12 palabras
+        // (evita partir oraciones con nombres propios: "voy a España" no se rompe)
+        resultado = resultado.replace(/([a-záéíóúñ])\s+([A-ZÁÉÍÓÚÑ])/g, (match, fin, inicio) => {
+            const finIndex = resultado.lastIndexOf(fin + ' ');
+            let inicioClausula = 0;
+            const finClausulaAnterior = Math.max(
+                resultado.lastIndexOf('.', finIndex),
+                resultado.lastIndexOf('!', finIndex),
+                resultado.lastIndexOf('?', finIndex),
+                resultado.lastIndexOf('…', finIndex)
+            );
+            if (finClausulaAnterior > -1) inicioClausula = finClausulaAnterior + 1;
+            const palabrasClausula = resultado.slice(inicioClausula, finIndex + 1).trim().split(/\s+/).filter(Boolean);
+            if (palabrasClausula.length >= 12) {
+                return fin + '. ' + inicio;
+            }
+            return match;
+        });
         
         // 4. Coma antes de conectores
         const conectores = [

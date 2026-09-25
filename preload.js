@@ -1,13 +1,6 @@
-// preload.js - Puente seguro IPC para Loquendo Studio
+// preload.js - Puente seguro entre el renderer y el main (contextIsolation ON)
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Control de ventana
-  closeApp: () => ipcRenderer.send('app-close'),
-  minimizeWindow: () => ipcRenderer.send('window-minimize'),
-  maximizeWindow: () => ipcRenderer.send('window-maximize'),
-
-  // Eventos del sistema
-  onBeforeQuit: (callback) => ipcRenderer.on('before-quit', callback),
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+    openExternal: (url) => ipcRenderer.send('abrir-enlace-externo', url)
 });

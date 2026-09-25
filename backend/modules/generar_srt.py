@@ -39,6 +39,21 @@ if ffmpeg_path:
 else:
     print("[WARN] FFmpeg no encontrado en las rutas esperadas.")
 
+def encontrar_ffprobe():
+    """Busca ffprobe.exe en el mismo directorio que ffmpeg (o rutas comunes)."""
+    base_dir = os.path.dirname(ffmpeg_path) if ffmpeg_path else os.path.join(current_dir, '..', 'bin')
+    posibles_rutas = [
+        os.path.join(base_dir, 'ffprobe.exe'),
+        os.path.join(current_dir, 'ffprobe.exe'),
+    ]
+    for ruta in posibles_rutas:
+        ruta_absoluta = os.path.abspath(ruta)
+        if os.path.exists(ruta_absoluta):
+            return ruta_absoluta
+    return None
+
+ffprobe_path = encontrar_ffprobe()
+
 try:
     import whisper
     WHISPER_DISPONIBLE = True
@@ -292,14 +307,34 @@ def generar_srt_fallback(texto_original, duracion_total, ruta_salida, max_palabr
 # OBTENER DURACIÓN DEL AUDIO
 # ============================================================
 def obtener_duracion_audio(ruta_audio):
-    try:
-        cmd = [ffmpeg_path if ffmpeg_path else 'ffprobe', '-v', 'error',
-               '-show_entries', 'format=duration',
-               '-of', 'default=noprint_wrappers=1:nokey=1', ruta_audio]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        return float(result.stdout.strip())
-    except Exception:
-        return 0
+    # 1) ffprobe: opción más fiable y limpia
+    if ffprobe_path:
+        try:
+            cmd = [ffprobe_path, '-v', 'error',
+                   '-show_entries', 'format=duration',
+                   '-of', 'default=noprint_wrappers=1:nokey=1', ruta_audio]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            if result.returncode == 0 and result.stdout.strip():
+                try:
+                    return float(result.stdout.strip())
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+
+    # 2) ffmpeg -i: parsear la duración desde stderr
+    if ffmpeg_path:
+        try:
+            result = subprocess.run([ffmpeg_path, '-i', ruta_audio],
+                                    capture_output=True, text=True, timeout=15)
+            match = re.search(r'Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})', result.stderr)
+            if match:
+                hh, mm, ss = int(match.group(1)), int(match.group(2)), float(match.group(3))
+                return hh * 3600 + mm * 60 + ss
+        except Exception:
+            pass
+
+    return 0
 
 
 # ============================================================

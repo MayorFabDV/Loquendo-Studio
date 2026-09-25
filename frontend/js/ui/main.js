@@ -48,15 +48,10 @@ function cambiarDiseno() {
 }
 
 function abrirEnlaceExterno(url) {
-    if (typeof require !== 'undefined') {
-        try {
-            const { shell } = require('electron');
-            shell.openExternal(url);
-        } catch (e) {
-            window.open(url, '_blank');
-        }
+    if (window.electronAPI && window.electronAPI.openExternal) {
+        window.electronAPI.openExternal(url);
     } else {
-        window.open(url, '_blank');
+        console.warn('electronAPI no disponible, no se puede abrir el enlace:', url);
     }
 }
 

@@ -12,7 +12,7 @@ const NarrationModes = {
                                 'espíritu', 'demonio', 'maldito', 'terror', 'pesadilla'];
 
         palabrasTerror.forEach(palabra => {
-            const regex = new RegExp(`\b(${palabra})\b`, 'gi');
+            const regex = new RegExp(`\\b(${palabra})\\b`, 'gi');
             // Solo 30% de probabilidad de agregar pausa, no siempre
             if (Math.random() > 0.7) {
                 resultado = resultado.replace(regex, '... $1');
@@ -38,7 +38,7 @@ const NarrationModes = {
                                'finalmente', 'siempre', 'nunca'];
 
         palabrasClave.forEach(palabra => {
-            const regex = new RegExp(`\b(${palabra})\b`, 'gi');
+            const regex = new RegExp(`\\b(${palabra})\\b`, 'gi');
             resultado = resultado.replace(regex, '$1,');
         });
 
@@ -60,7 +60,7 @@ const NarrationModes = {
                                 'crítico', 'épico', 'increíble', 'brutal'];
 
         palabrasAccion.forEach(palabra => {
-            const regex = new RegExp(`\b(${palabra})\b`, 'gi');
+            const regex = new RegExp(`\\b(${palabra})\\b`, 'gi');
             resultado = resultado.replace(regex, (match) => match.toUpperCase());
         });
 

@@ -12,14 +12,38 @@ class DictionaryEditor {
         this.searchTerm = '';
     }
 
+    // ✅ FIX #17: base unificada (usa CONFIG derivado del origen real, no hardcodea 3000)
+    get apiBase() {
+        if (window.CONFIG && window.CONFIG.API_BASE) return window.CONFIG.API_BASE;
+        if (window.API_BASE) return window.API_BASE;
+        if (window.location && window.location.port) return `http://localhost:${window.location.port}`;
+        return 'http://localhost:3000';
+    }
+
+    // ✅ FIX #13: escapa metacaracteres de regex
+    _escapeRegExp(s) {
+        return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // ✅ FIX #14: escapa HTML para evitar inyección al renderizar
+    _escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     async loadAll() {
         try {
-            const [resJer, resSin, resOrt, resGram] = await Promise.all([
-                fetch('http://localhost:3000/api/jergas'),
-                fetch('http://localhost:3000/api/sinonimos'),
-                fetch('http://localhost:3000/api/ortografia'),
-                fetch('http://localhost:3000/api/gramatica')
-            ]);
+          const apiBase = this.apiBase;
+const [resJer, resSin, resOrt, resGram] = await Promise.all([
+    fetch(`${apiBase}/api/jergas`),
+    fetch(`${apiBase}/api/sinonimos`),
+    fetch(`${apiBase}/api/ortografia`),
+    fetch(`${apiBase}/api/gramatica`)
+]);
 
             if (resJer.ok) this.dictionaries.jergas = await resJer.json();
             if (resSin.ok) this.dictionaries.sinonimos = await resSin.json();
@@ -64,7 +88,7 @@ class DictionaryEditor {
                 <div class="dictionary-header">
                     <h4>${this.getTabTitle()}</h4>
                     <input type="text" id="searchDictionary" placeholder="Buscar..." 
-                           value="${this.searchTerm}"
+                           value="${this._escapeHtml(this.searchTerm)}"
                            oninput="window.dictionaryEditor.handleSearch(this.value)">
                 </div>
                 <div class="dictionary-add-form">
@@ -120,10 +144,10 @@ class DictionaryEditor {
 
         return entries.map(([original, replacement]) => `
             <div class="dictionary-entry">
-                <span class="entry-word">${original}</span>
+                <span class="entry-word">${this._escapeHtml(original)}</span>
                 <span class="entry-arrow">→</span>
-                <span class="entry-replacement">${Array.isArray(replacement) ? replacement.join(', ') : replacement}</span>
-                <button class="btn-delete" onclick="window.dictionaryEditor.deleteEntry('${original}')">🗑️</button>
+                <span class="entry-replacement">${this._escapeHtml(Array.isArray(replacement) ? replacement.join(', ') : replacement)}</span>
+                <button class="btn-delete" data-word="${encodeURIComponent(original)}" onclick="window.dictionaryEditor.deleteEntry(this.dataset.word)">🗑️</button>
             </div>
         `).join('');
     }
@@ -154,26 +178,27 @@ class DictionaryEditor {
     }
 
     async deleteEntry(word) {
+        word = decodeURIComponent(word);
         if (!confirm(`¿Eliminar "${word}"?`)) return;
         delete this.dictionaries[this.currentTab][word];
 
         if (this.currentTab === 'fonetica') {
             this.saveFonetica();
         } else {
-            await fetch(`http://localhost:3000/api/${this.currentTab}/${encodeURIComponent(word)}`, {
-                method: 'DELETE'
-            });
+       await fetch(`${this.apiBase}/api/${this.currentTab}/${encodeURIComponent(word)}`, {
+    method: 'DELETE'
+});
         }
         this.render();
     }
 
     async saveToServer(tipo, original, reemplazo) {
         try {
-            await fetch(`http://localhost:3000/api/${tipo}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ original, reemplazo })
-            });
+await fetch(`${this.apiBase}/api/${tipo}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ original, reemplazo })
+});
         } catch (error) {
             console.error('Error guardando:', error);
         }
@@ -193,34 +218,37 @@ class DictionaryEditor {
         // Si no se pasa nada, no aplica nada (seguro por defecto)
     if (opciones.ortografia) {
         for (let [original, reemplazo] of Object.entries(this.dictionaries.ortografia || {})) {
-            resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
+            resultado = resultado.replace(new RegExp(`\\b${this._escapeRegExp(original)}\\b`, 'gi'), reemplazo);
         }
     }
 
     if (opciones.gramatica) {
         for (let [original, reemplazo] of Object.entries(this.dictionaries.gramatica || {})) {
-            resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
+            resultado = resultado.replace(new RegExp(`\\b${this._escapeRegExp(original)}\\b`, 'gi'), reemplazo);
         }
     }
         if (opciones.fonetica) {
             for (let [original, reemplazo] of Object.entries(this.dictionaries.fonetica)) {
-                resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
+                resultado = resultado.replace(new RegExp(`\\b${this._escapeRegExp(original)}\\b`, 'gi'), reemplazo);
             }
         }
 
         if (opciones.jergas) {
             for (let [original, reemplazo] of Object.entries(this.dictionaries.jergas)) {
-                resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), reemplazo);
+                resultado = resultado.replace(new RegExp(`\\b${this._escapeRegExp(original)}\\b`, 'gi'), reemplazo);
             }
         }
 
-        if (opciones.sinonimos) {
-            for (let [original, reemplazo] of Object.entries(this.dictionaries.sinonimos)) {
-                const valores = Array.isArray(reemplazo) ? reemplazo : [reemplazo];
-                const elegido = valores[Math.floor(Math.random() * valores.length)];
-                resultado = resultado.replace(new RegExp(`\\b${original}\\b`, 'gi'), elegido);
-            }
-        }
+       if (opciones.sinonimos) {
+    for (let [original, reemplazo] of Object.entries(this.dictionaries.sinonimos)) {
+        const valores = Array.isArray(reemplazo) ? reemplazo : [reemplazo];
+        
+        // ✅ FIX: Usar función callback para elegir sinónimo DIFERENTE en cada ocurrencia
+        resultado = resultado.replace(new RegExp(`\\b${this._escapeRegExp(original)}\\b`, 'gi'), () => {
+            return valores[Math.floor(Math.random() * valores.length)];
+        });
+    }
+}
 
         return resultado;
     }

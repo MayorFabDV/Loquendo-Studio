@@ -219,7 +219,12 @@
                             <option value="Microsoft Sabina Desktop">Sabina</option>
                         </optgroup>
                     </select>
-        
+                    <select id="calidadSeleccionada" title="Calidad del audio generado">
+                        <option value="48k" selected>Calidad: Nativa (48 kHz estéreo)</option>
+                        <option value="44k">Calidad: Alta (44.1 kHz mono)</option>
+                        <option value="22k">Calidad: Media (22.05 kHz mono)</option>
+                        <option value="16k">Calidad: Baja (16 kHz mono)</option>
+                    </select>
 
                     <button type="button" onclick="optimizar()">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>

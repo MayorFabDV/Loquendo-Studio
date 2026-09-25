@@ -30,6 +30,35 @@ class AudioService {
         console.log('   audioFolder:', this.audioFolder);
     }
 
+    _aplicarCalidad(rutaArchivo, calidad) {
+        return new Promise((resolve) => {
+            const mapaCalidades = {
+                '16k': { ar: '16000', ac: '1' },
+                '22k': { ar: '22050', ac: '1' },
+                '44k': { ar: '44100', ac: '1' }
+            };
+            const target = mapaCalidades[calidad];
+            if (!target || !rutaArchivo || !fs.existsSync(rutaArchivo)) {
+                return resolve(false);
+            }
+            const rutaTemp = rutaArchivo.replace(/\.wav$/i, '.resample.wav');
+            const args = ['-y', '-i', rutaArchivo, '-ar', target.ar, '-ac', target.ac, '-c:a', 'pcm_s16le', rutaTemp];
+            const proc = spawn(this.ffmpegPath, args, { windowsHide: true, shell: false });
+            proc.stderr.on('data', () => {});
+            proc.on('error', () => resolve(false));
+            proc.on('close', (code) => {
+                if (code === 0 && fs.existsSync(rutaTemp)) {
+                    fs.renameSync(rutaTemp, rutaArchivo);
+                    console.log(`   Calidad aplicada: ${calidad} (${target.ar} Hz, ${target.ac} ch)`);
+                    resolve(true);
+                } else {
+                    try { fs.unlinkSync(rutaTemp); } catch (e) {}
+                    resolve(false);
+                }
+            });
+        });
+    }
+
     limpiarTagsParaSubtitulos(texto) {
         if (!texto) return texto;
         texto = texto.replace(/<[^>]+>/g, '');
@@ -325,7 +354,7 @@ class AudioService {
             proceso.stdout.on('data', (data) => { stdout += data.toString(); });
             proceso.stderr.on('data', (data) => { stderr += data.toString(); });
 
-            proceso.on('close', (code) => {
+            proceso.on('close', async (code) => {
                 if (!fs.existsSync(rutaArchivo) || (!stdout.includes('EXITO') && code !== 0)) {
                     console.error('❌ Error al generar voz:', stderr || stdout);
                     return reject(new Error('Error al generar voz: ' + (stderr || stdout)));
@@ -338,7 +367,10 @@ class AudioService {
                     return reject(new Error('Audio vacio (' + stats.size + ' bytes)'));
                 }
 
-                console.log(`Voz generada: ${nombreArchivo} (${(stats.size / 1024).toFixed(2)} KB)`);
+                await this._aplicarCalidad(rutaArchivo, (opciones || {}).calidad);
+
+                const statsFinal = fs.statSync(rutaArchivo);
+                console.log(`Voz generada: ${nombreArchivo} (${(statsFinal.size / 1024).toFixed(2)} KB)`);
 
                 if (usarIA === false || usarIA === 'solo_audio') {
                     console.log('[AudioService] Generando SOLO audio (sin subtítulos)\n');
@@ -347,7 +379,7 @@ class AudioService {
                         srt: null,
                         ass: null,
                         textoLimpio: textoParaSubtitulosLimpio,
-                        stats
+                        stats: statsFinal
                     });
                 }
                 
@@ -446,7 +478,7 @@ class AudioService {
 
                     const pythonProcess = spawn(pythonCmd, [
                         this.pythonScript, rutaArchivo, rutaSRT, textoParaSubtitulosLimpio
-                    ]);
+                    ], { windowsHide: true, shell: false });
 
                     let pyStdout = '', pyStderr = '';
                     pythonProcess.stdout.on('data', (data) => {
@@ -458,16 +490,29 @@ class AudioService {
                         console.error('   [Whisper ERR]', data.toString().trim());
                     });
 
+                    const usarFallbackMatematico = () => {
+                        console.warn(' [SRT] Whisper Python falló');
+                        console.log(' [SRT] Usando fallback matemático...');
+                        if (this.generarSRTMatematico(textoParaSubtitulosLimpio, rutaArchivo, rutaSRT)) {
+                            srtUrl = '/audios/' + nombreSRT;
+                        }
+                        finalizar();
+                    };
+
                     pythonProcess.on('close', (pythonCode) => {
                         if (pythonCode === 0 && fs.existsSync(rutaSRT)) {
                             srtUrl = '/audios/' + nombreSRT;
                             console.log('[SRT] Whisper Python exitoso\n');
+                            finalizar();
                         } else {
-                            console.warn(' [SRT] Whisper Python falló');
-                            console.log(' [SRT] Usando fallback matemático...');
-                            if (this.generarSRTMatematico(textoParaSubtitulosLimpio, rutaArchivo, rutaSRT)) {
-                                srtUrl = '/audios/' + nombreSRT;
-                            }
+                            usarFallbackMatematico();
+                        }
+                    });
+
+                    pythonProcess.on('error', (err) => {
+                        console.error('❌ Error spawn Whisper Python:', err.message);
+                        if (this.generarSRTMatematico(textoParaSubtitulosLimpio, rutaArchivo, rutaSRT)) {
+                            srtUrl = '/audios/' + nombreSRT;
                         }
                         finalizar();
                     });
@@ -573,10 +618,14 @@ class AudioService {
                     '-filter_complex', filterComplex,
                     '-map', '[mixed]',
                     '-c:a', 'pcm_s16le',
-                    '-ar', '44100',
-                    '-y',
-                    rutaSalida
+                    '-ar', '44100'
                 );
+
+                if (loopMusic) {
+                    ffmpegArgs.push('-t', String(duracionVoz));
+                }
+
+                ffmpegArgs.push('-y', rutaSalida);
 
                 const ffmpegProcess = spawn(this.ffmpegPath, ffmpegArgs, {
                     windowsHide: true, shell: false
