@@ -289,12 +289,12 @@ async persistirAudioEditado() {
         const formData = new FormData();
         formData.append('audio', blob, `edited-${Date.now()}.wav`);
 
-        // ✅ CORREGIDO: Usar API_BASE
-        const res = await fetch(`${window.API_BASE}/api/upload-audio-editado`, {
+        // ✅ CORREGIDO: Usar CONFIG.API_BASE (fuente de verdad)
+        const res = await fetch(`${window.CONFIG.API_BASE}/api/upload-audio-editado`, {
             method: 'POST',
             body: formData
         });
-        
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
         const data = await res.json();
 
         if (data.url) {
@@ -307,10 +307,10 @@ async persistirAudioEditado() {
             // Actualizar variable global (para compatibilidad)
             window.voiceAudioRealPath = data.url;
 
-            // ✅ CORREGIDO: Actualizar botón de descarga con API_BASE
+            // ✅ CORREGIDO: Actualizar botón de descarga con CONFIG.API_BASE
             const btnDescargar = document.getElementById('btnDescargar');
             if (btnDescargar) {
-                btnDescargar.href = `${window.API_BASE}${data.url}`;
+                btnDescargar.href = `${window.CONFIG.API_BASE}${data.url}`;
                 btnDescargar.setAttribute('download', data.url.split('/').pop());
             }
 

@@ -1,8 +1,8 @@
 // js/main.js - Loquendo Studio (Controlador Principal Definitivo y Blindado)
 
-// Inicialización segura de API_BASE
+// Inicialización segura de API_BASE (fuente de verdad: window.CONFIG, que deriva del origen real)
 if (typeof API_BASE === 'undefined') {
-    var API_BASE = window.API_BASE || (window.location && window.location.port ? `http://localhost:${window.location.port}` : 'http://localhost:3000');
+    var API_BASE = (window.CONFIG && window.CONFIG.API_BASE) || window.API_BASE || (window.location && window.location.port ? `http://localhost:${window.location.port}` : 'http://localhost:3000');
     window.API_BASE = API_BASE;
 }
 

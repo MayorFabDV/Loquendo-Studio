@@ -117,7 +117,8 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS) {
             }
         }
 
-        document.getElementById("contenedorReproductor").style.display = "block";
+        const contenedorReproductor = document.getElementById("contenedorReproductor");
+        if (contenedorReproductor) contenedorReproductor.style.display = "block";
         asegurarEditorInicializado();
 
         setTimeout(() => {

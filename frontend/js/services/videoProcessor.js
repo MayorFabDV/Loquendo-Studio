@@ -6,7 +6,7 @@ const videoProcessor = {
             return null; 
         }
         try {
-            const data = await window.apiClient.uploadPngTuber(type, file);
+            const data = await window.apiClient.subirPNGTuber(file, type);
             window.appState.pngtuber[type] = data.url;
             window.notifications?.success(`✅ Imagen ${type} cargada.`);
             return data.url;
@@ -23,7 +23,7 @@ const videoProcessor = {
         const rutaLimpia = String(audioPath).replace(window.CONFIG.API_BASE, '').replace(/^\/+/, '').split('?')[0];
         try {
             window.notifications?.info('⏳ Procesando video...');
-            const data = await window.apiClient.generatePngTuberVideo(rutaLimpia, window.appState.pngtuber.idle, window.appState.pngtuber.talking);
+            const data = await window.apiClient.generarPNGTuber(rutaLimpia, window.appState.pngtuber.idle, window.appState.pngtuber.talking);
             window.notifications?.success('✅ ¡Video generado!');
             
             const link = document.createElement('a');

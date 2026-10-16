@@ -31,8 +31,10 @@ const audioActions = {
                 btnDescargar.href = `${window.CONFIG.API_BASE}${data.url}`;
                 btnDescargar.setAttribute('download', `audio_con_ducking_${Date.now()}.wav`);
             }
-            document.getElementById('btnDescargaSRT').style.display = 'inline-flex';
-            document.getElementById('btnExportarMP3').style.display = 'inline-block';
+            const btnDescargaSRT = document.getElementById('btnDescargaSRT');
+            if (btnDescargaSRT) btnDescargaSRT.style.display = 'inline-flex';
+            const btnExportarMP3 = document.getElementById('btnExportarMP3');
+            if (btnExportarMP3) btnExportarMP3.style.display = 'inline-block';
             
             if (window.cargarYReproducir) window.cargarYReproducir(data.url);
             window.notifications?.success('✅ Ducking aplicado.');

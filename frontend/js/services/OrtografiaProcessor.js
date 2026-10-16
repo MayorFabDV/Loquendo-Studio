@@ -94,14 +94,12 @@ class OrtografiaProcessor {
             
             // Errores comunes
             'aver': 'a ver',
-            'haber': 'haber',
             'haver': 'haber',
             'halla': 'halla',
             'haya': 'haya',
             'aya': 'haya',
             'alla': 'allá',
             'allá': 'allá',
-            'aya': 'haya',
             
             // Plurales
             'cuales': 'cuáles',
