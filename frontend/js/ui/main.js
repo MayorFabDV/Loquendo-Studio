@@ -519,7 +519,9 @@ function subirMusicaFondo() {
 
 function aplicarDucking() {
     const btnDescargar = document.getElementById('btnDescargar');
-    const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || (btnDescargar ? btnDescargar.href : '') || '';
+    // FIX Bug #4: priorizar la variable de estado, no el .href del botón
+    // (btnDescargar.href devuelve URL absoluta que puede fallar con puertos dinámicos)
+    const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || '';
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
         notificar('warning', 'Primero genera un audio de voz.');
@@ -622,8 +624,10 @@ function mutearMusica() { if (window.audioEditor) window.audioEditor.mutear(); }
 function cambiarVolumenMusica(valor) { if (window.audioEditor) window.audioEditor.cambiarVolumenDesdeSlider(valor); }
 
 async function exportarAMp3() {
-    const btnDescargar = document.getElementById('btnDescargar');
-    const voiceAudioPath = (btnDescargar ? btnDescargar.href : '') || voiceAudioRealPath || '';
+    // FIX Bug #4: priorizar la variable de estado, no el .href del botón
+    // btnDescargar.href devuelve URL absoluta y si el puerto cambió (3001/3002)
+    // el replace(API_BASE, '') no la limpia bien.
+    const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || '';
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
         notificar('warning', 'Primero genera un audio válido.');

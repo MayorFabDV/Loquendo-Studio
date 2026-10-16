@@ -4,7 +4,7 @@
   "description": "Loquendo Studio - Herramienta profesional de automatización de voz y edición multimedia",
   "main": "main-electron.js",
   "author": "BafYam",
-  "license": "ISC",
+  "license": "MIT",
   "scripts": {
     "start": "electron .",
     "prebuild": "node scripts/check_build_prereqs.js",

@@ -369,7 +369,8 @@ appExpress.post('/api/corregir-texto', async (req, res) => {
 
 // --- Generación de Audio y Subtítulos ---
 appExpress.post('/api/generar-audio', async (req, res) => {
-    const { texto, voz, modo, opciones } = req.body;
+    // FIX Bug #5: leer usarIA del body en lugar de hardcodear false
+    const { texto, voz, modo, opciones, usarIA } = req.body;
     if (!texto || texto.trim() === '') return res.status(400).json({ error: 'Texto vacío' });
     
     try {
@@ -377,7 +378,7 @@ appExpress.post('/api/generar-audio', async (req, res) => {
             ...(opciones || {}),
             maxPalabras: opciones?.maxPalabras || 7
         };
-        const resultado = await audioService.procesar(texto, voz, false, dbService, modo, opcionesConMax);
+        const resultado = await audioService.procesar(texto, voz, usarIA ?? false, dbService, modo, opcionesConMax);
         res.json(resultado);
     } catch (error) {
         console.error('❌ Error generar-audio:', error.message);
@@ -628,8 +629,13 @@ function getPort() {
     return server && server.address() ? server.address().port : null;
 }
 
+// FIX Bug #2: module.exports se evalúa ANTES de que la IIFE async termine.
+// El campo `server` siempre era null al momento del export.
+// Se expone `getServer()` como getter lazy para obtener el valor actual.
+function getServer() { return server; }
+
 (async () => {
     await dbService.whenReady();
     server = startServer(3000);
 })();
-module.exports = { expressApp: appExpress, server, getPort };
+module.exports = { expressApp: appExpress, getServer, getPort };

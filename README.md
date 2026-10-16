@@ -5,7 +5,7 @@
 
 [![Versión](https://img.shields.io/badge/versión-1.0.0-e41a1a?style=for-the-badge)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%2F11-0078D6?style=for-the-badge&logo=windows)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
-[![Licencia](https://img.shields.io/badge/licencia-ISC-green?style=for-the-badge)](LICENSE)
+[![Licencia](https://img.shields.io/badge/licencia-MIT-green?style=for-the-badge)](LICENSE)
 [![Estado](https://img.shields.io/badge/estado-activo-brightgreen?style=for-the-badge)]()
 
 **Convierte texto en audio profesional, genera subtítulos con IA, aplica efectos visuales y crea videos PNGTuber — todo en una sola aplicación offline.**
@@ -50,8 +50,8 @@
 ### 📝 Procesamiento de Texto
 - **5 diccionarios personalizables**: jergas, sinónimos, fonética, ortografía, gramática
 - **Corrección con LanguageTool** (Java): ortografía, gramática y puntuación
-- **Comas inteligentes**: +80 conectores detectados
-- **Puntos inteligentes**: puntuación automática
+- **Comas inteligentes**: conectores de contraste, causa y enumeración, antes y después
+- **Puntos inteligentes**: corta oraciones largas (>30 palabras / >170 caracteres) en puntos de pausa
 - **Modos de narración**: Estándar, Creepypasta, Tutorial, Gameplay
 
 ### 🎵 Editor de Audio
@@ -94,8 +94,10 @@
 
 ### 🎨 Interfaz
 - **Diseño moderno** con iconos SVG
+- **Interfaz por pestañas**: Guión → Audio → Video, con barra de flujo y salto automático a Audio al generar
+- **Ayudas contextuales**: tooltips en todos los controles (activables/desactivables)
+- **Menú Ajustes**: tema oscuro/claro/sistema, ayudas y sonidos de notificación (persistente en localStorage)
 - **Tema oscuro/claro**
-- **Vista horizontal/vertical**
 - **Notificaciones elegantes** (sin alertas)
 - **Modales de ayuda y testers**
 - **Selector de etiquetas interactivo**
@@ -173,8 +175,11 @@ npm install
 
 # 3. Ejecutar en desarrollo
 npm start
-Compilación
-bash
+```
+
+### Compilación
+
+```bash
 # Compilación portable (recomendado)
 npm run build:portable
 
@@ -183,8 +188,13 @@ npm run build:nsis
 
 # Compilación rápida (sin limpiar)
 npm run build
-📁 Estructura del Proyecto
-text
+```
+
+---
+
+## 📁 Estructura del Proyecto
+
+```text
 Loquendo-Studio/
 ├── backend/
 │   ├── bin/                    # Binarios nativos
@@ -211,8 +221,13 @@ Loquendo-Studio/
 ├── main-electron.js            # Entry point de Electron
 ├── server.js                   # API REST
 └── package.json
-🎯 Cómo Funciona
-text
+```
+
+---
+
+## 🎯 Cómo Funciona
+
+```text
 1. 📝 Escribe o pega tu texto
    ↓
 2. ⚙️ Activa opciones (ortografía, gramática, jergas, etc.)
@@ -232,74 +247,100 @@ text
 9. 📄 Exporta a MP3
    ↓
 10. 🎬 Genera video PNGTuber
-🚀 Roadmap
-✅ v1.0 (Completada)
-☑ Síntesis de voz con Loquendo
-☑ Editor de audio con WaveSurfer
-☑ Ducking con FFmpeg
-☑ Subtítulos con Whisper.cpp
-☑ LanguageTool
-☑ Diccionarios (5 tipos)
-☑ Video PNGTuber
-☑ Exportación MP3
-🔄 v2.0 (En desarrollo)
-□ Migración a Tauri (Rust)
-□ Editor de subtítulos avanzado
-□ Editor de audio avanzado (Tone.js)
-□ Editor de video multipista
-□ Versión Android
-□ Versión iOS
-🔮 v3.0 (Futuro)
-□ IA generativa de guiones
-□ Clonación de voz
-□ Traducción automática
-□ Publicación automática a YouTube
-□ Colaboración en tiempo real
-🧪 Testers
+```
+
+---
+
+## 🚀 Roadmap
+
+### ✅ v1.0 (Completada)
+- ☑ Síntesis de voz con Loquendo
+- ☑ Editor de audio con WaveSurfer
+- ☑ Ducking con FFmpeg
+- ☑ Subtítulos con Whisper.cpp
+- ☑ LanguageTool
+- ☑ Diccionarios (5 tipos)
+- ☑ Video PNGTuber
+- ☑ Exportación MP3
+
+### 🔧 v1.0.1 — Parche de Bugs (2026-10-15)
+- ☑ [Bug #1] Fix historial Undo/Redo: `historyIndex` desincronizado al llegar a `MAX_HISTORY` causaba Ctrl+Z errático (`audioProcessor.js`)
+- ☑ [Bug #2] Fix server exportado como null: `module.exports` se evaluaba antes de que el servidor async arrancara; ahora se expone `getServer()` como getter lazy (`server.js`)
+- ☑ [Bug #4] Fix exportar MP3 / ducking con puerto dinámico: `btnDescargar.href` devolvía URL absoluta que fallaba si el puerto cambiaba a 3001/3002; ahora se usa `voiceAudioRealPath` directamente (`main.js`)
+- ☑ [Bug #5] Fix usarIA ignorado: el backend hardcodeaba `false` al llamar a `audioService.procesar()`, ignorando el checkbox de subtítulos automáticos; ahora se lee el valor del body (`server.js`)
+
+### 🎨 v1.1 — Nueva Interfaz (2026-10-16)
+- ☑ Interfaz por pestañas (Guión → Audio → Video) con barra de flujo y salto automático a Audio al generar el reproductor
+- ☑ Sistema de ayudas contextuales: tooltips en todos los controles (`helpSystem.js` + `helpTexts.js`)
+- ☑ Menú Ajustes: tema oscuro/claro/sistema, mostrar/ocultar ayudas y sonidos de notificación (persistente en localStorage)
+- ☑ Rediseño visual completo de la interfaz (HTML + CSS)
+- ☑ Puntuación inteligente mejorada: más conectores (antes y después), comas de énfasis y corte de oraciones largas en puntos de pausa (`TextProcessor.js`)
+- ☑ Limpieza de código: lógica de puntuación consolidada en `TextProcessor` (eliminada la duplicada en `main.js`)
+
+### 🔄 v2.0 (En desarrollo)
+- □ Migración a Tauri (Rust)
+- □ Editor de subtítulos avanzado
+- □ Editor de audio avanzado (Tone.js)
+- □ Editor de video multipista
+- □ Versión Android
+- □ Versión iOS
+
+### 🔮 v3.0 (Futuro)
+- □ IA generativa de guiones
+- □ Clonación de voz
+- □ Traducción automática
+- □ Publicación automática a YouTube
+- □ Colaboración en tiempo real
+
+---
+
+## 🧪 Testers
+
 Gracias a los testers que hicieron posible esta versión:
 
-Tester	Rol	Canal
-LautyKT	Tester	YouTube
-Allstarz	Tester	YouTube
-DarkerGhost	Tester	YouTube
-Leo	Tester	-
-CreepyMoxo	Tester	YouTube
-🤝 Contribuir
+| Tester | Rol | Canal |
+|--------|-----|-------|
+| LautyKT | Tester | YouTube |
+| Allstarz | Tester | YouTube |
+| DarkerGhost | Tester | YouTube |
+| Leo | Tester | - |
+| CreepyMoxo | Tester | YouTube |
+
+---
+
+## 🤝 Contribuir
+
 ¡Las contribuciones son bienvenidas!
 
-Fork el proyecto
+1. Fork el proyecto
+2. Crea una rama (`git checkout -b feature/NuevaCaracteristica`)
+3. Commit tus cambios (`git commit -m 'Añade NuevaCaracteristica'`)
+4. Push a la rama (`git push origin feature/NuevaCaracteristica`)
+5. Abre un Pull Request
 
-Crea una rama (git checkout -b feature/NuevaCaracteristica)
+---
 
-Commit tus cambios (git commit -m 'Añade NuevaCaracteristica')
+## 📄 Licencia
 
-Push a la rama (git push origin feature/NuevaCaracteristica)
+Este proyecto está bajo la licencia **MIT**. Ver el archivo [LICENSE](LICENSE) para más detalles.
 
-Abre un Pull Request
+---
 
-📄 Licencia
-Este proyecto está bajo la licencia ISC. Ver el archivo LICENSE para más detalles.
+## 🙏 Agradecimientos
 
-🙏 Agradecimientos
-Loquendo por las voces
+- **Loquendo** por las voces
+- **OpenAI** por Whisper
+- **LanguageTool** por la corrección ortográfica
+- **FFmpeg** por el procesamiento multimedia
+- **WaveSurfer.js** por el editor de audio
+- **Electron** por el framework
+- Mis testers por el feedback
 
-OpenAI por Whisper
-
-LanguageTool por la corrección ortográfica
-
-FFmpeg por el procesamiento multimedia
-
-WaveSurfer.js por el editor de audio
-
-Electron por el framework
-
-Mis testers por el feedback
-
+---
 
 Creado con ❤️ por BafYam
 
-https://img.shields.io/badge/YouTube-BafYamRevival-red?style=for-the-badge&logo=youtube
-https://img.shields.io/badge/Ko--fi-Apoyar-FF5E5B?style=for-the-badge&logo=ko-fi
+[![YouTube](https://img.shields.io/badge/YouTube-BafYamRevival-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/@BafYamRevival)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Apoyar-FF5E5B?style=for-the-badge&logo=ko-fi)](https://ko-fi.com/bafyam)
 
 ⭐ Si te gusta el proyecto, dale una estrella ⭐
-

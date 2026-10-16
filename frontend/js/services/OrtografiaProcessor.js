@@ -385,4 +385,4 @@ class OrtografiaProcessor {
 const ortografiaProcessor = new OrtografiaProcessor();
 window.ortografiaProcessor = ortografiaProcessor;
 
-console.log('📝 OrtografiaProcessor cargado correctamente');
+console.log('OrtografiaProcessor cargado correctamente');

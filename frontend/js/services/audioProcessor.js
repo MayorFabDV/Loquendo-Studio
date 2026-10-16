@@ -441,8 +441,12 @@ async persistirAudioEditado() {
 
         this.historyStack.push(this._clonarBuffer(this.audioBuffer));
 
+        // FIX Bug #1: historyIndex siempre sigue al último elemento.
+        // Cuando el stack llega al límite, shift() mueve todo hacia atrás
+        // pero el índice debe quedar en MAX_HISTORY - 1, no dejar de avanzar.
         if (this.historyStack.length > this.MAX_HISTORY) {
             this.historyStack.shift();
+            // historyIndex queda en MAX_HISTORY - 1 (sin cambio, ya está ahí)
         } else {
             this.historyIndex++;
         }

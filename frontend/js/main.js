@@ -74,8 +74,8 @@ const mensajeAyuda = " Ayuda Rápida:\n\n" +
            "1. Escribe o pega tu texto\n" +
            "2. Selecciona el modo y opciones\n" +
            "3. Haz clic en 'Generar Audio'\n" +
-           "4. Usa el editor para cortar/normalizar\n" +
-           "5. Genera el video PNGTuber\n" +
+           "4. Usa el editor para cortar/igualar volumen\n" +
+           "5. Crea el video del personaje\n" +
            "6. Desliza para escuchar y ajustar la música\n" +
            "7. Descarga subtítulos SRT/ASS si quieres\n\n" +
            "¡Listo! Disfruta de tu audio y video.";
@@ -83,137 +83,6 @@ const mensajeAyuda = " Ayuda Rápida:\n\n" +
 function cerrarAyuda() {
     const modal = document.getElementById('modalAyuda');
     if (modal) modal.style.display = 'none';
-}
-// ==========================================
-// FUNCIÓN AUXILIAR: APLICAR COMAS (LÓGICA NATURAL)
-// ==========================================
-function aplicarComas(texto) {
-    let resultado = texto;
-    
-    // 1. Limpieza base: quitar espacios antes de signos y comas múltiples
-    resultado = resultado.replace(/\s+([,.!?])/g, "$1");
-    resultado = resultado.replace(/,+/g, ",");
-    
-    // 2. Comas después de saludos o muletillas al inicio de la oración
-    const saludos = ['Hola', 'Bueno', 'Pues', 'Entonces', 'Así que', 'Oye', 'Mira', 'Escucha', 'Buenas', 'Hey'];
-    saludos.forEach(saludo => {
-        const regex = new RegExp(`(^|[.!?]\\s+)(${saludo})\\b`, 'gi');
-        resultado = resultado.replace(regex, "$1$2,");
-    });
-    
-    // 3. Comas ANTES de conectores de contraste o causa
-    const conectoresAntes = [
-        'pero', 'aunque', 'sin embargo', 'no obstante', 'mas', 'sino',
-        'porque', 'ya que', 'puesto que', 'pues',
-        'mientras', 'donde', 'cuando'
-    ];
-    conectoresAntes.forEach(conector => {
-        const regex = new RegExp(`([^,.!?\\n])\\s+\\b(${conector})\\b`, "gi");
-        resultado = resultado.replace(regex, "$1, $2");
-    });
-    
-    // 4. Comas DESPUÉS de conectores que inician una nueva idea
-    const conectoresDespues = [
-        'Sin embargo', 'No obstante', 'Además', 'También', 'Asimismo',
-        'Por lo tanto', 'Por consiguiente', 'En conclusión', 'Finalmente',
-        'Es decir', 'O sea', 'Mejor dicho', 'Por ejemplo', 'En resumen',
-        'Primero', 'Segundo', 'Tercero', 'Por último'
-    ];
-    conectoresDespues.forEach(conector => {
-        const regex = new RegExp(`\\b(${conector})\\b(?![,])`, "gi");
-        resultado = resultado.replace(regex, "$1,");
-    });
-    
-    // 5. Limpieza final de puntuación
-    resultado = resultado.replace(/,\s*([.!?])/g, "$1");
-    resultado = resultado.replace(/,([^\s])/g, ", $1");
-    resultado = resultado.replace(/\s+/g, ' ');
-    
-    return resultado;
-}
-
-// ==========================================
-// FUNCIÓN AUXILIAR: APLICAR COMAS (CONSCIENTE DEL MODO)
-// ==========================================
-function aplicarComas(texto, modo = 'normal') {
-    let resultado = texto;
-    
-    // 1. Limpieza base: quitar espacios antes de signos y comas múltiples
-    resultado = resultado.replace(/\s+([,.!?])/g, "$1");
-    resultado = resultado.replace(/,+/g, ",");
-    
-    // 2. Comas después de saludos o muletillas al inicio de la oración
-    const saludos = ['Hola', 'Bueno', 'Pues', 'Entonces', 'Así que', 'Oye', 'Mira', 'Escucha', 'Buenas', 'Hey'];
-    saludos.forEach(saludo => {
-        const regex = new RegExp(`(^|[.!?]\\s+)(${saludo})\\b`, 'gi');
-        resultado = resultado.replace(regex, "$1$2,");
-    });
-    
-    // 3. Comas ANTES de conectores de contraste o causa
-    const conectoresAntes = [
-        'pero', 'aunque', 'sin embargo', 'no obstante', 'mas', 'sino',
-        'porque', 'ya que', 'puesto que', 'pues', 'mientras', 'donde', 'cuando'
-    ];
-    conectoresAntes.forEach(conector => {
-        const regex = new RegExp(`([^,.!?\\n])\\s+\\b(${conector})\\b`, "gi");
-        resultado = resultado.replace(regex, "$1, $2");
-    });
-    
-    // 4. Comas DESPUÉS de conectores que inician una nueva idea
-    const conectoresDespues = [
-        'Sin embargo', 'No obstante', 'Además', 'También', 'Asimismo',
-        'Por lo tanto', 'Por consiguiente', 'En conclusión', 'Finalmente',
-        'Es decir', 'O sea', 'Mejor dicho', 'Por ejemplo', 'En resumen',
-        'Primero', 'Segundo', 'Tercero', 'Por último'
-    ];
-    conectoresDespues.forEach(conector => {
-        const regex = new RegExp(`\\b(${conector})\\b(?![,])`, "gi");
-        resultado = resultado.replace(regex, "$1,");
-    });
-    
-    // 5. Limpieza final de puntuación (Adaptada al modo)
-    resultado = resultado.replace(/,\s*([.!?])/g, "$1");
-    
-    if (modo !== 'creepy' && modo !== 'creepypasta') {
-        resultado = resultado.replace(/,([^\s])/g, ", $1");
-    }
-    
-    resultado = resultado.replace(/\s+/g, ' ');
-    
-    return resultado;
-}
-
-// ==========================================
-// FUNCIÓN AUXILIAR: APLICAR PUNTOS (CONSCIENTE DEL MODO)
-// ==========================================
-function aplicarPuntos(texto, modo = 'normal') {
-    let resultado = texto;
-    
-    // 1. Asegurar espacio después de cada punto
-    if (modo !== 'creepy' && modo !== 'creepypasta') {
-        resultado = resultado.replace(/\.([^\s.])/g, ". $1");
-    } else {
-        resultado = resultado.replace(/(?<!\.)\.([^\s.])/g, ". $1");
-    }
-    
-    // 2. Capitalizar la primera letra después de un punto, signo de exclamación o interrogación
-    resultado = resultado.replace(/(^\s*\w|[.!?]\s+\w)/g, function(match) {
-        return match.toUpperCase();
-    });
-    
-    // 3. Asegurar que el texto termine con un signo de puntuación fuerte
-    const ultimoCaracter = resultado.trim().slice(-1);
-    if (!['.', '!', '?', '…'].includes(ultimoCaracter)) {
-        resultado = resultado.trim() + ".";
-    }
-    
-    // 4. Limpieza de puntos duplicados (solo si NO es creepypasta)
-    if (modo !== 'creepy' && modo !== 'creepypasta') {
-        resultado = resultado.replace(/\.{2,}/g, '.');
-        resultado = resultado.replace(/\.\s*\./g, '.');
-    }
-    
-    return resultado;
 }
 // ==========================================
 // 1.5 CARGAR VOCES DISPONIBLES DINÁMICAMENTE
@@ -419,21 +288,17 @@ function optimizar() {
     }
     
     // ============================================================
-    // 4. COMAS INTELIGENTES (CONSCIENTES DEL MODO)
+    // 4. PUNTUACIÓN FLUIDA (COMAS + PUNTOS, VÍA TEXT-PROCESSOR)
     // ============================================================
     const chkComas = document.getElementById("chkComas");
-    if (chkComas?.checked) {
-        texto = aplicarComas(texto, modo);
-        console.log('📝 [Optimizar] Después de comas:', texto.substring(0, 100));
-    }
-    
-    // ============================================================
-    // 5. PUNTOS INTELIGENTES (CONSCIENTES DEL MODO)
-    // ============================================================
     const chkPuntos = document.getElementById("chkPuntos");
-    if (chkPuntos?.checked) {
-        texto = aplicarPuntos(texto, modo);
-        console.log('📝 [Optimizar] Después de puntos:', texto.substring(0, 100));
+    if ((chkComas?.checked || chkPuntos?.checked) && window.textProcessor) {
+        texto = window.textProcessor.puntuar(
+            texto,
+            { comas: chkComas?.checked, puntos: chkPuntos?.checked },
+            modo
+        );
+        console.log('📝 [Optimizar] Después de puntuación fluida:', texto.substring(0, 100));
     }
     
     // ============================================================
@@ -463,12 +328,12 @@ async function generarAudio(event) {
     const modoSelect = document.getElementById('modo');
     const textoFinal = resultado ? resultado.value : "";
 
-    if (!textoFinal || textoFinal === "El texto aparecerá aquí...") {
+    if (!textoFinal || textoFinal === "El texto procesado aparecerá aquí...") {
         notificar('warning', 'Primero debes automatizar un texto.');
         return;
     }
 
-    if (btn) { btn.innerText = "Procesando Pipeline..."; btn.disabled = true; }
+        if (btn) { btn.innerText = "Procesando..."; btn.disabled = true; }
 
     try {
         const opciones = {
@@ -514,7 +379,7 @@ async function generarAudio(event) {
         console.error("Error fatal en red:", error);
         notificar('error', 'No hay conexión con la API. ¿Prendiste el servidor?');
     } finally {
-        if (btn) { btn.innerText = "Generar Audio Loquendo"; btn.disabled = false; }
+        if (btn) { btn.innerText = "Generar Audio"; btn.disabled = false; }
         asegurarEditable(resultado);
         asegurarEditable(textoEntrada);
         if (resultado) resultado.focus();
@@ -783,7 +648,7 @@ function aplicarDucking() {
         fadeOutMusic: parseFloat(fadeOutInput?.value || '3') || 3
     };
     
-    notificar('info', 'Aplicando Ducking...');
+    notificar('info', 'Mezclando voz y música...');
     
     fetch(`${API_BASE}/api/audio/apply-ducking`, {
         method: 'POST',
@@ -798,7 +663,7 @@ function aplicarDucking() {
             
             if (btnDescargar) {
                 btnDescargar.href = `${API_BASE}${data.url}`;
-                btnDescargar.setAttribute('download', `audio_con_ducking_${Date.now()}.wav`);
+                btnDescargar.setAttribute('download', `audio_con_musica_${Date.now()}.wav`);
             }
             const btnSRT = document.getElementById('btnDescargaSRT');
             if (btnSRT) btnSRT.style.display = 'inline-flex';
@@ -808,14 +673,14 @@ function aplicarDucking() {
             if (typeof window.cargarYReproducir === 'function') {
                 window.cargarYReproducir(data.url);
             }
-            notificar('success', 'Ducking aplicado correctamente.');
+            notificar('success', 'Mezcla aplicada correctamente.');
         } else {
             notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        notificar('error', 'Error de conexión al aplicar ducking');
+        notificar('error', 'Error de conexión al aplicar la mezcla');
     });
 }
 
@@ -909,6 +774,9 @@ function insertarEtiqueta() {
         case 'vol': textoInsertar = textoSeleccionado ? `[${etiqueta}]${textoSeleccionado}[/vol]` : `[${etiqueta}]texto[/vol]`; break;
         case 'emphasis': textoInsertar = textoSeleccionado ? `[emphasis]${textoSeleccionado}[/emphasis]` : '[emphasis]¡Importante![/emphasis]'; break;
         case 'spell': textoInsertar = textoSeleccionado ? `[spell]${textoSeleccionado}[/spell]` : '[spell]HOLA[/spell]'; break;
+        case 'laugh': case 'sigh': case 'scream': case 'cry': case 'whisper':
+        case 'angry': case 'happy': case 'sad': case 'surprise': case 'fear':
+            textoInsertar = textoSeleccionado ? `[${etiquetaPadre}]${textoSeleccionado}[/${etiquetaPadre}]` : `[${etiquetaPadre}]texto[/${etiquetaPadre}]`; break;
         case 'voz': textoInsertar = textoSeleccionado ? `[voz:Jorge]${textoSeleccionado}[/voz]` : '[voz:Jorge]texto[/voz]'; break;
         default: textoInsertar = etiqueta;
     }
@@ -943,23 +811,51 @@ function insertarExpresionRapida() {
         'pues': 'Pues...', 'entonces': 'Entonces...', 'o sea': 'O sea...',
         'mira': 'Mira...', 'oye': 'Oye...',
         'wow': '¡Wow!', 'genial': '¡Genial!', 'increible': '¡Increíble!',
-        'no-way': '¡No way!', 'que-loco': '¡Qué loco!', 'en-serio': '¿En serio?',
-        'risa': '[laugh]', 'suspiro': '[sigh]', 'grito': '[scream]',
-        'llanto': '[cry]', 'susurro': '[whisper]', 'enojado': '[angry]',
-        'feliz': '[happy]', 'triste': '[sad]', 'sorpresa': '[surprise]', 'miedo': '[fear]'
+        'no-way': '¡No way!', 'que-loco': '¡Qué loco!', 'en-serio': '¿En serio?'
     };
-    
-    const textoInsertar = expresionesMap[expresion];
-    if (!textoInsertar) return;
-    
+
+    // Emociones: se insertan como etiqueta con apertura y cierre, envolviendo
+    // el texto seleccionado (o una palabra de ejemplo) para que el motor de voz
+    // SAPI las aplique. Una etiqueta suelta como [laugh] no hace nada.
+    const emocionesMap = {
+        'risa': 'laugh', 'suspiro': 'sigh', 'grito': 'scream',
+        'llanto': 'cry', 'susurro': 'whisper', 'enojado': 'angry',
+        'feliz': 'happy', 'triste': 'sad', 'sorpresa': 'surprise', 'miedo': 'fear'
+    };
+
     const inicio = textarea.selectionStart;
     const fin = textarea.selectionEnd;
+    const seleccionado = textarea.value.substring(inicio, fin);
+
+    let textoInsertar;
+    let selDesde;
+    let selHasta;
+
+    if (emocionesMap[expresion]) {
+        const tag = emocionesMap[expresion];
+        const contenido = seleccionado || 'texto';
+        textoInsertar = `[${tag}]${contenido}[/${tag}]`;
+
+        if (seleccionado) {
+            selDesde = inicio;
+            selHasta = inicio + textoInsertar.length;
+        } else {
+            // Selecciona la palabra de ejemplo para poder reescribirla directamente.
+            selDesde = inicio + tag.length + 2;
+            selHasta = selDesde + contenido.length;
+        }
+    } else {
+        textoInsertar = expresionesMap[expresion];
+        if (!textoInsertar) return;
+        selDesde = inicio + textoInsertar.length;
+        selHasta = selDesde;
+    }
+
     textarea.value = textarea.value.substring(0, inicio) + textoInsertar + textarea.value.substring(fin);
-    
-    const nuevaPosicion = inicio + textoInsertar.length;
+
     textarea.focus();
-    textarea.setSelectionRange(nuevaPosicion, nuevaPosicion);
-    
+    textarea.setSelectionRange(selDesde, selHasta);
+
     selector.value = '';
     notificar('info', `Expresión "${textoInsertar}" insertada`);
 }
