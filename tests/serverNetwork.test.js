@@ -3,7 +3,9 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const net = require('node:net');
+const { EventEmitter } = require('node:events');
 const test = require('node:test');
+const { registrarLimpiezaAntesDeSalir } = require('../backend/services/electronQuit');
 const {
     normalizarPuerto,
     esperarPuertoLigado,
@@ -73,4 +75,53 @@ test('origen CORS permitido queda limitado al localhost y puerto de la aplicaci�
     assert.equal(origenLocalPermitido('https://localhost:3001', 3001), false);
     assert.equal(origenLocalPermitido('http://example.com:3001', 3001), false);
     assert.equal(origenLocalPermitido('null', 3001), false);
+});
+
+test('before-quit espera a la limpieza asíncrona y ejecuta quit una sola vez', async () => {
+    const app = new EventEmitter();
+    let resolverLimpieza;
+    let limpiezas = 0;
+    let quits = 0;
+    app.quit = () => {
+        quits++;
+        app.emit('before-quit', { preventDefault() { throw new Error('no debe cancelar el cierre completado'); } });
+    };
+
+    registrarLimpiezaAntesDeSalir(app, () => {
+        limpiezas++;
+        return new Promise((resolve) => { resolverLimpieza = resolve; });
+    });
+
+    let prevenido = false;
+    app.emit('before-quit', { preventDefault() { prevenido = true; } });
+    assert.equal(prevenido, true);
+    await Promise.resolve();
+    assert.equal(limpiezas, 1);
+    assert.equal(quits, 0);
+
+    app.emit('before-quit', { preventDefault() { prevenido = true; } });
+    assert.equal(limpiezas, 1);
+    resolverLimpieza();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(quits, 1);
+});
+
+test('before-quit continúa el cierre si la limpieza falla', async () => {
+    const app = new EventEmitter();
+    let quits = 0;
+    let logged = false;
+    app.quit = () => {
+        quits++;
+        app.emit('before-quit', { preventDefault() {} });
+    };
+
+    registrarLimpiezaAntesDeSalir(
+        app,
+        () => Promise.reject(new Error('fallo simulado')),
+        () => { logged = true; }
+    );
+    app.emit('before-quit', { preventDefault() {} });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(logged, true);
+    assert.equal(quits, 1);
 });

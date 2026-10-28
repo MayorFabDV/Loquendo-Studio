@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { esperarPuertoLigado } = require('./backend/services/serverNetwork');
+const { registrarLimpiezaAntesDeSalir } = require('./backend/services/electronQuit');
 
 // --- DATOS PERSISTENTES (antes de arrancar el servidor) ---
 // Los assets de proyectos NO pueden vivir en backend/public/audios: se borran al cerrar.
@@ -218,7 +219,7 @@ app.on('activate', () => {
 });
 
 // --- LIMPIEZA TOTAL AL CERRAR (CORREGIDO) ---
-app.on('before-quit', async () => {
+registrarLimpiezaAntesDeSalir(app, async () => {
     console.log('🧹 Limpiando caché de audio y PNGTuber...');
     
     // ✅ FIX: En producción, apuntar a resources/backend/public
@@ -251,4 +252,4 @@ app.on('before-quit', async () => {
         }
     }
     console.log('🧹 Limpieza completada.');
-});
+}, (error) => console.error('[MAIN] Error durante la limpieza final:', error));
