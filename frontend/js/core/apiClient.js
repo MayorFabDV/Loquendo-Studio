@@ -54,6 +54,51 @@ class ApiClient {
         return response.json();
     }
 
+    async renderAudio(audioPath, recipe, options = {}) {
+        const response = await fetch(`${this.baseURL}/api/audio/render`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                audioPath,
+                recipe,
+                format: options.format || 'wav',
+                bitDepth: options.bitDepth || 16,
+                loudness: options.loudness
+            })
+        });
+        if (!response.ok) {
+            const detalle = await response.json().catch(() => ({}));
+            throw new Error(detalle.error || 'Error al renderizar audio');
+        }
+        return response.json();
+    }
+
+    async procesarSeleccion(audioPath, start, end, recipe, normalize) {
+        const response = await fetch(`${this.baseURL}/api/audio/process-selection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioPath, start, end, recipe, normalize })
+        });
+        if (!response.ok) {
+            const detalle = await response.json().catch(() => ({}));
+            throw new Error(detalle.error || 'Error al procesar la selección');
+        }
+        return response.json();
+    }
+
+    async analyzeAudio(audioPath) {
+        const response = await fetch(`${this.baseURL}/api/audio/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioPath })
+        });
+        if (!response.ok) {
+            const detalle = await response.json().catch(() => ({}));
+            throw new Error(detalle.error || 'Error al analizar audio');
+        }
+        return response.json();
+    }
+
     async subirMusica(archivo) {
         const formData = new FormData();
         formData.append('music', archivo);

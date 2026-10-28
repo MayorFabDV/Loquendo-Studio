@@ -1,6 +1,6 @@
 {
   "name": "loquendo-studio",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Loquendo Studio - Herramienta profesional de automatización de voz y edición multimedia",
   "main": "main-electron.js",
   "author": "BafYam",

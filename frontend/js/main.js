@@ -13,6 +13,9 @@ let voiceAudioRealPath = null;
 let voiceAudioOriginalPath = null;
 let pngtuberIdlePath = null;
 let pngtuberTalkingPath = null;
+let pngtuberBlinkPath = null;
+let previewEnCurso = false;
+let pendingPreview = false;
 
 // ✅ Función auxiliar para notificaciones
 function notificar(tipo, mensaje, duracion) {
@@ -21,6 +24,20 @@ function notificar(tipo, mensaje, duracion) {
     } else {
         console.log(`[${tipo.toUpperCase()}] ${mensaje}`);
     }
+}
+
+async function rutaVozPersistida() {
+    let ruta = window.voiceAudioRealPath || voiceAudioRealPath || '';
+    const inst = window.audioEditor;
+    if (inst && typeof inst.asegurarAudioPersistido === 'function') {
+        try {
+            const persistida = await inst.asegurarAudioPersistido();
+            if (persistida) ruta = persistida;
+        } catch (error) {
+            console.error('No se pudo preparar el audio de voz:', error);
+        }
+    }
+    return ruta;
 }
 
 function asegurarEditable(elemento) {
@@ -170,6 +187,9 @@ async function cargarVoces() {
         
         if (select.options.length > 0) select.selectedIndex = 0;
         select.disabled = false;
+        if (window.settings && typeof window.settings.aplicarVozPorDefecto === 'function') {
+            window.settings.aplicarVozPorDefecto();
+        }
         console.log(`✅ ${data.total} voces cargadas`);
         notificar('success', `${data.total} voces detectadas`);
         
@@ -366,6 +386,7 @@ async function generarAudio(event) {
             voiceAudioRealPath = data.url;
             voiceAudioOriginalPath = data.url;
             window.voiceAudioRealPath = data.url;
+            window.voiceAudioOriginalPath = data.url;
             
             if (typeof window.cargarYReproducir === 'function') {
                 window.cargarYReproducir(data.url, data.srt, data.ass);
@@ -397,7 +418,7 @@ async function automatizarTodo() {
 // 4. SUBTÍTULOS
 // ==========================================
 async function generarYDescargarSRT() {
-    const audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
+    const audioPath = await rutaVozPersistida();
     const textoOriginal = document.getElementById('resultado')?.value || '';
     const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
 
@@ -418,6 +439,12 @@ async function generarYDescargarSRT() {
         });
         const data = await res.json();
         if (res.ok) {
+            if (window.appState && window.appState.subtitles) {
+                window.appState.subtitles.srtUrl = data.srtUrl || null;
+            }
+            if (window.audioMarkers && data.srtUrl) {
+                window.audioMarkers.cargarDesdeUrl(data.srtUrl, { forzar: true, silencioso: true });
+            }
             const link = document.getElementById('btnDescargaSRT');
             if (link) {
                 link.href = `${API_BASE}${data.srtUrl}?t=${Date.now()}`;
@@ -437,7 +464,7 @@ async function generarYDescargarSRT() {
 }
 
 async function generarYDescargarASS() {
-    const audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
+    const audioPath = await rutaVozPersistida();
     const textoOriginal = document.getElementById('resultado')?.value || '';
     const modo = document.getElementById('modo')?.value || 'normal';
     const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
@@ -483,8 +510,24 @@ async function generarYDescargarASS() {
 // ==========================================
 // 5. VIDEO PNGTUBER
 // ==========================================
+function actualizarEtiquetaEscalaPNGTuber() {
+    const input = document.getElementById('escalaPNGTuber');
+    const etiqueta = document.getElementById('escalaPNGTuberValor');
+    if (input && etiqueta) etiqueta.textContent = `${input.value}%`;
+}
+
+function obtenerOpcionesPNGTuber() {
+    const resolucion = document.getElementById('resolucionPNGTuber')?.value || 'original';
+    const escala = Number(document.getElementById('escalaPNGTuber')?.value || 100) / 100;
+    return {
+        resolucion,
+        escala: Number.isFinite(escala) ? escala : 1
+    };
+}
+
 async function subirImagenPNGTuber(tipo = 'idle') {
-    const inputId = tipo === 'talking' ? 'pngtuberTalkingInput' : 'pngtuberIdleInput';
+    const ids = { idle: 'pngtuberIdleInput', talking: 'pngtuberTalkingInput', blink: 'pngtuberBlinkInput' };
+    const inputId = ids[tipo] || 'pngtuberIdleInput';
     const input = document.getElementById(inputId);
     
     if (!input || !input.files || input.files.length === 0) {
@@ -499,15 +542,25 @@ async function subirImagenPNGTuber(tipo = 'idle') {
         notificar('info', `Subiendo imagen ${tipo}...`);
         const res = await fetch(`${API_BASE}/api/upload-pngtuber`, { method: 'POST', body: formData });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error al subir');
+        if (!res.ok) {
+            const mensaje = data.error === 'Unexpected field'
+                ? 'La app está desactualizada: ciérrala y vuelve a abrirla para aplicar los cambios.'
+                : (data.error || 'Error al subir');
+            throw new Error(mensaje);
+        }
         
         if (tipo === 'talking') pngtuberTalkingPath = data.url;
+        else if (tipo === 'blink') pngtuberBlinkPath = data.url;
         else pngtuberIdlePath = data.url;
+        window.pngtuberIdlePath = pngtuberIdlePath;
+        window.pngtuberTalkingPath = pngtuberTalkingPath;
+        window.pngtuberBlinkPath = pngtuberBlinkPath;
         
         notificar('success', `Imagen ${tipo} cargada correctamente.`);
+        actualizarPreviewPNGTuber();
     } catch (error) {
         console.error(error);
-        notificar('error', 'Error al subir la imagen PNGTuber');
+        notificar('error', error.message || 'Error al subir la imagen PNGTuber');
     } finally {
         ['resultado', 'textoEntrada'].forEach(id => {
             const el = document.getElementById(id);
@@ -517,8 +570,63 @@ async function subirImagenPNGTuber(tipo = 'idle') {
     }
 }
 
+async function actualizarPreviewPNGTuber() {
+    const video = document.getElementById('previewPngtuberVideo');
+    const placeholder = document.getElementById('previewPngtuberPlaceholder');
+    const btn = document.getElementById('btnActualizarPreview');
+
+    if (!video || !placeholder) return;
+
+    if (!pngtuberIdlePath) {
+        video.hidden = true;
+        video.removeAttribute('src');
+        placeholder.hidden = false;
+        return;
+    }
+
+    if (previewEnCurso) { pendingPreview = true; return; }
+    previewEnCurso = true;
+    const textoBtn = btn ? btn.innerText : '';
+    if (btn) { btn.innerText = 'Generando...'; btn.disabled = true; }
+
+    const fondo = document.getElementById('fondoPNGTuber')?.value || 'green';
+    const { resolucion, escala } = obtenerOpcionesPNGTuber();
+
+    try {
+        const res = await fetch(`${API_BASE}/api/pngtuber/preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                idleImagePath: pngtuberIdlePath,
+                talkingImagePath: pngtuberTalkingPath || null,
+                blinkImagePath: pngtuberBlinkPath || null,
+                fondo,
+                resolucion,
+                escala
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al generar la vista previa');
+
+        video.src = `${API_BASE}${data.url}?t=${Date.now()}`;
+        video.hidden = false;
+        placeholder.hidden = true;
+        video.load();
+        video.play().catch(() => {});
+    } catch (error) {
+        console.error('Error generando vista previa:', error);
+        notificar('error', error.message || 'Error al generar la vista previa.');
+        video.hidden = true;
+        placeholder.hidden = false;
+    } finally {
+        previewEnCurso = false;
+        if (btn) { btn.innerText = textoBtn; btn.disabled = false; }
+        if (pendingPreview) { pendingPreview = false; actualizarPreviewPNGTuber(); }
+    }
+}
+
 async function generarVideoPNGTuber() {
-    let audioPath = window.voiceAudioRealPath || voiceAudioRealPath;
+    let audioPath = await rutaVozPersistida();
     if (!audioPath || audioPath.startsWith('blob:')) {
         notificar('warning', 'Primero genera un audio válido (no ediciones temporales).');
         return;
@@ -535,24 +643,40 @@ async function generarVideoPNGTuber() {
     
     try {
         notificar('info', 'Procesando video...');
+        const { resolucion, escala } = obtenerOpcionesPNGTuber();
         const res = await fetch(`${API_BASE}/api/generar-video-pngtuber`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 audioPath: rutaLimpia,
                 idleImagePath: pngtuberIdlePath || null,
-                talkingImagePath: pngtuberTalkingPath || null
+                talkingImagePath: pngtuberTalkingPath || null,
+                blinkImagePath: pngtuberBlinkPath || null,
+                fondo: document.getElementById('fondoPNGTuber')?.value || 'green',
+                resolucion,
+                escala
             })
         });
         const data = await res.json();
         if (res.ok) {
             notificar('success', '¡Video PNGTuber generado con éxito!');
-            const link = document.createElement('a');
-            link.href = `${API_BASE}${data.video}`;
-            link.download = 'video_pngtuber.mp4';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const ext = (data.video || '').toLowerCase().endsWith('.webm') ? 'webm' : 'mp4';
+            const url = `${API_BASE}${data.video}`;
+            const player = document.getElementById('videoPngtuberResultado');
+            const placeholder = document.getElementById('placeholderVideoPngtuber');
+            const btnDescargar = document.getElementById('descargarVideoPngtuber');
+
+            if (player) {
+                player.src = `${url}?t=${Date.now()}`;
+                player.hidden = false;
+                player.load();
+            }
+            if (placeholder) placeholder.hidden = true;
+            if (btnDescargar) {
+                btnDescargar.href = url;
+                btnDescargar.download = `video_pngtuber.${ext}`;
+                btnDescargar.hidden = false;
+            }
         } else {
             notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
@@ -587,6 +711,7 @@ function subirMusicaFondo() {
     .then((data) => {
         if (data.url) {
             musicaFondoPath = data.url;
+            window.musicaFondoPath = data.url;
             if (window.audioEditor && typeof window.audioEditor.cargarMusica === 'function') {
                 window.audioEditor.cargarMusica(`${API_BASE}${data.url}`);
             }
@@ -606,10 +731,11 @@ function recargarAudio() {
     }
 }
 
-function aplicarDucking() {
+async function aplicarDucking() {
     const btnDescargar = document.getElementById('btnDescargar');
-    const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || (btnDescargar ? btnDescargar.href : '') || '';
-    
+    let voiceAudioPath = await rutaVozPersistida();
+    if (!voiceAudioPath && btnDescargar && btnDescargar.href) voiceAudioPath = btnDescargar.href;
+
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
         notificar('warning', 'Primero genera un audio de voz.');
         return;
@@ -618,13 +744,14 @@ function aplicarDucking() {
         notificar('warning', 'El audio actual es una versión editada temporal.');
         return;
     }
-    if (!musicaFondoPath) {
+    const musicaActual = window.musicaFondoPath || musicaFondoPath;
+    if (!musicaActual) {
         notificar('warning', 'Primero sube una música de fondo.');
         return;
     }
-    
+
     const cleanVoicePath = String(voiceAudioPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
-    const cleanMusicPath = String(musicaFondoPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
+    const cleanMusicPath = String(musicaActual).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
     
     const chkLoop = document.getElementById('chkLoopMusica');
     const thresholdInput = document.getElementById('duckingThreshold');
@@ -660,6 +787,7 @@ function aplicarDucking() {
         if (data.url) {
             voiceAudioRealPath = data.url;
             window.voiceAudioRealPath = data.url;
+            if (!window.voiceAudioOriginalPath) window.voiceAudioOriginalPath = data.url;
             
             if (btnDescargar) {
                 btnDescargar.href = `${API_BASE}${data.url}`;
@@ -671,7 +799,7 @@ function aplicarDucking() {
             if (btnMP3) btnMP3.style.display = 'inline-block';
             
             if (typeof window.cargarYReproducir === 'function') {
-                window.cargarYReproducir(data.url);
+                window.cargarYReproducir(data.url, null, null, { conservarMarcadores: true });
             }
             notificar('success', 'Mezcla aplicada correctamente.');
         } else {
@@ -690,7 +818,7 @@ function mutearMusica() { if (window.audioEditor) window.audioEditor.mutear(); }
 function cambiarVolumenMusica(valor) { if (window.audioEditor) window.audioEditor.cambiarVolumenDesdeSlider(valor); }
 
 async function exportarAMp3() {
-    const voiceAudioPath = window.voiceAudioRealPath || voiceAudioRealPath || '';
+    let voiceAudioPath = await rutaVozPersistida();
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
         notificar('warning', 'Primero genera un audio válido.');
@@ -702,8 +830,8 @@ async function exportarAMp3() {
     }
     
     const btnMP3 = document.getElementById('btnExportarMP3');
-    const textoOriginal = btnMP3 ? btnMP3.innerText : ' Exportar a MP3';
-    if (btnMP3) { btnMP3.innerText = 'Convirtiendo...'; btnMP3.disabled = true; }
+    const htmlOriginal = btnMP3 ? btnMP3.innerHTML : '';
+    if (btnMP3) { btnMP3.textContent = 'Convirtiendo...'; btnMP3.disabled = true; }
     
     try {
         notificar('info', 'Convirtiendo a MP3...');
@@ -741,7 +869,10 @@ async function exportarAMp3() {
         console.error('Error:', error);
         notificar('error', 'Error de conexión al exportar');
     } finally {
-        if (btnMP3) { btnMP3.innerText = textoOriginal; btnMP3.disabled = false; }
+        if (btnMP3) {
+            btnMP3.innerHTML = htmlOriginal || 'Descargar MP3';
+            btnMP3.disabled = false;
+        }
     }
 }
 
@@ -865,9 +996,24 @@ function insertarExpresionRapida() {
 // ==========================================
 document.addEventListener('keydown', (e) => {
     const target = e.target;
-    if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
-    
-    if (e.code === 'Space') { e.preventDefault(); if (window.audioEditor && window.audioEditor.wavesurfer) window.audioEditor.playPause(); }
+    const tag = target && target.tagName ? target.tagName : '';
+    const enCampo = tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON'
+        || tag === 'VIDEO' || tag === 'AUDIO' || (target && target.isContentEditable);
+    if (enCampo) return;
+
+    if (e.code === 'Space') {
+        const tabVideo = document.getElementById('tab-video');
+        const player = document.getElementById('videoPngtuberResultado');
+        const videoListo = tabVideo && tabVideo.classList.contains('tab-panel-activo')
+            && player && !player.hidden && player.src;
+        e.preventDefault();
+        if (videoListo) {
+            if (player.paused) player.play().catch(() => {});
+            else player.pause();
+        } else if (window.audioEditor && window.audioEditor.wavesurfer) {
+            window.audioEditor.playPause();
+        }
+    }
     if (e.code === 'Delete' || e.code === 'Backspace') { if (window.audioEditor) window.audioEditor.eliminarSeleccion(); }
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); if (window.audioEditor) window.audioEditor.deshacer(); }
     if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); if (window.audioEditor) window.audioEditor.rehacer(); }
@@ -924,6 +1070,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    actualizarEtiquetaEscalaPNGTuber();
+
     console.log('✅ Loquendo Studio cargado y listo');
     notificar('success', 'Loquendo Studio listo para usar');
 });
@@ -960,6 +1108,8 @@ window.optimizar = optimizar;
 window.generarAudio = generarAudio;
 window.automatizarTodo = automatizarTodo;
 window.subirImagenPNGTuber = subirImagenPNGTuber;
+window.actualizarPreviewPNGTuber = actualizarPreviewPNGTuber;
+window.actualizarEtiquetaEscalaPNGTuber = actualizarEtiquetaEscalaPNGTuber;
 window.generarVideoPNGTuber = generarVideoPNGTuber;
 window.subirMusicaFondo = subirMusicaFondo;
 window.aplicarDucking = aplicarDucking;

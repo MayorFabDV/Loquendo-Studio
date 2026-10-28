@@ -128,10 +128,10 @@ class NotificationSystem {
         setTimeout(() => { if (toast.parentNode) toast.remove(); }, 300);
     }
 
-    success(mensaje, duracion = 4000) { return this.show(mensaje, 'success', duracion); }
-    error(mensaje, duracion = 5000) { return this.show(mensaje, 'error', duracion); }
-    warning(mensaje, duracion = 4000) { return this.show(mensaje, 'warning', duracion); }
-    info(mensaje, duracion = 3000) { return this.show(mensaje, 'info', duracion); }
+    success(mensaje, duracion = this.defaultDuration) { return this.show(mensaje, 'success', duracion); }
+    error(mensaje, duracion = this.defaultDuration) { return this.show(mensaje, 'error', duracion); }
+    warning(mensaje, duracion = this.defaultDuration) { return this.show(mensaje, 'warning', duracion); }
+    info(mensaje, duracion = this.defaultDuration) { return this.show(mensaje, 'info', duracion); }
     clearAll() { Array.from(this.container.children).forEach(t => this._removeToast(t)); }
 }
 

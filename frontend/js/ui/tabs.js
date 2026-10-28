@@ -25,6 +25,10 @@
             pasos[m].classList.toggle('flow-step-activo', m === idx);
             pasos[m].classList.toggle('flow-step-hecho', idx > -1 && m < idx);
         }
+
+        try {
+            document.dispatchEvent(new CustomEvent('loquendo:tab-activada', { detail: { tabId: tabId } }));
+        } catch (e) { /* noop */ }
     }
 
     function irA(nombre) {
@@ -48,10 +52,17 @@
             });
         }
 
-        activar('tab-guion');
+        var tabInicial = 'tab-guion';
+        try {
+            if (window.settings && typeof window.settings.get === 'function') {
+                var guardada = window.settings.get('startTab');
+                if (guardada && document.getElementById(guardada)) tabInicial = guardada;
+            }
+        } catch (e) { /* usar Guion */ }
+        activar(tabInicial);
 
-        // Auto-cambio a la pestaña Audio cuando el reproductor aparece (al generar audio).
-        // Observador externo: NO toca la lógica de main.js/audioPlayer.js.
+        // Mantener oculto el placeholder cuando el reproductor ya está visible.
+        // El cambio a la pestaña Audio lo hace cargarYReproducir() en cada audio.
         var player = document.getElementById('contenedorReproductor');
         var placeholder = document.getElementById('audioPlaceholder');
         function sincronizarPlaceholder() {
@@ -62,12 +73,7 @@
         if (player && window.MutationObserver) {
             var obs = new MutationObserver(function (muts) {
                 for (var n = 0; n < muts.length; n++) {
-                    if (muts[n].attributeName === 'style') {
-                        sincronizarPlaceholder();
-                        if (player.style.display === 'block') {
-                            activar('tab-audio');
-                        }
-                    }
+                    if (muts[n].attributeName === 'style') sincronizarPlaceholder();
                 }
             });
             obs.observe(player, { attributes: true, attributeFilter: ['style'] });

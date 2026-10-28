@@ -4,6 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
+// --- DATOS PERSISTENTES (antes de arrancar el servidor) ---
+// Los assets de proyectos NO pueden vivir en backend/public/audios: se borran al cerrar.
+process.env.LOQUENDO_DATA_DIR = process.env.LOQUENDO_DATA_DIR
+    || path.join(app.getPath('userData'), 'data');
+
 // --- ARRANQUE DEL SERVIDOR EXPRESS ---
 const serverModule = require('./server.js');
 
@@ -232,8 +237,8 @@ app.on('before-quit', async () => {
     console.log(`[MAIN] Limpiando en: ${backendPublic}`);
     
     const carpetasALimpiar = [
-        { ruta: path.join(backendPublic, 'audios'), extensiones: /\.(wav|srt|ass|mp3|mp4)$/i },
-        { ruta: path.join(backendPublic, 'pngtuber'), extensiones: /\.(png|jpg|jpeg)$/i }
+        { ruta: path.join(backendPublic, 'audios'), extensiones: /\.(wav|srt|ass|mp3|mp4|webm)$/i },
+        { ruta: path.join(backendPublic, 'pngtuber'), extensiones: /\.(png|jpg|jpeg|mp4|webm)$/i }
     ];
 
     for (const carpeta of carpetasALimpiar) {

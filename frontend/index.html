@@ -13,6 +13,7 @@
     <script src="js/libs/regions.min.js"></script>
     <script src="js/libs/timeline.min.js"></script>
     <script src="js/libs/hover.min.js"></script>
+    <script src="js/libs/wavesurfer-multitrack.min.js"></script>
 </head>
 <body>
     <!-- HEADER -->
@@ -31,32 +32,114 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Ajustes</span>
                 </button>
-                <div class="settings-menu" id="menuAjustes" role="menu" hidden>
-                    <div class="settings-menu-title">Ajustes</div>
-
-                    <div class="settings-group">
-                        <span class="settings-label">Tema</span>
-                        <div class="settings-segmented" role="group" aria-label="Tema de la interfaz">
-                            <button type="button" data-theme-opt="dark" onclick="setTema('dark')">Oscuro</button>
-                            <button type="button" data-theme-opt="light" onclick="setTema('light')">Claro</button>
-                            <button type="button" data-theme-opt="system" onclick="setTema('system')">Sistema</button>
-                        </div>
+                <div class="settings-menu" id="menuAjustes" role="dialog" aria-label="Ajustes" hidden>
+                    <div class="settings-menu-head">
+                        <div class="settings-menu-title">Ajustes</div>
+                        <span class="settings-autosave">Se guarda solo</span>
                     </div>
 
-                    <label class="settings-row">
-                        <span class="settings-label">Mostrar ayudas</span>
-                        <input type="checkbox" id="setAyudas" class="settings-check" onchange="setAyudas(this.checked)">
-                    </label>
+                    <div class="settings-tabs" role="tablist" aria-label="Secciones de ajustes">
+                        <button type="button" class="settings-tab activo" id="settingsTabGeneral" data-settings-tab="general" role="tab" aria-selected="true" aria-controls="settingsPanelGeneral" tabindex="0">General</button>
+                        <button type="button" class="settings-tab" id="settingsTabAudio" data-settings-tab="audio" role="tab" aria-selected="false" aria-controls="settingsPanelAudio" tabindex="-1">Audio</button>
+                    </div>
 
-                    <label class="settings-row">
-                        <span class="settings-label">Sonidos de notificación</span>
-                        <input type="checkbox" id="setSonidos" class="settings-check" onchange="setSonidos(this.checked)">
-                    </label>
+                    <div class="settings-panels">
+                        <section class="settings-panel activo" id="settingsPanelGeneral" data-settings-panel="general" role="tabpanel" aria-labelledby="settingsTabGeneral" aria-hidden="false">
+                            <div class="settings-group">
+                                <span class="settings-label">Tema</span>
+                                <div class="settings-segmented" role="group" aria-label="Tema de la interfaz">
+                                    <button type="button" data-theme-opt="dark" onclick="setTema('dark')">Oscuro</button>
+                                    <button type="button" data-theme-opt="light" onclick="setTema('light')">Claro</button>
+                                    <button type="button" data-theme-opt="system" onclick="setTema('system')">Sistema</button>
+                                </div>
+                            </div>
 
-                    <button type="button" class="settings-reset" onclick="restaurarAjustes()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                        Restaurar ajustes por defecto
-                    </button>
+                            <label class="settings-row">
+                                <span class="settings-label">Pestaña inicial</span>
+                                <select id="setTabInicial" class="settings-select">
+                                    <option value="tab-guion">Guion y Voz</option>
+                                    <option value="tab-audio">Audio</option>
+                                    <option value="tab-subtitulos">Subtítulos</option>
+                                    <option value="tab-video">Video</option>
+                                </select>
+                            </label>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Mostrar tooltips</span>
+                                <input type="checkbox" id="setTooltips" class="settings-check">
+                            </label>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Botones ? de sección</span>
+                                <input type="checkbox" id="setAyudas" class="settings-check">
+                            </label>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Retardo de tooltips</span>
+                                <select id="setTooltipDelay" class="settings-select">
+                                    <option value="0">Instantáneo</option>
+                                    <option value="300">300 ms</option>
+                                    <option value="600">600 ms</option>
+                                </select>
+                            </label>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Sonidos de notificación</span>
+                                <input type="checkbox" id="setSonidos" class="settings-check" onchange="setSonidos(this.checked)">
+                            </label>
+
+                            <div class="settings-range-block">
+                                <div class="settings-range-head">
+                                    <span class="settings-label">Volumen de notificaciones</span>
+                                    <span id="setVolumenNotifValue" class="settings-range-value">50%</span>
+                                </div>
+                                <input type="range" id="setVolumenNotif" class="settings-range" min="0" max="100" step="5" value="50">
+                            </div>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Duración de notificaciones</span>
+                                <select id="setDuracionNotif" class="settings-select">
+                                    <option value="2500">2,5 s</option>
+                                    <option value="4000">4 s</option>
+                                    <option value="6000">6 s</option>
+                                </select>
+                            </label>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Recordar automatización</span>
+                                <input type="checkbox" id="setRecordarAutomatizacion" class="settings-check">
+                            </label>
+                            <small class="settings-hint">Guarda las opciones marcadas al optimizar el texto.</small>
+                        </section>
+
+                        <section class="settings-panel" id="settingsPanelAudio" data-settings-panel="audio" role="tabpanel" aria-labelledby="settingsTabAudio" aria-hidden="true">
+                            <label class="settings-row">
+                                <span class="settings-label">Reproducir al cargar</span>
+                                <input type="checkbox" id="setAutoplay" class="settings-check">
+                            </label>
+
+                            <label class="settings-row">
+                                <span class="settings-label">Zoom inicial</span>
+                                <select id="setZoomInicial" class="settings-select">
+                                    <option value="50">50 %</option>
+                                    <option value="100">100 %</option>
+                                    <option value="150">150 %</option>
+                                </select>
+                            </label>
+                            <small class="settings-hint">El zoom se aplica cada vez que cargas un audio.</small>
+                        </section>
+                    </div>
+
+                    <div class="settings-footer">
+                        <button type="button" class="settings-maintenance" id="btnLimpiarTemporales" title="Borra audios y PNGtuber con más de 24 horas">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            Limpiar temporales
+                        </button>
+                        <button type="button" class="settings-reset" onclick="restaurarAjustes()">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            Restaurar
+                        </button>
+                    </div>
                 </div>
             </div>
             <button type="button" class="mode-badge" data-help="btnAyuda" onclick="abrirAyuda()">
@@ -93,6 +176,8 @@
 
         <!-- ==================== PESTAÑA: GUION Y VOZ ==================== -->
         <div id="tab-guion" class="tab-panel tab-panel-activo" role="tabpanel">
+            <div class="guion-layout">
+            <div class="guion-main">
             <!-- Panel 1: Entrada de texto -->
             <section class="seccion-entrada">
                 <div class="textarea-wrapper" data-help-section="entrada-texto" data-help-anchor="#contadorCaracteres">
@@ -100,10 +185,11 @@
                     <div class="textarea-footer">
                         <!-- Barra de inserción rápida (horizontal, en la base del textarea) -->
                         <div class="quick-insert">
-                            <div class="quick-insert-group" data-help-section="expresiones-rapidas">
-                                <label class="quick-insert-toggle" data-help="chkExpresionesRapidas" title="Expresiones rápidas">
+                            <div class="quick-insert-group" data-help-section="expresiones-rapidas" data-help-anchor=".quick-insert-label">
+                                <span class="quick-insert-label">Expresiones</span>
+                                <label class="quick-insert-toggle" data-help="chkExpresionesRapidas" title="Activar expresiones rápidas">
                                     <input type="checkbox" id="chkExpresionesRapidas">
-                                    <span>Expresiones</span>
+                                    <span>Activar</span>
                                 </label>
                                 <div id="expresionesRapidasContainer" class="quick-insert-item" style="display: none;">
                                     <select id="expresionRapidaSelector" data-help="expresionRapidaSelector" class="tag-selector" onchange="insertarExpresionRapida()">
@@ -164,7 +250,9 @@
                                 </div>
                             </div>
 
-                            <div class="quick-insert-item" data-help-section="etiquetas-voz">
+                            <div class="quick-insert-group" data-help-section="etiquetas-voz" data-help-anchor=".quick-insert-label">
+                                <span class="quick-insert-label">Etiquetas</span>
+                                <div class="quick-insert-item">
                                 <select id="tagSelector" data-help="tagSelector" class="tag-selector" onchange="insertarEtiqueta()">
                                     <option value="">Insertar Etiqueta...</option>
 
@@ -225,15 +313,19 @@
                                         <option value="voz">Cambiar voz [voz:nombre]texto[/voz]</option>
                                     </optgroup>
                                 </select>
+                                </div>
                             </div>
 
-                            <div class="quick-insert-item" data-help-section="modo-narracion">
+                            <div class="quick-insert-group" data-help-section="modo-narracion" data-help-anchor=".quick-insert-label">
+                                <span class="quick-insert-label">Estilo</span>
+                                <div class="quick-insert-item">
                                 <select id="modo" data-help="modo" title="Estilo de Narración">
                                     <option value="normal">Estándar / Neutral</option>
                                     <option value="creepy">Creepypasta / MISTERIO</option>
                                     <option value="tutorial">Tutorial / Educativo</option>
                                     <option value="gameplay">Gameplay / Dinámico</option>
                                 </select>
+                                </div>
                             </div>
                         </div>
                         <small id="contadorCaracteres">Caracteres: 0</small>
@@ -312,6 +404,14 @@
                 </div>
             </div>
 
+            </div>
+
+            <aside class="guion-sidebar" aria-label="Ajustes del flujo">
+                <div class="guion-sidebar-title">
+                    <span>Ajustes del flujo</span>
+                    <small>Optimización y diccionarios</small>
+                </div>
+
             <!-- Ajustes de Automatización (movidos aquí, junto a Optimizar) -->
             <div class="panel-opciones" data-help-section="automatizacion">
                 <h4>
@@ -351,15 +451,11 @@
                         <input type="checkbox" id="chkSinonimos">
                         <span class="opcion-texto">Variación por Sinónimos</span>
                     </label>
-                    <label class="opcion-card" data-help="chkSRT_IA">
-                        <input type="checkbox" id="chkSRT_IA">
-                        <span class="opcion-texto">Generar SRT con IA (Whisper)</span>
-                    </label>
                 </div>
             </div>
 
-            <!-- Diccionarios (plegado por defecto) -->
-            <details class="colapsable" data-help-section="diccionarios">
+            <!-- Diccionarios (abiertos por defecto en la barra lateral) -->
+            <details class="colapsable" data-help-section="diccionarios" open>
                 <summary class="colapsable-header">
                     <h4>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
@@ -370,27 +466,50 @@
                     <div id="dictionaryEditor"></div>
                 </div>
             </details>
+            </aside>
+            </div>
         </div>
 
         <!-- ==================== PESTAÑA: AUDIO ==================== -->
         <div id="tab-audio" class="tab-panel" role="tabpanel">
             <div id="contenedorReproductor" class="custom-player" data-help-section="reproductor" data-help-anchor=".player-info span" style="display: none;">
                 <div class="player-info">
-                    <span>
+                    <div class="player-info-title">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                        Pista de Voz
-                    </span>
-                    <span id="currentTime" class="player-info-badge">00:00</span>
+                        <span>Pista de Voz</span>
+                        <span id="currentTime" class="player-info-badge">00:00</span>
+                    </div>
+
+                    <div class="audio-mode-switcher" role="radiogroup" aria-label="Modo del editor de audio">
+                        <button type="button" class="btn-audio-mode activo" data-audio-mode="basico" id="btnAudioModeBasico" data-help="btnAudioModeBasico" role="radio" aria-checked="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            Básico
+                        </button>
+                        <button type="button" class="btn-audio-mode" data-audio-mode="avanzado" id="btnAudioModeAvanzado" data-help="btnAudioModeAvanzado" role="radio" aria-checked="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                            Avanzado
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Waveform Principal -->
-                <div class="waveform-container">
-                    <div id="waveform" class="waveform"></div>
-                    <div id="timeline" class="timeline"></div>
+                <div class="audio-subtabs" role="tablist" aria-label="Secciones del editor de audio">
+                    <button type="button" class="audio-subtab-btn audio-subtab-activo" data-audio-subtab="edicion" role="tab" aria-selected="true">Edición</button>
+                    <button type="button" class="audio-subtab-btn" data-audio-subtab="efectos" role="tab" aria-selected="false">Efectos</button>
+                    <button type="button" class="audio-subtab-btn" data-audio-subtab="mezcla" role="tab" aria-selected="false">Mezcla</button>
+                    <button type="button" class="audio-subtab-btn" data-audio-subtab="mezclador" role="tab" aria-selected="false">Mezclador</button>
+                    <button type="button" class="audio-subtab-btn" data-audio-subtab="exportar" role="tab" aria-selected="false">Exportar</button>
+                </div>
+
+                <!-- Waveform Principal: visible en todas las subtabs del editor -->
+                <div id="audioWaveformDock" class="audio-waveform-dock">
+                    <div class="waveform-container audio-waveform-main">
+                        <div id="waveform" class="waveform"></div>
+                        <div id="timeline" class="timeline"></div>
+                    </div>
                 </div>
 
                 <!-- Waveform Música -->
-                <div id="waveform-musica" class="waveform-container" style="display: none;">
+                <div id="waveform-musica" class="waveform-container" data-audio-group="mezcla" style="display: none;">
                     <div class="player-info">
                         <span style="color: var(--purple-accent);">Música de Fondo</span>
                         <span id="musicaVolumeDisplay" style="color: var(--purple-accent);">Volumen: 50%</span>
@@ -404,9 +523,99 @@
                     <div id="waveform-musica-inner" class="waveform"></div>
                 </div>
 
+                <!-- Mezclador Multitrack (pistas arrastrables) -->
+                <div class="audio-fx-panel mezclador-panel" data-audio-group="mezclador" data-help-section="mezclador">
+                    <div class="mezclador-cabecera">
+                        <div>
+                            <h4 class="mezclador-titulo">Mezclador de pistas</h4>
+                            <span class="mezclador-subtitulo">Arrastra cada pista para moverla. Inserta efectos de sonido soltándolos en la zona punteada.</span>
+                        </div>
+                        <div class="mezclador-toolbar">
+                            <button type="button" id="btnMixerPlay" onclick="window.mixer.play()" class="btn-mixer btn-mixer-play" title="Reproducir mezcla">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            </button>
+                            <button type="button" id="btnMixerPause" onclick="window.mixer.pausa()" class="btn-mixer" title="Pausa">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="4" x2="8" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/></svg>
+                            </button>
+                            <button type="button" id="btnMixerStop" onclick="window.mixer.detener()" class="btn-mixer" title="Detener y volver al inicio">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="6" y="6" rx="2"/></svg>
+                            </button>
+                            <span class="mezclador-separador"></span>
+                            <button type="button" onclick="window.mixer.zoomOut()" class="btn-mixer" title="Alejar">−</button>
+                            <button type="button" onclick="window.mixer.zoomReset()" class="btn-mixer btn-mixer-zoom-reset" title="Zoom 100%">100%</button>
+                            <button type="button" onclick="window.mixer.zoomIn()" class="btn-mixer" title="Acercar">+</button>
+                            <span class="mezclador-separador"></span>
+                            <button type="button" onclick="window.mixer.agregarVozActual()" class="btn-mixer btn-mixer-agregar-voz" title="Añadir el audio de voz actual como pista">+ Voz actual</button>
+                            <button type="button" onclick="window.mixer.agregarMusicaActual()" class="btn-mixer btn-mixer-agregar-musica" title="Añadir la música actual como pista">+ Música actual</button>
+                            <button type="button" onclick="window.mixer.vaciar()" class="btn-mixer" title="Quitar todas las pistas">Vaciar</button>
+                            <span class="mezclador-separador"></span>
+                            <button type="button" id="btnMixerGuardarProyecto" onclick="window.mixer.guardarProyecto()" class="btn-mixer btn-mixer-extendido" title="Descargar el proyecto de mezcla (.json)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Guardar
+                            </button>
+                            <button type="button" id="btnMixerCargarProyecto" onclick="document.getElementById('inputProyectoMezcla').click()" class="btn-mixer btn-mixer-extendido" title="Cargar un proyecto de mezcla (.json)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Cargar
+                            </button>
+                            <input type="file" id="inputProyectoMezcla" accept="application/json,.json" style="display: none;" onchange="window.mixer.importarProyecto(this.files[0]); this.value = '';">
+                            <span class="mezclador-separador"></span>
+                            <select id="mixerRenderFormato" class="mezclador-select" title="Formato del render final">
+                                <option value="wav">WAV 24-bit</option>
+                                <option value="mp3">MP3 320k</option>
+                                <option value="flac">FLAC</option>
+                                <option value="opus">Opus 160k</option>
+                            </select>
+                            <button type="button" id="btnMixerRender" onclick="window.mixer.renderizarMezcla()" class="btn-mixer btn-mixer-render" title="Renderizar la mezcla y descargarla">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Renderizar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mezclador-cuerpo">
+                        <div id="mezcladorPistas" class="mezclador-pistas"></div>
+                        <aside class="mezclador-biblioteca">
+                            <h5 class="mezclador-biblioteca-titulo">Biblioteca SFX</h5>
+                            <ul id="mezcladorSfxLista" class="mezclador-sfx-lista"></ul>
+                            <button type="button" id="btnSfxArchivo" onclick="document.getElementById('inputSfxArchivo').click()" class="btn-mixer btn-mixer-extendido" title="Añadir archivos de sonido locales">Añadir SFX locales…</button>
+                            <input type="file" id="inputSfxArchivo" multiple accept="audio/*" style="display: none;" onchange="window.mixer.cargarArchivosSfx(this.files); this.value = '';">
+                            <div class="mezclador-continuado-tip">Suelta archivos en la zona punteada de la pista SFX.</div>
+                        </aside>
+                    </div>
+                    <div id="mezcladorInspector" class="mezclador-inspector">
+                        <div class="mezclador-inspector-cabecera">
+                            <span id="mezcladorInspectorNombre" class="mezclador-inspector-nombre">Selecciona un clip en la línea de tiempo</span>
+                            <span id="mezcladorInspectorInfo" class="mezclador-inspector-info"></span>
+                        </div>
+                        <div class="mezclador-inspector-controles">
+                            <label class="mezclador-control" title="Volumen del clip (dB lineales)">
+                                <span>Volumen</span>
+                                <input type="range" id="mixerInspVolumen" min="0" max="100" step="1" value="100">
+                                <span id="mixerInspVolumenValor" class="mezclador-control-valor">100% · 0.0 dB</span>
+                            </label>
+                            <label class="mezclador-control" title="Paneo del clip (solo render)">
+                                <span>Pan</span>
+                                <input type="range" id="mixerInspPan" min="-100" max="100" step="1" value="0">
+                                <span id="mixerInspPanValor" class="mezclador-control-valor">Centro</span>
+                            </label>
+                            <label class="mezclador-control mezclador-control-corto" title="Fade de entrada en segundos">
+                                <span>Fade in</span>
+                                <input type="number" id="mixerInspFadeIn" min="0" max="120" step="0.1" value="0">
+                            </label>
+                            <label class="mezclador-control mezclador-control-corto" title="Fade de salida en segundos">
+                                <span>Fade out</span>
+                                <input type="number" id="mixerInspFadeOut" min="0" max="120" step="0.1" value="0">
+                            </label>
+                            <span id="mixerInspAuto" class="mezclador-inspector-auto">Sin automatización</span>
+                            <button type="button" id="mixerInspAgregarAuto" class="btn-mixer" title="Añadir un punto de automatización en la posición del cursor">+ Punto</button>
+                            <button type="button" id="mixerInspLimpiarAuto" class="btn-mixer" title="Quitar la automatización del clip">Limpiar auto</button>
+                        </div>
+                    </div>
+                    <div class="mezclador-pie" id="mezcladorEstado">Sin pistas cargadas</div>
+                </div>
+
                 <!-- Editor Controls -->
                 <div class="editor-controls-compact">
-                    <div class="control-group">
+                    <div class="control-group" data-audio-group="edicion">
                         <button type="button" data-help="editorZoomOut" onclick="editorZoomOut()" title="Alejar">−</button>
                         <button type="button" data-help="editorResetZoom" onclick="editorResetZoom()" title="Reset">100%</button>
                         <button type="button" data-help="editorZoomIn" onclick="editorZoomIn()" title="Acercar">+</button>
@@ -423,6 +632,17 @@
                         </button>
                     </div>
                     <div class="control-group">
+                        <button type="button" data-help="btnDeshacer" id="btnDeshacer" onclick="window.audioEditor.deshacer()" title="Deshacer (Ctrl+Z)" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                        </button>
+                        <button type="button" data-help="btnRehacer" id="btnRehacer" onclick="window.audioEditor.rehacer()" title="Rehacer (Ctrl+Y)" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+                        </button>
+                        <button type="button" data-help="btnRestaurarOriginal" id="btnRestaurarOriginal" onclick="window.audioEditor.restaurarOriginal()" title="Restaurar el audio original" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg>
+                        </button>
+                    </div>
+                    <div class="control-group" data-audio-group="edicion">
                         <button type="button" data-help="btnCortar" onclick="eliminarSeleccion()" id="btnEliminar" class="btn-cut" title="Cortar" disabled>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/></svg>
                             Cortar
@@ -430,8 +650,90 @@
                     </div>
                 </div>
 
+                <!-- Panel de Modo Básico (Simplificado y Rápido) -->
+                <div id="audioBasicPanel" class="audio-basic-panel" data-help-section="modo-basico-audio">
+                    <div class="basic-presets-section">
+                        <span class="basic-section-label">Preajuste de Voz:</span>
+                        <div class="basic-presets-grid">
+                            <button type="button" class="basic-preset-chip activo" data-preset="plana" data-help="basicPresetPlana">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-7 4 14 2-7h4"/></svg>
+                                <span>Original</span>
+                            </button>
+                            <button type="button" class="basic-preset-chip" data-preset="voz" data-help="basicPresetVoz">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                <span>Voz Clara</span>
+                            </button>
+                            <button type="button" class="basic-preset-chip" data-preset="podcast" data-help="basicPresetPodcast">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                                <span>Podcast</span>
+                            </button>
+                            <button type="button" class="basic-preset-chip" data-preset="calida" data-help="basicPresetCalida">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                                <span>Cálida</span>
+                            </button>
+                            <button type="button" class="basic-preset-chip" data-preset="radio" data-help="basicPresetRadio">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+                                <span>Radio</span>
+                            </button>
+                            <button type="button" class="basic-preset-chip" data-preset="suave" data-help="basicPresetSuave">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9a3 3 0 1 0-3-3"/><path d="M3 16h13a3 3 0 1 1-3 3"/><path d="M3 12h17"/></svg>
+                                <span>Suave</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="basic-controls-grid">
+                        <div class="basic-control-item" data-help="basicVolume">
+                            <label>
+                                <span>Volumen</span>
+                                <span id="basicVolumeVal" class="basic-val">100%</span>
+                            </label>
+                            <input type="range" id="basicVolumeSlider" min="0" max="150" step="1" value="100">
+                        </div>
+                        <div class="basic-control-item" data-help="basicClarity">
+                            <label>
+                                <span>Claridad / Brillo</span>
+                                <span id="basicClarityVal" class="basic-val">0 dB</span>
+                            </label>
+                            <input type="range" id="basicClaritySlider" min="-6" max="6" step="0.5" value="0">
+                        </div>
+                        <div class="basic-control-item" data-help="basicRate">
+                            <label>
+                                <span>Velocidad</span>
+                                <span id="basicRateVal" class="basic-val">1.00×</span>
+                            </label>
+                            <input type="range" id="basicRateSlider" min="0.75" max="1.50" step="0.05" value="1">
+                        </div>
+                    </div>
+
+                    <div class="basic-quick-actions">
+                        <button type="button" data-help="basicFadeIn" onclick="window.audioEditor.aplicarFadeIn(1)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18 21 6"/><path d="M3 18h18"/></svg>
+                            Fade in (1 s)
+                        </button>
+                        <button type="button" data-help="basicFadeOut" onclick="window.audioEditor.aplicarFadeOut(1)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6 21 18"/><path d="M21 18H3"/></svg>
+                            Fade out (1 s)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="audio-transport-extra">
+                    <button type="button" id="btnLoopAudio" class="btn-transport-toggle" data-help="btnLoopAudio">Loop</button>
+                    <div class="transport-fx-item transport-slider">
+                        <label>Velocidad <span data-fx-value="rate">1.00×</span></label>
+                        <input type="range" id="audioRate" data-help="audioRate" data-fx="rate" min="0.5" max="2" step="0.05" value="1">
+                    </div>
+                    <div class="transport-fx-item transport-slider">
+                        <label>Tono <span data-fx-value="pitch">0 st</span></label>
+                        <input type="range" id="audioPitch" data-help="audioPitch" data-fx="pitch" min="-12" max="12" step="1" value="0">
+                    </div>
+                    <button type="button" id="btnBypassFX" class="btn-transport-toggle" data-help="btnBypassFX">A/B</button>
+                    <span id="audioEngineStatus" class="audio-engine-status">Motor: Tone.js</span>
+                </div>
+
                 <!-- Avanzado: volumen y mezcla (colapsables, abiertos por defecto) -->
-                <details class="colapsable colapsable-avanzado" open>
+                <details class="colapsable colapsable-avanzado" data-audio-group="mezcla" open>
                     <summary class="colapsable-header">Subir y bajar volumen (avanzado)</summary>
                     <div class="colapsable-body">
                         <!-- Entrada/salida de voz -->
@@ -481,13 +783,96 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                     Mezclar Audio
                                 </button>
-                            </div>
-                        </div>
-                    </div>
+                </div>
+            </div>
+        </div>
                 </details>
 
+                <div class="audio-fx-panel" data-audio-group="efectos" data-help-section="efectos-audio">
+                    <div class="fx-header">
+                        <h4>Efectos en vivo</h4>
+                        <div class="fx-actions">
+                            <select id="audioFxPreset" data-help="audioFxPreset">
+                                <option value="custom" selected>Personalizado</option>
+                                <option value="voz">Voz clara</option>
+                                <option value="podcast">Podcast</option>
+                                <option value="calida">Cálida</option>
+                                <option value="radio">Radio</option>
+                                <option value="suave">Suave</option>
+                                <option value="plana">Plana (sin efectos)</option>
+                            </select>
+                            <button type="button" id="btnResetFX" data-help="btnResetFX">Restablecer</button>
+                        </div>
+                    </div>
+
+                    <div class="fx-meters">
+                        <div class="fx-meter-row">
+                            <span>Pico</span>
+                            <div class="fx-meter"><div id="fxMeterPeak" class="fx-meter-fill"></div></div>
+                            <span id="fxMeterPeakValue" class="fx-meter-value">-∞ dB</span>
+                        </div>
+                        <div class="fx-meter-row">
+                            <span>Nivel</span>
+                            <div class="fx-meter"><div id="fxMeterRms" class="fx-meter-fill"></div></div>
+                            <span id="fxMeterRmsValue" class="fx-meter-value">-∞ dB</span>
+                        </div>
+                        <div class="fx-meter-row">
+                            <span>Reducción</span>
+                            <div class="fx-meter"><div id="fxMeterReduction" class="fx-meter-fill fx-meter-reduction"></div></div>
+                            <span id="fxMeterReductionValue" class="fx-meter-value">0 dB</span>
+                        </div>
+                    </div>
+
+                    <div class="fx-grid">
+                        <div class="fx-control" data-help="fxHighpass">
+                            <label>Paso alto <span data-fx-value="highpass">80 Hz</span></label>
+                            <input type="range" data-fx="highpass" min="20" max="500" step="5" value="80">
+                        </div>
+                        <div class="fx-control" data-help="fxLowpass">
+                            <label>Paso bajo <span data-fx-value="lowpass">12000 Hz</span></label>
+                            <input type="range" data-fx="lowpass" min="3000" max="20000" step="100" value="12000">
+                        </div>
+                        <div class="fx-control" data-help="fxEqLow">
+                            <label>Graves <span data-fx-value="eqLow">0 dB</span></label>
+                            <input type="range" data-fx="eqLow" min="-12" max="12" step="0.5" value="0">
+                        </div>
+                        <div class="fx-control" data-help="fxEqMid">
+                            <label>Medios <span data-fx-value="eqMid">0 dB</span></label>
+                            <input type="range" data-fx="eqMid" min="-12" max="12" step="0.5" value="0">
+                        </div>
+                        <div class="fx-control" data-help="fxEqHigh">
+                            <label>Agudos <span data-fx-value="eqHigh">0 dB</span></label>
+                            <input type="range" data-fx="eqHigh" min="-12" max="12" step="0.5" value="0">
+                        </div>
+                        <div class="fx-control" data-help="fxCompThreshold">
+                            <label>Compresor <span data-fx-value="compThreshold">-24 dB</span></label>
+                            <input type="range" data-fx="compThreshold" min="-60" max="0" step="1" value="-24">
+                        </div>
+                        <div class="fx-control" data-help="fxCompRatio">
+                            <label>Relación <span data-fx-value="compRatio">3:1</span></label>
+                            <input type="range" data-fx="compRatio" min="1" max="20" step="0.5" value="3">
+                        </div>
+                        <div class="fx-control" data-help="fxGateThreshold">
+                            <label>Puerta <span data-fx-value="gateThreshold">-80 dB</span></label>
+                            <input type="range" data-fx="gateThreshold" min="-80" max="-10" step="1" value="-80">
+                        </div>
+                        <div class="fx-control" data-help="fxReverbWet">
+                            <label>Reverb <span data-fx-value="reverbWet">0%</span></label>
+                            <input type="range" data-fx="reverbWet" min="0" max="100" step="1" value="0">
+                        </div>
+                        <div class="fx-control" data-help="fxLimiterThreshold">
+                            <label>Limitador <span data-fx-value="limiterThreshold">-1 dB</span></label>
+                            <input type="range" data-fx="limiterThreshold" min="-12" max="0" step="0.5" value="-1">
+                        </div>
+                        <div class="fx-control" data-help="fxVolume">
+                            <label>Volumen <span data-fx-value="volume">100%</span></label>
+                            <input type="range" data-fx="volume" min="0" max="150" step="1" value="100">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Efectos Rápidos -->
-                <div class="efectos-rapidos">
+                <div class="efectos-rapidos" data-audio-group="edicion">
                     <button type="button" data-help="btnNormalizar" onclick="window.audioEditor.normalizarVolume(0.95)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                         Igualar volumen
@@ -498,15 +883,106 @@
                     </button>
                 </div>
 
+                <div class="audio-fx-panel audio-selection-panel audio-advanced-only" data-audio-group="edicion" data-help-section="seleccion-audio">
+                    <div class="fx-header">
+                        <h4>Selección</h4>
+                        <span id="audioSelectionStatus" class="audio-engine-status">Listo</span>
+                    </div>
+                    <p id="audioSelectionRange" class="audio-selection-range">Arrastra sobre la onda para seleccionar</p>
+                    <div class="audio-selection-actions">
+                        <button type="button" id="btnEscucharSeleccion" data-help="btnEscucharSeleccion" onclick="window.audioEditor.escucharSeleccion()" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            Escuchar
+                        </button>
+                        <button type="button" id="btnAplicarFxSeleccion" class="btn-seleccion-principal" data-help="btnAplicarFxSeleccion" onclick="window.audioEditor.aplicarFXSeleccion()" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2L12 3Z"/><path d="M19 15l.9 2.6L22.5 18l-2.6.9L19 21l-.9-2.1L15.5 18l2.6-.4L19 15Z"/></svg>
+                            Aplicar efectos
+                        </button>
+                    </div>
+                    <div class="audio-selection-quick">
+                        <button type="button" id="btnSelNormalizar" data-help="btnSelNormalizar" onclick="window.audioEditor.normalizarSeleccion(-1)" disabled>Normalizar</button>
+                        <button type="button" id="btnSelSilenciar" data-help="btnSelSilenciar" onclick="window.audioEditor.silenciarSeleccion()" disabled>Silenciar</button>
+                        <button type="button" id="btnSelFadeIn" data-help="btnSelFadeIn" onclick="window.audioEditor.aplicarFadeSeleccion('in', 1)" disabled>Fade in</button>
+                        <button type="button" id="btnSelFadeOut" data-help="btnSelFadeOut" onclick="window.audioEditor.aplicarFadeSeleccion('out', 1)" disabled>Fade out</button>
+                        <button type="button" id="btnSelLimpiar" data-help="btnSelLimpiar" onclick="window.audioEditor.limpiarRuidoSeleccion()" disabled>Limpiar ruido</button>
+                        <button type="button" id="btnSelDeesser" data-help="btnSelDeesser" onclick="window.audioEditor.reducirSibilanciasSeleccion()" disabled>Sibilancias</button>
+                    </div>
+                    <div class="audio-selection-quick audio-selection-edit">
+                        <button type="button" id="btnSelCopiar" data-help="btnSelCopiar" onclick="window.audioEditor.copiarSeleccion()" disabled>Copiar</button>
+                        <button type="button" id="btnSelPegar" data-help="btnSelPegar" onclick="window.audioEditor.pegarSeleccion()" disabled>Pegar</button>
+                        <button type="button" id="btnSelDuplicar" data-help="btnSelDuplicar" onclick="window.audioEditor.duplicarSeleccion()" disabled>Duplicar</button>
+                        <button type="button" id="btnSelCrossfade" data-help="btnSelCrossfade" onclick="window.audioEditor.crossfadeSeleccion()" disabled>Crossfade</button>
+                    </div>
+                    <p class="audio-export-note">Se aplica de forma destructiva solo al tramo seleccionado. Puedes deshacer con Ctrl+Z o con el botón Deshacer.</p>
+                </div>
+
+                <div class="audio-fx-panel audio-render-panel" data-audio-group="exportar" data-help-section="exportar-audio">
+                    <div class="fx-header">
+                        <h4>Render final</h4>
+                        <span id="audioRenderStatus" class="audio-engine-status">Listo</span>
+                    </div>
+                    <p class="audio-export-note">
+                        El render aplica los efectos y la limpieza actuales con FFmpeg, normaliza el volumen y genera el archivo final.
+                    </p>
+                    <div class="fx-grid">
+                        <div class="fx-control">
+                            <label>Formato</label>
+                            <select id="audioRenderFormat" data-help="audioRenderFormat">
+                                <option value="wav">WAV</option>
+                                <option value="mp3">MP3 320 kbps</option>
+                                <option value="flac">FLAC</option>
+                                <option value="opus">Opus 160 kbps</option>
+                            </select>
+                        </div>
+                        <div class="fx-control">
+                            <label>Profundidad</label>
+                            <select id="audioRenderBitDepth" data-help="audioRenderBitDepth">
+                                <option value="16">16 bits</option>
+                                <option value="24">24 bits (WAV)</option>
+                            </select>
+                        </div>
+                        <div class="fx-control">
+                            <label>Sonoridad</label>
+                            <select id="audioRenderLoudness" data-help="audioRenderLoudness">
+                                <option value="off">Sin normalizar</option>
+                                <option value="-14">-14 LUFS (streaming)</option>
+                                <option value="-16" selected>-16 LUFS (voz/YouTube)</option>
+                                <option value="-18">-18 LUFS (podcast)</option>
+                                <option value="-23">-23 LUFS (EBU R128)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="fx-checkbox-row">
+                        <label class="fx-check" data-help="chkAudioRenderPrecise">
+                            <input type="checkbox" id="chkAudioRenderPrecise" checked> Normalización precisa (2 pasadas)
+                        </label>
+                        <label class="fx-check" data-help="chkAudioRenderDenoise">
+                            <input type="checkbox" id="chkAudioRenderDenoise" checked> Reducir ruido
+                        </label>
+                        <label class="fx-check" data-help="chkAudioRenderDeesser">
+                            <input type="checkbox" id="chkAudioRenderDeesser" checked> Reducir sibilancias
+                        </label>
+                    </div>
+                    <div class="fx-actions">
+                        <button type="button" id="btnAnalizarAudio" data-help="btnAnalizarAudio">Analizar sonoridad</button>
+                        <button type="button" id="btnRenderizarAudio" class="btn-play-primary" data-help="btnRenderizarAudio">Renderizar y cargar</button>
+                    </div>
+                    <div id="audioRenderInfo" class="audio-render-info">Aún sin analizar.</div>
+                </div>
+
+                <div class="audio-export-note" data-audio-group="exportar">
+                    También puedes descargar el audio editado directamente sin pasar por el render.
+                </div>
+
                 <!-- Botones Exportación (audio) -->
-                <div class="player-controls">
+                <div class="player-controls" data-audio-group="exportar">
                     <a id="btnDescargar" data-help="btnDescargarWAV" href="#" download="audio_loquendo.wav" class="btn-descarga">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Descargar WAV
                     </a>
                     <button type="button" id="btnExportarMP3" data-help="btnExportarMP3" onclick="exportarAMp3()" style="display: none;" class="btn-descarga">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                        Exportar MP3
+                        Descargar MP3
                     </button>
                 </div>
 
@@ -523,8 +999,15 @@
                     Subtítulos Dinámicos
                 </h4>
                 <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 12px;">
-                    Para subtítulos con IA (Whisper), marca «Generar SRT con IA» en Ajustes de Automatización (pestaña Guion y Voz). Aquí generas SRT/ASS por plantilla.
+                    Activa «Generar SRT con IA (Whisper)» aquí abajo y se aplicará al crear el próximo audio. También puedes generar SRT/ASS por plantilla desde esta pestaña.
                 </p>
+                <div class="subtitulos-ia-config">
+                    <label class="opcion-card" data-help="chkSRT_IA">
+                        <input type="checkbox" id="chkSRT_IA">
+                        <span class="opcion-texto">Generar SRT con IA (Whisper) al crear el audio</span>
+                    </label>
+                    <small>Se aplica la próxima vez que generes audio desde Guion y Voz.</small>
+                </div>
                 <div class="controls-subtitulos">
                     <div class="fade-group">
                         <label>Palabras por subtítulo: <span id="palabrasSubtituloValue" class="fade-group-val">7</span></label>
@@ -563,6 +1046,59 @@
                         Descargar ASS
                     </a>
                 </div>
+
+                <!-- Onda compartida con el editor de audio -->
+                <section id="subtitlesWaveformSection" class="subtitles-waveform-section is-empty" aria-label="Onda del audio para editar subtítulos">
+                    <div class="subtitles-waveform-toolbar">
+                        <div class="control-group">
+                            <button type="button" data-help="btnReiniciar" onclick="restartAudio()" title="Reiniciar">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            </button>
+                            <button type="button" data-help="btnPlay" id="subtitlesPlayBtn" class="btn-play-primary" onclick="togglePlay()" title="Play/Pausa">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            </button>
+                            <button type="button" data-help="btnDetener" onclick="stopAudio()" title="Detener">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="6" y="6" rx="2"/></svg>
+                            </button>
+                        </div>
+                        <span id="subtitlesWaveTime" class="subtitles-wave-time">0:00 / 0:00</span>
+                        <div class="control-group subtitles-wave-zoom">
+                            <button type="button" data-help="editorZoomOut" onclick="editorZoomOut()" title="Alejar">-</button>
+                            <button type="button" data-help="editorResetZoom" onclick="editorResetZoom()" title="Reset">100%</button>
+                            <button type="button" data-help="editorZoomIn" onclick="editorZoomIn()" title="Acercar">+</button>
+                        </div>
+                    </div>
+                    <div id="subtitlesWaveformDock" class="subtitles-waveform-dock"></div>
+                    <p class="subtitles-waveform-empty">Genera o carga un audio para ver la onda y editar los marcadores aquí.</p>
+                </section>
+
+                <!-- Marcadores SRT editables -->
+                <div class="audio-marker-panel" data-help-section="marcadores-audio">
+                    <div class="fx-header">
+                        <h4>Marcadores SRT</h4>
+                        <span id="audioMarkerStatus" class="audio-engine-status">Sin marcadores</span>
+                        <div class="audio-marker-actions">
+                            <label class="btn-marker-file" for="audioMarkerFile" data-help="btnMarkerCargar">Cargar SRT</label>
+                            <input type="file" id="audioMarkerFile" accept=".srt,.vtt,text/plain" hidden>
+                            <button type="button" id="btnMarkerDescargar" data-help="btnMarkerDescargar" disabled>Descargar SRT</button>
+                            <button type="button" id="btnMarkerLimpiar" data-help="btnMarkerLimpiar" disabled>Limpiar</button>
+                        </div>
+                    </div>
+                    <div class="audio-marker-fields">
+                        <label>Inicio <input type="number" id="audioMarkerStart" data-help="audioMarkerStart" min="0" step="0.01" disabled></label>
+                        <label>Fin <input type="number" id="audioMarkerEnd" data-help="audioMarkerEnd" min="0" step="0.01" disabled></label>
+                        <label class="audio-marker-text-field">Texto <input type="text" id="audioMarkerText" data-help="audioMarkerText" maxlength="240" disabled></label>
+                    </div>
+                    <div class="audio-marker-buttons">
+                        <button type="button" id="btnMarkerGuardar" data-help="btnMarkerGuardar" disabled>Guardar cambios</button>
+                        <button type="button" id="btnMarkerIr" data-help="btnMarkerIr" disabled>Ir al inicio</button>
+                        <button type="button" id="btnMarkerDividir" data-help="btnMarkerDividir" disabled>Dividir</button>
+                        <button type="button" id="btnMarkerUnir" data-help="btnMarkerUnir" disabled>Unir con siguiente</button>
+                        <button type="button" id="btnMarkerEliminar" data-help="btnMarkerEliminar" disabled>Eliminar</button>
+                    </div>
+                    <div id="audioMarkerList" class="audio-marker-list"></div>
+                    <p class="audio-export-note">Los marcadores se cargan del SRT y se ajustan aquí; los bloques también se ven sobre la onda. Editar marcadores no cambia el audio.</p>
+                </div>
             </div>
         </div>
 
@@ -574,20 +1110,40 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                         Fondo:
                     </label>
-                    <select id="fondoPNGTuber" data-help="fondoPNGTuber">
+                    <select id="fondoPNGTuber" data-help="fondoPNGTuber" onchange="actualizarPreviewPNGTuber()">
                         <option value="green">Verde (para quitar el fondo)</option>
                         <option value="black">Negro</option>
                         <option value="transparent">Transparente</option>
                     </select>
 
+                    <label for="resolucionPNGTuber">Resolución:</label>
+                    <select id="resolucionPNGTuber" data-help="resolucionPNGTuber" onchange="actualizarPreviewPNGTuber()">
+                        <option value="original">Original (tamaño de la imagen)</option>
+                        <option value="720p">16:9 · 1280 x 720</option>
+                        <option value="1080p">16:9 · 1920 x 1080</option>
+                    </select>
+
+                    <div class="settings-range-block video-scale-control">
+                        <div class="settings-range-head">
+                            <label for="escalaPNGTuber" data-help="escalaPNGTuber">Escala del personaje</label>
+                            <span id="escalaPNGTuberValor" class="settings-range-value">100%</span>
+                        </div>
+                        <input type="range" id="escalaPNGTuber" class="settings-range" min="50" max="200" step="5" value="100" oninput="actualizarEtiquetaEscalaPNGTuber()" onchange="actualizarPreviewPNGTuber()">
+                    </div>
+
                     <label class="btn-video-upload" data-help="pngtuberIdleInput">
                         <span>Imagen en reposo</span>
-                        <input type="file" id="pngtuberIdleInput" accept="image/png" onchange="subirImagenPNGTuber('idle')">
+                        <input type="file" id="pngtuberIdleInput" accept="image/*" onchange="subirImagenPNGTuber('idle')">
                     </label>
 
                     <label class="btn-video-upload" data-help="pngtuberTalkingInput">
                         <span>Imagen hablando</span>
-                        <input type="file" id="pngtuberTalkingInput" accept="image/png" onchange="subirImagenPNGTuber('talking')">
+                        <input type="file" id="pngtuberTalkingInput" accept="image/*" onchange="subirImagenPNGTuber('talking')">
+                    </label>
+
+                    <label class="btn-video-upload" data-help="pngtuberBlinkInput">
+                        <span>Imagen con ojos cerrados (opcional)</span>
+                        <input type="file" id="pngtuberBlinkInput" accept="image/*" onchange="subirImagenPNGTuber('blink')">
                     </label>
                 </div>
 
@@ -595,6 +1151,36 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
                     Crear Video del Personaje
                 </button>
+            </section>
+
+            <section class="pngtuber-visual">
+                <section class="preview-pngtuber" data-help="previewPngtuber">
+                    <div class="preview-frame">
+                        <video id="previewPngtuberVideo" loop muted autoplay playsinline hidden></video>
+                        <div id="previewPngtuberPlaceholder" class="preview-placeholder">
+                            Sube una imagen en reposo para ver la vista previa.
+                        </div>
+                    </div>
+                    <div class="preview-acciones">
+                        <span class="preview-nota">Vista previa: el personaje alterna entre reposo y habla.</span>
+                        <button type="button" data-help="btnActualizarPreview" id="btnActualizarPreview" class="btn-preview" onclick="actualizarPreviewPNGTuber()">
+                            Actualizar vista previa
+                        </button>
+                    </div>
+                </section>
+
+                <section class="player-pngtuber" data-help="videoPngtuberResultado">
+                    <div class="preview-frame">
+                        <video id="videoPngtuberResultado" controls playsinline hidden></video>
+                        <div id="placeholderVideoPngtuber" class="preview-placeholder">
+                            Genera el video para verlo aquí.
+                        </div>
+                    </div>
+                    <div class="preview-acciones">
+                        <span class="preview-nota">Resultado final con audio. Revísalo aquí antes de descargarlo.</span>
+                        <a id="descargarVideoPngtuber" data-help="btnDescargarVideoPngtuber" class="btn-preview" hidden download>Descargar video</a>
+                    </div>
+                </section>
             </section>
         </div>
     </main>
@@ -607,8 +1193,20 @@
     <script src="js/ui/narrationModes.js"></script>
     <script src="js/ui/dictionaryEditor.js"></script>
     <script src="js/services/TextProcessor.js"></script>
+    <script src="js/libs/tone.min.js"></script>
+    <script src="js/services/audioEngine.js"></script>
+    <script src="js/services/audioSessionStore.js"></script>
     <script src="js/services/audioProcessor.js"></script>
+    <script src="js/services/audioMarkers.js"></script>
     <script src="js/services/audioPlayer.js"></script>
+    <script src="js/services/mixer/config.js"></script>
+    <script src="js/services/mixer/state.js"></script>
+    <script src="js/services/mixer/inspector.js"></script>
+    <script src="js/services/mixer/timeline.js"></script>
+    <script src="js/services/mixer/media.js"></script>
+    <script src="js/services/mixer/project.js"></script>
+    <script src="js/services/mixer/transport.js"></script>
+    <script src="js/services/mixerService.js"></script>
     <script src="js/services/audioActions.js"></script>
     <script src="js/services/videoProcessor.js"></script>
     <script src="js/services/OrtografiaProcessor.js"></script>
@@ -617,6 +1215,8 @@
     <script src="js/core/helpTexts.js"></script>
     <script src="js/ui/helpSystem.js"></script>
     <script src="js/ui/settings.js"></script>
+    <script src="js/ui/audioEditorUI.js"></script>
+    <script src="js/ui/audioRenderUI.js"></script>
 
     <!-- MODAL DE AYUDA -->
     <div id="modalAyuda" class="modal-overlay" style="display: none;">

@@ -1,11 +1,11 @@
 @echo off
 chcp 65001 >nul
-title Empaquetador Loquendo Studio - Portable ZIP
+title Empaquetador Loquendo Studio - WIN-UNPACKED ZIP
 cls
 color 0B
 
 echo ============================================
-echo   EMPAQUETADOR PORTABLE ZIP
+echo   EMPAQUETADOR WIN-UNPACKED ZIP
 echo   Loquendo Studio
 echo ============================================
 echo.
@@ -21,7 +21,7 @@ for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%PACKAG
 if not defined VERSION set "VERSION=1.0.0"
 if not defined APP_NAME set "APP_NAME=LoquendoStudio"
 
-set "ZIP_NAME=%APP_NAME%-v%VERSION%-portable.zip"
+set "ZIP_NAME=LoquendoStudio-v%VERSION%-win64.zip"
 set "OUTPUT=%PROJECT_DIR%dist\%ZIP_NAME%"
 
 echo [1/4] Verificando carpeta fuente...
@@ -81,7 +81,7 @@ echo    Ruta: %OUTPUT%
 echo.
 
 echo ============================================
-echo   PORTABLE LISTO PARA DISTRIBUIR
+echo   RELEASE WIN-UNPACKED LISTO PARA PUBLICAR
 echo ============================================
 echo.
 echo Instrucciones para el usuario:

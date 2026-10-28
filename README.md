@@ -3,7 +3,7 @@
 
 ### Suite profesional de automatización de voz y edición multimedia
 
-[![Versión](https://img.shields.io/badge/versión-1.0.0-e41a1a?style=for-the-badge)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
+[![Versión](https://img.shields.io/badge/versión-1.2.0-e41a1a?style=for-the-badge)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%2F11-0078D6?style=for-the-badge&logo=windows)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-green?style=for-the-badge)](LICENSE)
 [![Estado](https://img.shields.io/badge/estado-activo-brightgreen?style=for-the-badge)]()
@@ -131,26 +131,24 @@
 
 ## 📥 Descarga
 
-### Para Usuarios (Portable)
+### Windows 10/11 (64 bits)
 
 1. Ve a la sección **[Releases](https://github.com/MayorFabDV/Loquendo-Studio/releases)**
-2. Descarga `LoquendoStudio-Portable-1.0.0.exe`
-3. Ejecuta el archivo
-4. ¡Listo!
+2. Descarga el ZIP `LoquendoStudio-v1.2.0-win64.zip`
+3. Descomprime el ZIP en una carpeta local (no ejecutes la app desde dentro del ZIP)
+4. Ejecuta `Loquendo Studio.exe`
+
+La distribución oficial es la carpeta `win-unpacked` empaquetada en ZIP. No requiere instalador ni Node.js.
 
 **Requisitos:**
-- ✅ Windows 10/11 (64 bits)
-- ✅ Loquendo instalado (opcional, para voces Loquendo)
-- ❌ No requiere Node.js
-- ❌ No requiere Python
-- ❌ No requiere Java
-- ❌ No requiere internet
+- Windows 10/11 (64 bits)
+- Loquendo instalado (opcional, para voces Loquendo)
+- No requiere Node.js
+- No requiere Python
+- No requiere Java
+- No requiere internet
 
-### Para Usuarios (Instalador)
-
-1. Descarga `Loquendo Studio Setup 1.0.0.exe`
-2. Ejecuta el instalador
-3. Sigue las instrucciones
+> Si Windows SmartScreen muestra una advertencia, usa "Más información" → "Ejecutar de todas formas". El ejecutable no está firmado.
 
 ---
 
@@ -180,14 +178,21 @@ npm start
 ### Compilación
 
 ```bash
-# Compilación portable (recomendado)
+# 1. Verificar binarios y módulos requeridos
+node scripts/check_build_prereqs.js
+
+# 2. Generar la carpeta win-unpacked
+npx electron-builder --win dir
+
+# 3. Crear el ZIP de release
+empaquetar_portable.bat
+```
+
+Formatos opcionales (no son la distribución oficial):
+
+```bash
 npm run build:portable
-
-# Compilación con instalador
 npm run build:nsis
-
-# Compilación rápida (sin limpiar)
-npm run build
 ```
 
 ---

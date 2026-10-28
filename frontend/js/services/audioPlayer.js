@@ -34,8 +34,47 @@ const timeDisplay = document.getElementById('currentTime');
 const btnDescargar = document.getElementById('btnDescargar');
 const btnDescargaSRT = document.getElementById('btnDescargaSRT');
 const btnDescargaASS = document.getElementById('btnDescargaASS');
+const subtitlesPlayBtn = document.getElementById('subtitlesPlayBtn');
+const subtitlesWaveTime = document.getElementById('subtitlesWaveTime');
+const subtitlesWaveformSection = document.getElementById('subtitlesWaveformSection');
 
 let editorInicializado = false;
+let autoplayPendiente = false;
+
+function leerAjuste(clave, defecto) {
+    try {
+        if (window.settings && typeof window.settings.get === 'function') {
+            const valor = window.settings.get(clave);
+            return valor === undefined || valor === null ? defecto : valor;
+        }
+    } catch (e) { /* noop */ }
+    return defecto;
+}
+
+function formatearTiempoUI(segundos) {
+    const total = Math.max(0, Math.floor(Number(segundos) || 0));
+    const minutos = Math.floor(total / 60);
+    const resto = total % 60;
+    return `${minutos}:${resto < 10 ? '0' : ''}${resto}`;
+}
+
+function actualizarIconosPlay(reproduciendo) {
+    const icono = reproduciendo ? ICONOS.pause : ICONOS.play;
+    if (playBtn) playBtn.innerHTML = icono;
+    if (subtitlesPlayBtn) subtitlesPlayBtn.innerHTML = icono;
+}
+
+function actualizarTiempoSubtitulos(actual, total) {
+    if (!subtitlesWaveTime) return;
+    subtitlesWaveTime.innerText = `${formatearTiempoUI(actual)} / ${formatearTiempoUI(total)}`;
+}
+
+function mostrarOndaSubtitulos() {
+    if (subtitlesWaveformSection) subtitlesWaveformSection.classList.remove('is-empty');
+    if (window.audioEditorUI && typeof window.audioEditorUI.refrescarOnda === 'function') {
+        window.audioEditorUI.refrescarOnda();
+    }
+}
 
 // ==========================================
 // 🎯 INICIALIZACIÓN DEL EDITOR
@@ -44,19 +83,36 @@ function asegurarEditorInicializado() {
     if (!editorInicializado && window.audioEditor) {
         editorInicializado = window.audioEditor.inicializar('#waveform');
 
-        window.audioEditor.onReady = () => { console.log('Editor listo'); };
+        window.audioEditor.onReady = () => {
+            console.log('Editor listo');
+            const zoom = Number(leerAjuste('zoomInicial', 50)) || 50;
+            if (window.audioEditor.wavesurfer) {
+                try { window.audioEditor.wavesurfer.zoom(zoom); } catch (e) { /* noop */ }
+            }
+            actualizarTiempoSubtitulos(0, window.audioEditor.getDuration());
+            mostrarOndaSubtitulos();
+            if (autoplayPendiente) {
+                autoplayPendiente = false;
+                if (leerAjuste('autoplay', false)) {
+                    setTimeout(() => {
+                        try { window.audioEditor.play(); } catch (e) { /* noop */ }
+                    }, 120);
+                }
+            }
+        };
         
         // ✅ Ahora usamos innerHTML con SVG en lugar de innerText con emojis
         window.audioEditor.onPlay = () => { 
-            if (playBtn) playBtn.innerHTML = ICONOS.pause; 
+            actualizarIconosPlay(true);
         };
         window.audioEditor.onPause = () => { 
-            if (playBtn) playBtn.innerHTML = ICONOS.play; 
+            actualizarIconosPlay(false);
         };
         window.audioEditor.onFinish = () => {
-            if (playBtn) playBtn.innerHTML = ICONOS.play;
+            actualizarIconosPlay(false);
             if (timeDisplay) timeDisplay.innerText = '00:00';
             if (progressBar) progressBar.style.width = '0%';
+            actualizarTiempoSubtitulos(0, window.audioEditor.getDuration());
         };
         window.audioEditor.onInteraction = (currentTime) => {
             const duration = window.audioEditor.getDuration();
@@ -67,6 +123,7 @@ function asegurarEditorInicializado() {
             let m = Math.floor(currentTime / 60);
             let s = Math.floor(currentTime % 60);
             if (timeDisplay) timeDisplay.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+            actualizarTiempoSubtitulos(currentTime, duration);
         };
     }
 }
@@ -74,8 +131,9 @@ function asegurarEditorInicializado() {
 // ==========================================
 // 🎵 CARGAR Y REPRODUCIR AUDIO
 // ==========================================
-async function cargarYReproducir(urlAudio, urlSRT, urlASS) {
+async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
     if (!urlAudio) return;
+    const conservarMarcadores = !!(opciones && opciones.conservarMarcadores);
     try {
         audio.pause();
         audio.currentTime = 0;
@@ -89,6 +147,12 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS) {
             btnDescargar.href = nuevaUrl;
             btnDescargar.setAttribute('download', `audio_loquendo_${Date.now()}.wav`);
             btnDescargar.style.display = 'inline-flex';
+        }
+
+        const btnMP3 = document.getElementById('btnExportarMP3');
+        if (btnMP3) {
+            btnMP3.style.display = 'inline-flex';
+            btnMP3.disabled = false;
         }
 
         if (btnDescargaSRT) {
@@ -117,13 +181,33 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS) {
             }
         }
 
+        if (window.appState && window.appState.subtitles) {
+            if (urlSRT) window.appState.subtitles.srtUrl = urlSRT;
+            else if (!conservarMarcadores) window.appState.subtitles.srtUrl = null;
+            if (urlASS) window.appState.subtitles.assUrl = urlASS;
+            else if (!conservarMarcadores) window.appState.subtitles.assUrl = null;
+        }
+        if (window.audioMarkers) {
+            if (urlSRT) {
+                window.audioMarkers.cargarDesdeApp({ silencioso: true, forzar: true });
+            } else if (!conservarMarcadores) {
+                window.audioMarkers.setMarkers([], { historial: false, activarPrimero: false });
+            }
+        }
+
         const contenedorReproductor = document.getElementById("contenedorReproductor");
         if (contenedorReproductor) contenedorReproductor.style.display = "block";
         asegurarEditorInicializado();
+        mostrarOndaSubtitulos();
+        if (window.tabs && typeof window.tabs.irA === 'function') {
+            window.tabs.irA('audio');
+        }
 
         setTimeout(() => {
             if (window.audioEditor) {
+                autoplayPendiente = true;
                 window.audioEditor.cargarAudio(nuevaUrl);
+                setTimeout(() => { autoplayPendiente = false; }, 15000);
             }
         }, 300);
     } catch (error) {
@@ -143,10 +227,10 @@ function togglePlay() {
     } else {
         if (audio.paused) {
             audio.play();
-            if (playBtn) playBtn.innerHTML = ICONOS.pause;
+            actualizarIconosPlay(true);
         } else {
             audio.pause();
-            if (playBtn) playBtn.innerHTML = ICONOS.play;
+            actualizarIconosPlay(false);
         }
     }
 }
@@ -158,9 +242,10 @@ function stopAudio() {
         audio.pause(); 
         audio.currentTime = 0; 
     }
-    if (playBtn) playBtn.innerHTML = ICONOS.play;
+    actualizarIconosPlay(false);
     if (progressBar) progressBar.style.width = "0%";
     if (timeDisplay) timeDisplay.innerText = "0:00";
+    actualizarTiempoSubtitulos(0, window.audioEditor ? window.audioEditor.getDuration() : 0);
 }
 
 function restartAudio() {
@@ -173,7 +258,7 @@ function restartAudio() {
         audio.currentTime = 0;
         audio.play();
     }
-    if (playBtn) playBtn.innerHTML = ICONOS.pause;
+    actualizarIconosPlay(true);
 }
 
 // ==========================================
@@ -231,6 +316,7 @@ if (audio && progressBar && progressContainer) {
             let s = Math.floor(audio.currentTime % 60);
             timeDisplay.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
         }
+        actualizarTiempoSubtitulos(audio.currentTime, audio.duration);
     });
 
     progressContainer.addEventListener('click', (e) => {
@@ -243,9 +329,10 @@ if (audio && progressBar && progressContainer) {
 
 if (audio) {
     audio.addEventListener('ended', () => {
-        if (playBtn) playBtn.innerHTML = ICONOS.play;
+        actualizarIconosPlay(false);
         if (progressBar) progressBar.style.width = "0%";
         if (timeDisplay) timeDisplay.innerText = "0:00";
+        actualizarTiempoSubtitulos(0, audio.duration || 0);
     });
 }
 

@@ -4,18 +4,70 @@
     var DEFAULT_ANCHOR = 'h4, .controles-principales-title, .salida-header';
     var HELP_MODAL_ID = 'modalAyuda';
     var seccionesInicializadas = new WeakSet();
-    var habilitado = true;
+    var tooltipsHabilitado = true;
+    var botonesHabilitado = true;
+    var tooltipDelay = 0;
+    var showTimer = null;
+
+    function actualizarClases() {
+        if (!document.body) return;
+        document.body.classList.toggle('ls-help-tooltips-off', !tooltipsHabilitado);
+        document.body.classList.toggle('ls-help-buttons-off', !botonesHabilitado);
+        document.body.classList.toggle('ls-help-off', !tooltipsHabilitado && !botonesHabilitado);
+    }
+
+    function guardarYQuitarTitle(el) {
+        if (el.hasAttribute('data-ls-saved-title')) return;
+        var title = el.getAttribute('title');
+        if (title === null) return;
+        el.setAttribute('data-ls-saved-title', title);
+        el.removeAttribute('title');
+    }
+
+    function restaurarTitle(el) {
+        if (!el.hasAttribute('data-ls-saved-title')) return;
+        if (!el.hasAttribute('title')) {
+            el.setAttribute('title', el.getAttribute('data-ls-saved-title'));
+        }
+        el.removeAttribute('data-ls-saved-title');
+    }
+
+    function suprimirTitlesNativos() {
+        document.querySelectorAll('[data-help][title], .help-section-btn[title]').forEach(guardarYQuitarTitle);
+    }
+
+    function restaurarTitlesNativos() {
+        document.querySelectorAll('[data-ls-saved-title]').forEach(restaurarTitle);
+    }
 
     function setEnabled(v) {
-        habilitado = !!v;
-        if (document.body) {
-            document.body.classList.toggle('ls-help-off', !habilitado);
-        }
-        if (!habilitado) hideTip();
+        var activo = !!v;
+        tooltipsHabilitado = activo;
+        botonesHabilitado = activo;
+        actualizarClases();
+        if (activo) restaurarTitlesNativos(); else suprimirTitlesNativos();
+        if (!activo) hideTip();
+    }
+
+    function setTooltips(v) {
+        tooltipsHabilitado = !!v;
+        actualizarClases();
+        if (tooltipsHabilitado) restaurarTitlesNativos(); else suprimirTitlesNativos();
+        if (!tooltipsHabilitado) hideTip();
+    }
+
+    function setHelpButtons(v) {
+        botonesHabilitado = !!v;
+        actualizarClases();
+    }
+
+    function setTooltipDelay(ms) {
+        var valor = parseInt(ms, 10);
+        tooltipDelay = isNaN(valor) || valor < 0 ? 0 : valor;
     }
 
     function isEnabled() {
-        return habilitado;
+        return tooltipsHabilitado && botonesHabilitado;
     }
 
     function texts() {
@@ -37,17 +89,21 @@
 
     function hideTip() {
         currentTipEl = null;
+        if (showTimer) {
+            clearTimeout(showTimer);
+            showTimer = null;
+        }
         if (tipEl) tipEl.classList.remove('ls-tooltip--visible');
     }
 
     function showTip(el) {
+        if (!tooltipsHabilitado) return;
         var key = el.getAttribute('data-help');
         if (!key) return;
         var txt = texts().controles[key];
         if (!txt) return;
-        if (el.hasAttribute('title')) {
-            el.setAttribute('data-ls-saved-title', el.getAttribute('title'));
-            el.removeAttribute('title');
+        if (el.hasAttribute('title') || el.hasAttribute('data-ls-saved-title')) {
+            guardarYQuitarTitle(el);
         }
         var tip = ensureTip();
         tip.textContent = txt;
@@ -68,13 +124,27 @@
     }
 
     document.addEventListener('mouseover', function (e) {
-        if (!habilitado) { hideTip(); return; }
+        if (!tooltipsHabilitado) { hideTip(); return; }
         var node = e.target;
         var el = (node && node.closest) ? node.closest('[data-help]') : null;
         if (el === currentTipEl) return;
         currentTipEl = el;
-        if (el) showTip(el);
-        else hideTip();
+        if (showTimer) {
+            clearTimeout(showTimer);
+            showTimer = null;
+        }
+        if (!el) {
+            hideTip();
+            return;
+        }
+        if (tooltipDelay > 0) {
+            showTimer = setTimeout(function () {
+                showTimer = null;
+                if (currentTipEl === el) showTip(el);
+            }, tooltipDelay);
+        } else {
+            showTip(el);
+        }
     });
 
     document.addEventListener('scroll', hideTip, true);
@@ -140,8 +210,12 @@
         btn.type = 'button';
         btn.className = 'help-section-btn';
         btn.textContent = '?';
+        var sec = texts().secciones[clave];
+        var nombre = (sec && sec.titulo) ? sec.titulo : clave;
         btn.setAttribute('data-help-seccion-btn', clave);
-        btn.setAttribute('aria-label', 'Ayuda de esta sección');
+        btn.setAttribute('aria-label', 'Ayuda sobre ' + nombre);
+        btn.title = 'Ayuda: ' + nombre;
+        if (!tooltipsHabilitado) guardarYQuitarTitle(btn);
         btn.addEventListener('click', function (ev) {
             ev.preventDefault();
             ev.stopPropagation();
@@ -196,6 +270,9 @@
         abrirSeccion: abrirSeccion,
         ocultarTooltip: hideTip,
         setEnabled: setEnabled,
+        setTooltips: setTooltips,
+        setHelpButtons: setHelpButtons,
+        setTooltipDelay: setTooltipDelay,
         isEnabled: isEnabled
     };
     window.abrirAyudaSeccion = abrirSeccion;

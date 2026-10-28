@@ -36,7 +36,7 @@ const audioActions = {
             const btnExportarMP3 = document.getElementById('btnExportarMP3');
             if (btnExportarMP3) btnExportarMP3.style.display = 'inline-block';
             
-            if (window.cargarYReproducir) window.cargarYReproducir(data.url);
+            if (window.cargarYReproducir) window.cargarYReproducir(data.url, null, null, { conservarMarcadores: true });
             window.notifications?.success('✅ Ducking aplicado.');
             return data.url;
         } catch (e) { window.notifications?.error('Error: ' + e.message); return null; }
