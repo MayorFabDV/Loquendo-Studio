@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const { esperarPuertoLigado } = require('./backend/services/serverNetwork');
 
 // --- DATOS PERSISTENTES (antes de arrancar el servidor) ---
 // Los assets de proyectos NO pueden vivir en backend/public/audios: se borran al cerrar.
@@ -30,24 +31,15 @@ const pngtuberFolder = path.join(__base, 'public', 'pngtuber');
 
 // --- FUNCIÓN PARA ESPERAR AL SERVIDOR ---
 function getBoundPort() {
-    const port = (serverModule.getPort && serverModule.getPort()) || Number(process.env.PORT) || 3000;
-    return port;
+    // No usar 3000 como fallback aquí: Express puede estar reintentando en 3001+.
+    return serverModule.getPort ? serverModule.getPort() : null;
 }
 
-let BOUND_PORT = getBoundPort();
+let BOUND_PORT = Number(process.env.PORT) || 3000;
 
-function esperarPuertoLigado(maxAttempts = 40, delay = 250) {
-    return new Promise((resolve) => {
-        let attempts = 0;
-        const check = () => {
-            const port = getBoundPort();
-            if (port) return resolve(port);
-            attempts++;
-            if (attempts >= maxAttempts) return resolve(BOUND_PORT);
-            setTimeout(check, delay);
-        };
-        check();
-    });
+async function esperarPuertoExpress(maxAttempts = 40, delay = 250) {
+    BOUND_PORT = await esperarPuertoLigado(getBoundPort, { maxAttempts, delay });
+    return BOUND_PORT;
 }
 
 function waitForServer(maxAttempts = 20, delay = 500) {
@@ -203,7 +195,7 @@ app.whenReady().then(async () => {
         console.log('[MAIN] Esperando al servidor...');
         
         // Espera a que Express haya ligado realmente un puerto (puede ser != 3000)
-        BOUND_PORT = await esperarPuertoLigado();
+        BOUND_PORT = await esperarPuertoExpress();
         console.log(`[MAIN] Puerto detectado: ${BOUND_PORT}`);
         
         await waitForServer();

@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "test": "node --test tests",
     "prebuild": "node scripts/check_build_prereqs.js",
     "clean": "rmdir /s /q dist 2>nul & echo Limpiado",
     "build": "npm run clean && electron-builder",

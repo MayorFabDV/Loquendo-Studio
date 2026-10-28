@@ -6,6 +6,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { spawn } = require('child_process');
 const APP_VERSION = require('./package.json').version;
+const { escucharConFallback, origenLocalPermitido } = require('./backend/services/serverNetwork');
 
 // ==========================================
 // 1. DETECCIÃ“N DE ENTORNO Y RUTAS BASE
@@ -126,9 +127,7 @@ function iniciarLanguageTool() {
         '-Xmx512m',
         '-cp', ltJar,
         'org.languagetool.server.HTTPServer',
-        '--port', String(LT_PORT),
-        '--allow-origin', '*',
-        '--public'
+        '--port', String(LT_PORT)
     ], { 
         windowsHide: true,
         cwd: path.dirname(ltJar)
@@ -212,9 +211,26 @@ const uploadPngTuber = multer({
 });
 
 const appExpress = express();
-const PORT = process.env.PORT || 3000;
+const puertoConfigurado = Number(process.env.PORT);
+const PORT = Number.isInteger(puertoConfigurado) && puertoConfigurado > 0 && puertoConfigurado <= 65535
+    ? puertoConfigurado
+    : 3000;
 
-appExpress.use(cors({ origin: '*' }));
+appExpress.use((req, res, next) => {
+    const origin = req.get('origin');
+    if (origin && !origenLocalPermitido(origin, boundPort)) {
+        return res.status(403).json({ error: 'Origen no permitido' });
+    }
+    next();
+});
+appExpress.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || !origenLocalPermitido(origin, boundPort)) {
+            return callback(null, false);
+        }
+        callback(null, origin);
+    }
+}));
 appExpress.use(express.json({ limit: '25mb' }));
 
 const FRONTEND_PATH = fs.existsSync(FRONTEND_DIR) ? FRONTEND_DIR : ROOT_DIR;
@@ -311,7 +327,7 @@ appExpress.get('/api/health', (req, res) => {
             whispercpp: fs.existsSync(whisperExe),
             whispermodel: fs.existsSync(whisperModel)
         },
-        puerto: PORT,
+        puerto: boundPort || PORT,
         languageToolPort: LT_PORT
     });
 });
@@ -934,10 +950,17 @@ appExpress.get('*', (req, res) => {
 // ==========================================
 let boundPort = null;
 let server = null;
+let serverRuntime = null;
 
-function startServer(port = 3000) {
-    const server = appExpress.listen(port, () => {
-        boundPort = server.address().port;
+function startServer(port = PORT) {
+    serverRuntime = escucharConFallback(appExpress, port, 'localhost', 20, (ocupado, siguiente) => {
+        console.log(`\nâš ï¸  Puerto ${ocupado} ocupado, intentando ${siguiente}...`);
+    });
+    server = serverRuntime.getServidor();
+
+    serverRuntime.listo.then((servidorLigado) => {
+        server = servidorLigado;
+        boundPort = serverRuntime.getPuerto();
         console.log('\n========================================');
         console.log(`âœ… Servidor escuchando en: http://localhost:${boundPort}`);
         console.log('========================================');
@@ -945,32 +968,26 @@ function startServer(port = 3000) {
         console.log('');
 
         setTimeout(() => { iniciarLanguageTool(); }, 1500);
-    }).on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-            console.log(`\nâš ï¸  Puerto ${port} ocupado, intentando ${port + 1}...`);
-            startServer(port + 1);
-        } else {
-            console.error('âŒ Error del servidor:', err);
-            process.exit(1);
-        }
+    }).catch((err) => {
+        console.error('Error del servidor:', err);
+        process.exit(1);
     });
-    return server;
+    return serverRuntime;
 }
 
 function getPort() {
-    if (boundPort) return boundPort;
-    return server && server.address() ? server.address().port : null;
+    return boundPort;
 }
 
 // FIX Bug #2: module.exports se evalÃºa ANTES de que la IIFE async termine.
 // El campo `server` siempre era null al momento del export.
 // Se expone `getServer()` como getter lazy para obtener el valor actual.
-function getServer() { return server; }
+function getServer() { return serverRuntime ? serverRuntime.getServidor() : server; }
 
 if (process.env.LOQUENDO_NO_AUTOSTART !== '1') {
     (async () => {
         await dbService.whenReady();
-        server = startServer(3000);
+        startServer(PORT);
     })();
 }
 module.exports = { expressApp: appExpress, getServer, getPort };
