@@ -1,5 +1,6 @@
 // Smoke aislado: Electron real, servidor/onda sintéticos, sin server.js ni datos del usuario.
 // Ejecutar: node node_modules/electron/cli.js scripts/smoke_mixer.cjs
+// Layout completo: añadir --full-page (HTML y CSS reales, APIs/datos aislados).
 const { app, BrowserWindow } = require('electron');
 const http = require('node:http');
 const fs = require('node:fs');
@@ -7,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../frontend');
+const fullPage = process.argv.includes('--full-page');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'loquendo-mixer-smoke-'));
 app.setPath('userData', profile);
 const samples = 48000 * 3, wav = Buffer.alloc(44 + samples * 4);
@@ -43,7 +45,14 @@ AudioContext.prototype.createChannelMerger=function(...args){
 ${scripts.map(s=>`<script src="/js/${s}"></script>`).join('')}`;
 const server = http.createServer((req,res)=>{
     const url = new URL(req.url,'http://localhost');
-    if(url.pathname==='/'){res.setHeader('Content-Type','text/html');return res.end(html);}
+    if(url.pathname==='/'){
+        res.setHeader('Content-Type','text/html');
+        if (fullPage) {
+            const instrumentation = html.slice(html.indexOf('<script>'),html.indexOf('</script>')+9);
+            return res.end(fs.readFileSync(path.join(root,'index.html'),'utf8').replace('</head>',instrumentation+'</head>'));
+        }
+        return res.end(html);
+    }
     if(url.pathname==='/test.wav'){
         res.setHeader('Content-Type','audio/wav');res.setHeader('Accept-Ranges','bytes');
         const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
@@ -55,9 +64,14 @@ const server = http.createServer((req,res)=>{
     }
     if(url.pathname==='/api/audio/peaks'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({duration:3,peaks:Array.from({length:300},(_,i)=>Math.sin(i)*0.1)}));}
     if(url.pathname==='/api/sfx/list'){res.setHeader('Content-Type','application/json');return res.end('{"items":[]}');}
+    if(fullPage && url.pathname.startsWith('/api/')) {
+        res.setHeader('Content-Type','application/json');
+        return res.end(url.pathname==='/api/voces' ? '{"voces":[],"total":0}' : '{}');
+    }
     const file = path.resolve(root,'.'+url.pathname);
     if(!file.startsWith(root+path.sep) || !fs.existsSync(file)){res.statusCode=404;return res.end();}
-    res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(file));
+    const types={'.css':'text/css','.js':'text/javascript','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon'};
+    res.setHeader('Content-Type',types[path.extname(file)] || 'application/octet-stream');res.end(fs.readFileSync(file));
 });
 let win;
 async function run(){
@@ -67,13 +81,37 @@ async function run(){
     win.webContents.on('console-message', event => { if(event.level === 'error') console.log('RENDERER:',event.message); });
     await win.loadURL('http://localhost:'+server.address().port);
     const evaluate = code => win.webContents.executeJavaScript(code,true);
+    if (fullPage) await evaluate(`document.getElementById('contenedorReproductor').style.display='block';
+        tabs.irA('audio');audioEditorUI.setMode('avanzado');audioEditorUI.setSubtab('mezclador');`);
     const wait = async expression => {
         for(let i=0;i<180;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}
         throw new Error('Timeout: '+expression+' '+await evaluate(`JSON.stringify({errors,audios:nativeAudios.map(a=>({src:a.src,ready:a.readyState,error:a.error?.message})),clips:mixer.estado.clips.map(c=>({in:c.in,out:c.out})),tracks:mixer.app.timeline.getMultitrack()?.tracks.map(t=>({id:t.id,start:t.startPosition}))})`));
     };
     await evaluate(`mixer.init(); MixerApp.store.agregarClip('voz','/test.wav',{duration:3,in:0.5,out:2.5,start:0,pan:0.5});
         mixer.app.timeline.rebuild();`);
+    if(fullPage) {
+        const widths=await evaluate(`JSON.stringify({container:document.getElementById('mezcladorPistas').clientWidth,body:document.querySelector('.mezclador-cuerpo').clientWidth})`);
+        console.log('FULL_PAGE_LAYOUT',widths);
+        assert.ok(JSON.parse(widths).container>100,'La onda debe disponer de ancho visible en el layout real');
+    }
     await wait(`mixer.app.timeline.getMultitrack()?.audios?.[0]?.readyState >= 2`);
+    await wait(`Array.from(mixer.app.timeline.getMultitrack().wavesurfers[0].getWrapper().querySelectorAll('canvas'))
+        .some(c => c.width>0 && c.height>0 && c.getBoundingClientRect().width>0)`);
+    const painted = await evaluate(`Array.from(mixer.app.timeline.getMultitrack().wavesurfers[0].getWrapper().querySelectorAll('canvas')).some(c=>{
+        if(!c.width || !c.height) return false;
+        const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+        let filled=0; for(let i=3;i<pixels.length;i+=4) if(pixels[i]>0) filled++;
+        return filled>100;
+    })`);
+    assert.equal(painted,true,'La onda debe contener píxeles dibujados, no solo una pista vacía');
+    if(fullPage) {
+        win.setSize(900,800);
+        await wait(`document.querySelector('.mezclador-cuerpo').clientWidth<1000`);
+        const ancho = await evaluate(`document.getElementById('mezcladorPistas').clientWidth`);
+        assert.ok(ancho>100,'La onda también debe ser visible con una ventana de 900 px');
+        console.log('FULL_PAGE_LAYOUT_900',ancho);
+        win.setSize(1200,800);
+    }
     await new Promise(r=>setTimeout(r,500));
     assert.equal(await evaluate(`Math.abs(mixer.app.timeline.getMultitrack().tracks[0].startPosition + 0.5)<0.001`),true);
     await evaluate(`mixer.editar('dividir',1);`);
@@ -114,6 +152,9 @@ async function run(){
 run().then(()=>finish(0),error=>{console.error(error);finish(1);});
 function finish(code){
     if(win && !win.isDestroyed()) win.destroy();
-    server.close(()=>{fs.rmSync(profile,{recursive:true,force:true});app.exit(code);});
+    server.close();
     server.closeAllConnections();
+    try { fs.rmSync(profile,{recursive:true,force:true}); }
+    catch (error) { console.warn('Perfil temporal de prueba retenido:', profile, error.message); }
+    app.exit(code);
 }

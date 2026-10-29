@@ -57,7 +57,9 @@
             btn.addEventListener('click', () => editar(accion, document.getElementById('mixerPosicion').value));
             barra.appendChild(btn);
         }
-        raiz.before(barra);
+        // La barra no es una columna de la fila flex de ondas + biblioteca.
+        // Si se inserta junto a ellas, puede consumir todo el ancho de la onda.
+        (raiz.closest('.mezclador-cuerpo') || raiz).before(barra);
         document.addEventListener('keydown', (event) => {
             if (raiz.closest('.audio-group-hidden') || raiz.getClientRects().length === 0) return;
             if (event.target.closest('input, textarea, select, [contenteditable="true"]')) return;

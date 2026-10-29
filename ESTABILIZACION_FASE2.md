@@ -82,3 +82,15 @@ Comportamiento deseado: **visibilidad exclusiva por expresión**, como el ojo de
 ## Punto de continuación
 
 Detenerse al finalizar esta fase. No comenzar Fase 3 sin aprobación del usuario. Priorizar después la revisión del editor legacy, portabilidad/recuperación de medios y regresión completa, según el alcance que se apruebe.
+
+## Seguimiento: ondas invisibles en desarrollo
+
+Tras el reporte del usuario se reprodujo un fallo en el layout completo: la nueva barra de edición se insertaba como tercera columna de `.mezclador-cuerpo` (fila flex de ondas y biblioteca SFX), dejando `#mezcladorPistas` con **0 px** de ancho. La comunicación con el backend ya existía; este fallo concreto era de distribución de la interfaz.
+
+Se movió la barra por encima de la fila. En una ventana de 1200 px el contenedor pasó de 0 a **830 px**. Se amplió el smoke con `--full-page` para cargar `frontend/index.html` y su CSS reales, manteniendo APIs, audios y perfil aislados. Comprueba ancho a 1200/900 px y píxeles efectivamente dibujados en los canvas, además de las operaciones y reproducción anteriores:
+
+```powershell
+node node_modules/electron/cli.js scripts/smoke_mixer.cjs --full-page
+```
+
+El smoke simplificado anterior no comprobaba el layout real; esta regresión queda cubierta por la nueva variante. Se mantuvieron las 17 pruebas Node/FFmpeg aprobadas. En Windows, un perfil temporal del smoke puede quedar retenido si Chromium mantiene archivos abiertos; el test lo informa y sale sin tocar datos del usuario.
