@@ -11,11 +11,11 @@ Este es el índice de las etapas operativas del trabajo. La misión original agr
 | 0 | Protección del repositorio, respaldo y auditoría inicial | Completada |
 | 1 | Arranque, puertos, acceso local y cierre de Electron | Completada |
 | 2 | Pruebas, integridad de proyectos y edición en el mezclador | Completada; fallo de ondas corregido y confirmado por el usuario |
-| 3 | Estabilizar las sesiones del editor de voz legacy y su integración | Aprobada por el usuario; implementación aún no iniciada |
+| 3 | Estabilizar las sesiones del editor de voz legacy y su integración | Completada y verificada; límites en `ESTABILIZACION_FASE3.md` |
 | 4 | Gestión y recuperación de proyectos; investigación de exportación portable | Pendiente |
 | 5 | Regresión completa, documentación y evaluación para entrega | Pendiente |
 
-La Fase 3 se aprueba en la conversación después de confirmar que las ondas del mezclador vuelven a verse. El siguiente mensaje solicita consolidar primero este registro.
+La Fase 3 fue aprobada después de confirmar que las ondas del mezclador vuelven a verse y se ejecutó tras consolidar este registro. No se inició la Fase 4.
 
 ## Etapa 0 — Protección y auditoría
 
@@ -49,20 +49,22 @@ El respaldo no se modifica durante las siguientes etapas. No representa una copi
 
 Informe, comandos, commits y limitaciones: [ESTABILIZACION_FASE2.md](ESTABILIZACION_FASE2.md). Corrección posterior de ondas: `ff63b81`.
 
-## Etapa 3 — Editor de voz legacy (aprobada)
+## Etapa 3 — Editor de voz legacy (completada)
 
 Objetivo: completar el trabajo de sesiones ya iniciado y hacer fiable su integración con el mezclador, sin construir un segundo editor multipista.
 
-- [ ] Revisar el código actual y reproducir fallos antes de corregirlos.
-- [ ] Recuperar la sesión de edición tras recarga y reinicio de la aplicación.
-- [ ] Conservar un audio original restaurable aunque se limpien los temporales.
-- [ ] Manejar errores de IndexedDB, registros incompletos y subidas concurrentes.
-- [ ] Sincronizar audio, marcadores y estado visible al recuperar/restaurar.
-- [ ] Verificar que mezclador, exportación, subtítulos y video reciben el audio correcto.
-- [ ] Añadir pruebas focalizadas, ejecutar regresiones y hacer commits pequeños.
-- [ ] Entregar resumen de resultados y pendientes antes de continuar.
+- [x] Revisar el código actual y reproducir fallos antes de corregirlos.
+- [x] Recuperar la sesión de edición tras recarga/reinicio en el mismo perfil y origen.
+- [x] Conservar un audio original restaurable aunque se limpien los temporales.
+- [x] Manejar errores de IndexedDB, registros incompletos y subidas concurrentes.
+- [x] Sincronizar audio, marcadores y estado visible al recuperar/restaurar.
+- [x] Verificar entrega de rutas al mezclador y salidas con backend simulado; no equivale a renders reales de Whisper/PNGTuber.
+- [x] Añadir pruebas focalizadas, ejecutar regresiones y hacer commits locales.
+- [x] Documentar resultados, limitaciones y punto de continuación en `ESTABILIZACION_FASE3.md`.
 
 Referencias: `audioProcessor.js`, `audioSessionStore.js`, `audioPlayer.js`, `audioRenderUI.js`, `main.js`, `index.html` y `helpTexts.js`. El alcance concreto de las correcciones depende de la revisión del código real.
+
+Resultado: 27 pruebas Node/FFmpeg aprobadas; smoke de sesiones con cinco procesos Electron separados; regresión del mezclador con HTML/CSS reales aprobada. El estado del editor se conserva en IndexedDB por origen: si cambia el puerto de la app, no se busca automáticamente la sesión del puerto anterior. Ese caso queda pendiente.
 
 ## Etapa 4 — Proyectos y medios
 

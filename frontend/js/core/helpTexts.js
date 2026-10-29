@@ -47,7 +47,7 @@ window.HELP_TEXTS = {
         btnCortar: "Cortar y eliminar la selección de la onda",
         btnDeshacer: "Deshace el último cambio en el audio (Ctrl+Z).",
         btnRehacer: "Vuelve a aplicar el último cambio deshecho (Ctrl+Y).",
-        btnRestaurarOriginal: "Recupera la copia original del audio y sus marcadores, y reinicia el historial. La sesión se guarda localmente para volver a abrirla.",
+        btnRestaurarOriginal: "Recupera la copia original del audio y sus marcadores, y reinicia el historial. Los ajustes de escucha se mantienen. La sesión se guarda localmente para volver a abrirla.",
         btnEscucharSeleccion: "Reproduce solo el tramo seleccionado de la onda.",
         btnAplicarFxSeleccion: "Aplica la cadena de efectos actual con FFmpeg solo al tramo seleccionado.",
         btnSelNormalizar: "Sube el volumen del tramo seleccionado hasta -1 dB sin distorsionar.",
