@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { spawn } = require('child_process');
+const { randomUUID } = require('crypto');
+const { pipeline } = require('stream/promises');
 const APP_VERSION = require('./package.json').version;
 const { escucharConFallback, origenLocalPermitido } = require('./backend/services/serverNetwork');
 
@@ -248,6 +250,7 @@ const AudioService = require('./backend/services/audioService');
 const AudioRenderService = require('./backend/services/audioRenderService');
 const VideoService = require('./backend/services/videoService');
 const { AssetStore } = require('./backend/services/projects/assetStore');
+const { PortableProject, MAX_BYTES: MAX_PORTABLE_BYTES } = require('./backend/services/projects/portableProject');
 const { PeaksService } = require('./backend/services/audio/peaksService');
 const { ProjectRenderService } = require('./backend/services/audio/projectRenderService');
 
@@ -257,6 +260,18 @@ const audioRenderService = new AudioRenderService(ffmpegPath, ffprobePath, audio
 const videoService = new VideoService(ffmpegPath, audioFolder, pngtuberFolder, ffprobePath);
 
 const assetStore = new AssetStore(DATA_DIR, { raicesPermitidas: [PUBLIC_FOLDER, DATA_DIR] });
+const portableProject = new PortableProject(assetStore);
+const uploadPortable = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            const dir = path.join(assetStore.cacheDir, 'imports');
+            try { fs.mkdirSync(dir, { recursive: true }); cb(null, dir); } catch (error) { cb(error); }
+        },
+        filename: (req, file, cb) => cb(null, `${randomUUID()}.tar`)
+    }),
+    limits: { fileSize: MAX_PORTABLE_BYTES, files: 1 },
+    fileFilter: (req, file, cb) => cb(/\.tar$/i.test(file.originalname) ? null : new Error('Selecciona un paquete .loquendo.tar'), /\.tar$/i.test(file.originalname))
+});
 const peaksService = new PeaksService(ffmpegPath, assetStore.cacheDir);
 
 function dentroDe(base, candidato) {
@@ -777,10 +792,36 @@ appExpress.post('/api/proyectos', asyncHandler(async (req, res) => {
 }));
 
 appExpress.get('/api/proyectos/:id', (req, res) => {
-    const proyecto = assetStore.leerProyecto(req.params.id);
+    if (!assetStore.idValido(req.params.id)) return res.status(400).json({ error: 'Proyecto inválido' });
+    const { proyecto, recuperado } = assetStore.leerConRespaldo(req.params.id);
     if (!proyecto) return res.status(404).json({ error: 'Proyecto no encontrado' });
-    res.json({ ok: true, proyecto });
+    res.json({ ok: true, proyecto, recuperado });
 });
+
+appExpress.post('/api/proyectos/importar-portable', uploadPortable.single('project'), asyncHandler(async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Falta el paquete de proyecto' });
+    try {
+        const proyecto = await portableProject.importar(req.file.path);
+        res.json({ ok: true, proyecto });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    } finally { await fs.promises.unlink(req.file.path).catch(() => {}); }
+}));
+
+appExpress.get('/api/proyectos/:id/portable', asyncHandler(async (req, res) => {
+    if (!assetStore.idValido(req.params.id)) return res.status(400).json({ error: 'Proyecto inválido' });
+    const paquete = await portableProject.exportar(req.params.id);
+    res.set('Content-Type', 'application/x-tar');
+    res.attachment(paquete.nombre);
+    try { await pipeline(paquete.stream, res); }
+    catch (error) { if (res.headersSent) res.destroy(error); else throw error; }
+}));
+
+appExpress.get('/api/proyectos/:id/integridad', asyncHandler(async (req, res) => {
+    if (!assetStore.idValido(req.params.id)) return res.status(400).json({ error: 'Proyecto inválido' });
+    if (!assetStore.leerProyecto(req.params.id)) return res.status(404).json({ error: 'Proyecto no encontrado' });
+    res.json(await assetStore.comprobarIntegridad(req.params.id));
+}));
 
 appExpress.put('/api/proyectos/:id', asyncHandler(async (req, res) => {
     if (!assetStore.idValido(req.params.id)) return res.status(400).json({ error: 'Proyecto invÃ¡lido' });

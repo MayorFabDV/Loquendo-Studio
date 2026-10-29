@@ -211,10 +211,13 @@ class ProjectRenderService {
     }
 
     async render(project, opciones = {}) {
+        if (Array.isArray(project?.clips) && project.clips.length > 500) throw new Error('El render admite hasta 500 clips; no se descartó ninguno');
         const datos = this._normalizarProyecto(project);
         if (!datos.clips.length) throw new Error('El proyecto no tiene clips');
         const projectId = String(opciones.projectId || project.id || '');
         if (!this.assetStore.idValido(projectId)) throw new Error('Proyecto inválido para renderizar');
+        const integridad = await this.assetStore.comprobarIntegridad(projectId, { clips: datos.clips.filter(c => c.asset) });
+        if (!integridad.ok) throw new Error('El proyecto contiene medios persistentes faltantes o dañados; recupera sus fuentes antes de renderizar');
 
         const formato = FORMATOS[opciones.formato] ? opciones.formato : 'wav';
         const cfgFormato = FORMATOS[formato];
