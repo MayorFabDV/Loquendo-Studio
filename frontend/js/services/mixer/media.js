@@ -82,8 +82,8 @@
         let ruta = '';
         try {
             const inst = global.audioEditor;
-            ruta = inst && typeof inst._rutaAudioServidor === 'function'
-                ? inst._rutaAudioServidor()
+            ruta = inst && typeof inst.asegurarAudioPersistido === 'function'
+                ? await inst.asegurarAudioPersistido()
                 : (global.voiceAudioRealPath || '');
         } catch (e) {
             ruta = '';
@@ -100,7 +100,7 @@
             return null;
         }
 
-        const clip = app.store.agregarClip('voz', limpia, { nombre: 'Voz', reemplazar: true });
+        const clip = app.store.agregarClip('voz', limpia, { nombre: 'Voz' });
         app.timeline.rebuild();
         if (clip && app.inspector) app.inspector.seleccionar(clip.id);
         notificar('success', 'Pista de voz añadida al mezclador');
@@ -120,7 +120,7 @@
             return null;
         }
 
-        const clip = app.store.agregarClip('musica', limpia, { nombre: 'Música', reemplazar: true });
+        const clip = app.store.agregarClip('musica', limpia, { nombre: 'Música' });
         app.timeline.rebuild();
         if (clip && app.inspector) app.inspector.seleccionar(clip.id);
         notificar('success', 'Pista de música añadida al mezclador');

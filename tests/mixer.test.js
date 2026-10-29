@@ -58,4 +58,62 @@ test('importar con medios faltantes conserva los clips y bloquea render antes de
     assert.equal(requests,0);
 });
 
-module.exports = { cargar, plain, clip };
+test('split con offset conserva fuente, tiempos, automatización y undo/redo', () => {
+    const {app} = cargar(); const s = app.store;
+    const original = s.agregarClip('voz','/audios/a.wav',{start:2,in:1,out:5,duration:6,automation:[{id:'pt',t:3,gain:0.4}],effects:{eq:{mid:2}}});
+    const right = s.dividirClip(original.id,4);
+    assert.equal(original.out,3); assert.equal(right.in,3); assert.equal(right.start,4);
+    assert.equal(s.duracionProyecto(),6);
+    assert.deepEqual(plain(right.effects),{eq:{mid:2}});
+    assert.equal(right.automation[0].t,3);
+    assert.equal(s.deshacer(),true); assert.equal(s.state.clips.length,1);
+    assert.equal(s.state.clips[0].out,5);
+    assert.equal(s.rehacer(),true); assert.equal(s.state.clips.length,2);
+    assert.equal(s.dividirClip(right.id,4),null);
+});
+
+test('copiar/cortar/pegar/duplicar crean IDs únicos y descartan redo al editar', () => {
+    const h = cargar(), s = h.app.store;
+    const a = s.agregarClip('musica','/audios/a.wav',{duration:4,out:4,automation:[{t:1,gain:0.5}]});
+    assert.equal(s.copiarClip(a.id),true);
+    const b = s.pegarClip(8); assert.notEqual(b.id,a.id);
+    b.automation[0].gain = 0.1;
+    const c = s.pegarClip(12); assert.equal(c.automation[0].gain,0.5);
+    assert.equal(s.cortarClip(b.id),true);
+    assert.equal(s.buscarClip(b.id),null);
+    s.deshacer(); assert.ok(s.buscarClip(b.id));
+    s.moverClip(a.id,0.125); assert.equal(s.puedeRehacer(),false);
+    const d = s.duplicarClip(a.id); assert.equal(d.start,4.125);
+    assert.equal(s.recortarClip(d.id,1,3),true);
+    assert.equal(s.moverClip(d.id,NaN),false);
+    assert.equal(s.recortarClip(d.id,3,1),false);
+    h.flush(); const next = cargar(h.storage); next.app.store.cargarLocal();
+    assert.equal(next.app.store.buscarClip(d.id).in,1);
+});
+
+test('voz editada se persiste antes de añadirla; fallo no añade la versión antigua', async () => {
+    const h = cargar();
+    h.app.timeline = { rebuild() {} };
+    h.app.inspector = { seleccionar() {} };
+    h.app.util.head = async () => true;
+    h.ctx.window.voiceAudioRealPath = '/audios/old.wav';
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/services/audioProcessor.js'),'utf8'),h.ctx);
+    const editor = h.ctx.window.audioEditor;
+    editor.audioBuffer = {}; editor._dirty = true; editor._baseServidor = '/audios/old.wav';
+    editor.currentWavBlobUrl = 'blob:test'; editor.persistirAudioEditado = async () => null;
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/services/mixer/media.js'),'utf8'),h.ctx);
+    assert.equal(await h.app.media.agregarVozActual(),null);
+    assert.equal(h.app.state.clips.length,0);
+    editor.persistirAudioEditado = async () => '/audios/edited.wav';
+    await h.app.media.agregarVozActual(); await h.app.media.agregarVozActual();
+    assert.equal(h.app.state.clips.length,2);
+    assert.equal(h.app.state.clips[0].src,'/audios/edited.wav');
+});
+
+test('split no altera silenciosamente un fade atravesado por el corte', () => {
+    const s = cargar().app.store;
+    const c = s.agregarClip('voz','/audios/a.wav',{out:4,duration:4,fadeIn:2});
+    assert.equal(s.dividirClip(c.id,1),null);
+    assert.equal(s.state.clips.length,1);
+    assert.ok(s.dividirClip(c.id,2.5));
+});

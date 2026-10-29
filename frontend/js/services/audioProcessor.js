@@ -536,10 +536,10 @@ class AudioProcessor {
         if (!this._dirty && this._baseServidor) {
             return this._normalizarFuente(this._baseServidor);
         }
-        if (!this.currentWavBlobUrl) return this._rutaAudioServidor();
+        if (!this.currentWavBlobUrl) return this._dirty ? null : this._rutaAudioServidor();
 
         const persistida = await this.persistirAudioEditado();
-        return persistida || this._rutaAudioServidor();
+        return persistida;
     }
 
     async _asegurarRutaServidor() {
@@ -999,8 +999,9 @@ async persistirAudioEditado() {
         return this._rutaAudioServidor() || null;
     }
 
+    const blobUrl = this.currentWavBlobUrl;
     try {
-        const response = await fetch(this.currentWavBlobUrl);
+        const response = await fetch(blobUrl);
         const blob = await response.blob();
 
         const formData = new FormData();
@@ -1013,6 +1014,10 @@ async persistirAudioEditado() {
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
         const data = await res.json();
         if (!data || !data.url) throw new Error('El servidor no devolvio la ruta del audio editado');
+        if (this.currentWavBlobUrl !== blobUrl) {
+            // Se editó/cargó otro audio durante la subida; no publicar el derivado anterior.
+            return null;
+        }
 
         const ruta = this._normalizarFuente(data.url);
         this._baseServidor = ruta;

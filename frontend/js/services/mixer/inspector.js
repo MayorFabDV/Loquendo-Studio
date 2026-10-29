@@ -28,6 +28,18 @@
     }
 
     function refresh() {
+        const selector = $('mixerSeleccionClip');
+        if (selector) {
+            selector.replaceChildren();
+            const vacio = document.createElement('option'); vacio.value = ''; vacio.textContent = 'Selecciona un clip';
+            selector.appendChild(vacio);
+            for (const item of state.clips) {
+                const opcion = document.createElement('option'); opcion.value = item.id;
+                opcion.textContent = `${item.trackId}: ${item.nombre || item.id}`;
+                selector.appendChild(opcion);
+            }
+            selector.value = state.selectedId;
+        }
         const clip = clipActual();
         const panel = $('mezcladorInspector');
         if (!panel) return;
@@ -40,6 +52,10 @@
         }
 
         habilitar(true);
+        for (const [id, valor] of [['mixerPosicion',clip.start],['mixerEntrada',clip.in],['mixerSalida',clip.out]]) {
+            const campo = $(id);
+            if (campo && document.activeElement !== campo) campo.value = String(valor);
+        }
         const titulo = app.config.NOMBRE_TITULO[clip.trackId] || clip.trackId;
         if (nombre) nombre.textContent = `${titulo}${clip.nombre ? ' · ' + clip.nombre : ''}`;
 

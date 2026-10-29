@@ -18,6 +18,39 @@
     };
 
     let guardadoTimer = null;
+    let historial = [];
+    let indiceHistorial = -1;
+    let restaurando = false;
+    let portapapeles = null;
+
+    function snapshot() {
+        return JSON.stringify({ ...aProyecto(), zoomPx: state.zoomPx }, (key, value) =>
+            key === 'peaks' || key === 'peaksPoints' ? undefined : value);
+    }
+
+    function registrarEstado() {
+        if (restaurando) return;
+        const actual = snapshot();
+        if (historial[indiceHistorial] === actual) return;
+        historial = historial.slice(0, indiceHistorial + 1);
+        historial.push(actual);
+        if (historial.length > 100) historial.shift();
+        indiceHistorial = historial.length - 1;
+    }
+
+    function restaurarHistorial(delta) {
+        const siguiente = indiceHistorial + delta;
+        if (siguiente < 0 || siguiente >= historial.length) return false;
+        restaurando = true;
+        try {
+            const selectedId = state.selectedId;
+            aplicarEstado(normalizarEstado(JSON.parse(historial[siguiente])));
+            state.selectedId = buscarClip(selectedId) ? selectedId : (state.clips[0]?.id || '');
+            indiceHistorial = siguiente;
+            guardarLocal();
+        } finally { restaurando = false; }
+        return true;
+    }
 
     function trackValido(trackId) {
         return Object.prototype.hasOwnProperty.call(ORDEN_PISTAS, trackId);
@@ -182,7 +215,7 @@
     function aplicarEstado(estado, opciones = {}) {
         state.clips = estado.clips.map((clip, i) => ({ ...clip, _orden: i }));
         state.zoomPx = estado.zoomPx;
-        state.projectId = estado.projectId || state.projectId;
+        state.projectId = estado.projectId || '';
         state.nombre = estado.nombre || state.nombre;
         state.master = estado.master || state.master;
         state.tracks = new Map((estado.tracks || []).map((t) => [t.id, JSON.parse(JSON.stringify(t))]));
@@ -192,7 +225,9 @@
         return state.clips;
     }
 
-    function guardarLocal() {
+    function guardarLocal(opciones = {}) {
+        if (opciones.historial !== false) registrarEstado();
+        else if (!restaurando) historial[indiceHistorial] = snapshot();
         state.dirty = true;
         if (guardadoTimer) clearTimeout(guardadoTimer);
         guardadoTimer = setTimeout(() => {
@@ -285,12 +320,78 @@
     }
 
     function seleccionar(id) {
-        state.selectedId = id || '';
+        state.selectedId = buscarClip(id) ? id : '';
         return buscarClip(state.selectedId);
     }
 
     function clipSeleccionado() {
         return buscarClip(state.selectedId);
+    }
+
+    function moverClip(id, inicio) {
+        const clip = buscarClip(id);
+        if (!clip || !Number.isFinite(Number(inicio)) || Number(inicio) < 0) return false;
+        clip.start = clip.startPosition = Number(inicio);
+        guardarLocal();
+        return true;
+    }
+
+    function recortarClip(id, entrada, salida) {
+        const clip = buscarClip(id);
+        const a = Number(entrada), b = Number(salida);
+        if (!clip || !Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b - a < 0.01 || b > clip.duration) return false;
+        clip.in = a; clip.out = b;
+        clip.fadeIn = Math.min(clip.fadeIn, b - a);
+        clip.fadeOut = Math.min(clip.fadeOut, b - a);
+        guardarLocal();
+        return true;
+    }
+
+    function dividirClip(id, tiempo) {
+        const clip = buscarClip(id);
+        const offset = Number(tiempo) - (clip ? clip.start : 0);
+        if (!clip || !Number.isFinite(offset) || offset < 0.01 || duracionClip(clip) - offset < 0.01) return null;
+        // No cambiar silenciosamente la forma de un fade al dividirlo por la mitad.
+        if (offset < clip.fadeIn || duracionClip(clip) - offset < clip.fadeOut) return null;
+        const corte = clip.in + offset;
+        const derecho = normalizarClip({ ...clip, id: uid('clip'), start: Number(tiempo), in: corte,
+            fadeIn: 0 }, state.clips.length);
+        clip.out = corte;
+        clip.fadeOut = 0;
+        clip.fadeIn = Math.min(clip.fadeIn, offset);
+        derecho.fadeOut = Math.min(derecho.fadeOut, duracionClip(derecho));
+        state.clips.push(derecho);
+        state.selectedId = derecho.id;
+        guardarLocal();
+        return derecho;
+    }
+
+    function copiarClip(id) {
+        const clip = buscarClip(id);
+        if (!clip) return false;
+        portapapeles = JSON.parse(JSON.stringify(clip));
+        return true;
+    }
+
+    function pegarClip(tiempo) {
+        if (!portapapeles || !Number.isFinite(Number(tiempo)) || Number(tiempo) < 0) return null;
+        return agregarClip(portapapeles.trackId, portapapeles.src,
+            { ...JSON.parse(JSON.stringify(portapapeles)), id: uid('clip'), start: Number(tiempo), reemplazar: false });
+    }
+
+    function cortarClip(id) {
+        if (!copiarClip(id)) return false;
+        return quitarClip(id, { silencioso: true });
+    }
+
+    function duplicarClip(id) {
+        const clip = buscarClip(id);
+        if (!clip) return null;
+        const anterior = portapapeles;
+        copiarClip(id);
+        const nuevo = pegarClip(clip.start + duracionClip(clip));
+        portapapeles = anterior;
+        return nuevo;
     }
 
     function limpiar() {
@@ -299,6 +400,7 @@
         state.selectedId = '';
         state.projectId = '';
         state.nombre = 'Mezcla';
+        state.master = { gainDb: 0, limiter: true, loudness: { enabled: false } };
         guardarLocal();
     }
 
@@ -379,7 +481,13 @@
         return estado;
     }
 
+    registrarEstado();
     app.store = {
+        moverClip, recortarClip, dividirClip, copiarClip, pegarClip, cortarClip, duplicarClip,
+        deshacer: () => restaurarHistorial(-1),
+        rehacer: () => restaurarHistorial(1),
+        puedeDeshacer: () => indiceHistorial > 0,
+        puedeRehacer: () => indiceHistorial < historial.length - 1,
         state,
         normalizarEstado,
         normalizarClips,
