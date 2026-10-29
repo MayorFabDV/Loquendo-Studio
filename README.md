@@ -1,6 +1,8 @@
 
 # 🎙️ Loquendo Studio
 
+> **Estabilización 1.2.0:** las fases de desarrollo y regresión están documentadas en [ESTABILIZACION.md](ESTABILIZACION.md). La nueva distribución y la validación de su asar siguen pendientes; los artefactos existentes no se regeneraron durante estas fases.
+
 ### Suite profesional de automatización de voz y edición multimedia
 
 [![Versión](https://img.shields.io/badge/versión-1.2.0-e41a1a?style=for-the-badge)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
@@ -62,6 +64,9 @@
 - **Eliminar silencios**: automáticamente
 - **Historial**: Deshacer/Rehacer (Ctrl+Z/Ctrl+Y)
 - **Atajos**: Espacio, Delete, Ctrl+Z, Ctrl+Y, M
+- **Mezclador multipista**: varios clips de voz, música y SFX; dividir, copiar/cortar/pegar, mover, recortar y deshacer/rehacer.
+- **Sesión de voz recuperable**: audio y marcadores actuales, original restaurable y ajustes de escucha guardados localmente (mismo perfil/origen).
+- **Proyectos**: guardar/abrir en el equipo, recuperar fuentes faltantes, exportar JSON y paquete `.loquendo.tar` con medios incluidos.
 
 ### 🎚️ Ducking Inteligente
 - **Sidechain compression** con FFmpeg
@@ -80,17 +85,20 @@
 - **Sin internet**: 100% offline
 
 ### 🎬 Video PNGTuber
-- **Imágenes Idle/Talking**
+- **Imágenes de reposo/habla/parpadeo** con visibilidad exclusiva por expresión
 - **Fondos**: verde (chroma key), negro, transparente
-- **Renderizado MP4** con FFmpeg
+- **Renderizado MP4 o WebM con alfa** mediante FFmpeg
 - **Listo para OBS/Streamlabs**
 
 ### 💾 Exportación
 - **WAV** (sin pérdida)
 - **MP3** (comprimido)
+- **FLAC / Opus / WAV 24-bit** mediante el render avanzado
 - **SRT** (subtítulos)
 - **ASS** (subtítulos con efectos)
 - **MP4** (video PNGTuber)
+- **WebM** (PNGTuber con transparencia)
+- **JSON / `.loquendo.tar`** (proyecto de mezcla; el TAR incluye los audios referenciados, sin compresión, hasta 2 GiB)
 
 ### 🎨 Interfaz
 - **Diseño moderno** con iconos SVG
@@ -177,6 +185,8 @@ npm start
 
 ### Compilación
 
+Antes de empaquetar, revisar el informe de regresión [ESTABILIZACION_FASE5.md](ESTABILIZACION_FASE5.md). Las pruebas disponibles no sustituyen probar la distribución generada.
+
 ```bash
 # 1. Verificar binarios y módulos requeridos
 node scripts/check_build_prereqs.js
@@ -194,6 +204,20 @@ Formatos opcionales (no son la distribución oficial):
 npm run build:portable
 npm run build:nsis
 ```
+
+### Pruebas de desarrollo
+
+```powershell
+npm test
+node scripts/smoke_projects.cjs
+node scripts/smoke_projects.cjs --desktop
+node scripts/smoke_projects.cjs --sapi
+node scripts/smoke_audio_sessions.cjs
+node node_modules/electron/cli.js scripts/smoke_mixer.cjs --full-page
+node scripts/smoke_native.cjs
+```
+
+Los smokes usan perfiles y salidas temporales aislados. `--sapi` requiere la voz Jorge instalada, el ejecutable SAPI y el Python embebido de 32 bits. El smoke nativo usa también Whisper/modelo local y JRE/LanguageTool; no descarga componentes. Consultar el informe para resultados, límites y qué casos usan APIs simuladas.
 
 ---
 

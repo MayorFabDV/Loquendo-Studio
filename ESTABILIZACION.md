@@ -13,9 +13,9 @@ Este es el índice de las etapas operativas del trabajo. La misión original agr
 | 2 | Pruebas, integridad de proyectos y edición en el mezclador | Completada; fallo de ondas corregido y confirmado por el usuario |
 | 3 | Estabilizar las sesiones del editor de voz legacy y su integración | Completada y verificada; límites en `ESTABILIZACION_FASE3.md` |
 | 4 | Gestión/recuperación de proyectos y exportación portable compatible | Completada; informe en `ESTABILIZACION_FASE4.md` |
-| 5 | Regresión completa, documentación y evaluación para entrega | Pendiente |
+| 5 | Regresión completa, documentación y evaluación para entrega | Completada en desarrollo; build/asar pendientes de autorización |
 
-Las Fases 3 y 4 fueron aprobadas y ejecutadas después de consolidar este registro. No se inició la Fase 5.
+Las Fases 3, 4 y 5 fueron aprobadas y ejecutadas después de consolidar este registro. El usuario confirmó también la verificación manual del flujo de proyectos de la Fase 4.
 
 ## Etapa 0 — Protección y auditoría
 
@@ -76,21 +76,24 @@ Resultado: 27 pruebas Node/FFmpeg aprobadas; smoke de sesiones con cinco proceso
 
 Las protecciones contra pérdida de clips ya implementadas en la Etapa 2 no deben rehacerse ni retirarse.
 
-Resultado: 39 pruebas Node aprobadas; `PROJECTS_REAL_SERVER_PASS`, `PROJECTS_ELECTRON_PASS` y regresiones de Fases 2/3 aprobadas. Comandos, uso y límites en [ESTABILIZACION_FASE4.md](ESTABILIZACION_FASE4.md). La Fase 5 requiere aprobación antes de continuar; los builds siguen requiriendo autorización específica.
+Resultado de esa fase: 39 pruebas Node aprobadas; `PROJECTS_REAL_SERVER_PASS`, `PROJECTS_ELECTRON_PASS` y regresiones de Fases 2/3 aprobadas. Comandos, uso y límites en [ESTABILIZACION_FASE4.md](ESTABILIZACION_FASE4.md). La regresión final se registra en la Fase 5; los builds siguen requiriendo autorización específica.
 
-## Etapa 5 — Regresión y cierre
+## Etapa 5 — Regresión y cierre (completada en desarrollo)
 
-- [ ] Verificar inicio, voz SAPI con Python embebido de 32 bits, edición, mezclador y proyectos.
-- [ ] Comprobar subtítulos, exportaciones y PNGTuber con datos de prueba aislados.
-- [ ] Revisar errores de consola, recursos y compatibilidad Windows.
-- [ ] Actualizar informes y entregar estado final de Git, pruebas y limitaciones.
-- [ ] Solicitar autorización específica antes de cualquier build de distribución y posterior validación del asar.
+- [x] Verificar main/preload/IPC reales, puerto ocupado, voz SAPI x86, edición, mezclador y proyectos.
+- [x] Comprobar Whisper local, ASS, LanguageTool, exportaciones y PNGTuber con datos aislados.
+- [x] Revisar excepciones, cierre/limpieza y rutas con espacios/acentos en Windows dentro de los casos ejecutados.
+- [x] Corregir superposición de sprites PNGTuber, fades lineales inválidos y colisiones de nombres de salidas; proteger el runtime Python de 32 bits.
+- [x] Actualizar informes, estado de Git y limitaciones en `ESTABILIZACION_FASE5.md`.
+- [ ] Generar distribución y validar el nuevo asar: pendiente de autorización específica; no ejecutado.
 
-## Pendiente transversal: PNGTuber
+Resultado final: **43 pruebas Node aprobadas, ninguna omitida**, smokes de main/preload, SAPI+video desde UI con backend real, native stack, proyectos, sesiones y mezclador aprobados. No se equipara esta verificación de desarrollo con una distribución empaquetada validada.
 
-**Registrado, todavía sin resolver:** al cambiar de expresión, los PNG anteriores permanecen visibles y se superponen. La previsualización reproduce el mismo video temporal y muestra el defecto.
+## PNGTuber — pendiente resuelto en Fase 5
 
-Comportamiento deseado: visibilidad exclusiva por expresión, similar al ojo de las capas de GIMP; activar un sprite oculta el anterior sin borrar sus archivos. Su fase de corrección se decidirá con el usuario; no forma parte de la implementación de sesiones legacy.
+**Resuelto y verificado:** el sprite de reposo permanecía debajo del de habla/parpadeo. Se aplica visibilidad exclusiva con prioridad parpadeo → habla → reposo tanto en preview como en render.
+
+Se verificaron píxeles de sprites transparentes en MP4 y WebM con alfa, incluido parpadeo durante el habla. Los PNG originales se conservan durante el render. La política de limpieza de copias temporales al cerrar la app no se cambió.
 
 ## Reglas vigentes
 

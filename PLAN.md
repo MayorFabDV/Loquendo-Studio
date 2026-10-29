@@ -1,6 +1,6 @@
 # Plan — Mejoras de flujo y rediseño de Guion y Voz
 
-> **Actualización de estabilización 1.2.0 (2026-10-29):** índice de etapas en [ESTABILIZACION.md](ESTABILIZACION.md). Fases 2, 3 y 4 completadas; informes en `ESTABILIZACION_FASE2.md`, `ESTABILIZACION_FASE3.md` y `ESTABILIZACION_FASE4.md`. La Fase 5 no se inició y los builds requieren autorización específica. Las evaluaciones anteriores del mezclador que aparecen más abajo son históricas.
+> **Actualización de estabilización 1.2.0 (2026-10-29):** índice de etapas en [ESTABILIZACION.md](ESTABILIZACION.md). Fases 1–5 completadas en desarrollo; informe final en [ESTABILIZACION_FASE5.md](ESTABILIZACION_FASE5.md), con 43 pruebas Node y smokes reales de escritorio, voz, audio, subtítulos y video. No se generó una distribución ni se validó un nuevo asar; los builds requieren autorización específica. Las evaluaciones anteriores que aparecen más abajo son históricas.
 
 Estado: mejoras de flujo, rediseño, ayudas y Ajustes implementados y validados en desarrollo. La sección 8 simplifica Ajustes y deja pendiente solo `npm run build:safe` y la verificación del asar, con autorización expresa.
 
