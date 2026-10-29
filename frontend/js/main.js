@@ -31,13 +31,22 @@ async function rutaVozPersistida() {
     const inst = window.audioEditor;
     if (inst && typeof inst.asegurarAudioPersistido === 'function') {
         try {
-            const persistida = await inst.asegurarAudioPersistido();
-            if (persistida) ruta = persistida;
+            return await inst.asegurarAudioPersistido();
         } catch (error) {
             console.error('No se pudo preparar el audio de voz:', error);
+            return null;
         }
     }
     return ruta;
+}
+
+function versionAudioActual() {
+    return [window.audioEditor?._loadToken, window.audioEditor?._revisionAudio];
+}
+
+function audioSigueActual(version) {
+    const actual = versionAudioActual();
+    return actual[0] === version[0] && actual[1] === version[1];
 }
 
 function asegurarEditable(elemento) {
@@ -389,7 +398,7 @@ async function generarAudio(event) {
             window.voiceAudioOriginalPath = data.url;
             
             if (typeof window.cargarYReproducir === 'function') {
-                window.cargarYReproducir(data.url, data.srt, data.ass);
+                await window.cargarYReproducir(data.url, data.srt, data.ass);
             }
             notificar('success', 'Audio generado correctamente');
         } else {
@@ -419,6 +428,7 @@ async function automatizarTodo() {
 // ==========================================
 async function generarYDescargarSRT() {
     const audioPath = await rutaVozPersistida();
+    const version = versionAudioActual();
     const textoOriginal = document.getElementById('resultado')?.value || '';
     const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
 
@@ -439,6 +449,7 @@ async function generarYDescargarSRT() {
         });
         const data = await res.json();
         if (res.ok) {
+            if (!audioSigueActual(version)) return;
             if (window.appState && window.appState.subtitles) {
                 window.appState.subtitles.srtUrl = data.srtUrl || null;
             }
@@ -465,6 +476,7 @@ async function generarYDescargarSRT() {
 
 async function generarYDescargarASS() {
     const audioPath = await rutaVozPersistida();
+    const version = versionAudioActual();
     const textoOriginal = document.getElementById('resultado')?.value || '';
     const modo = document.getElementById('modo')?.value || 'normal';
     const maxPalabras = document.getElementById('palabrasSubtitulo')?.value || 7;
@@ -490,6 +502,7 @@ async function generarYDescargarASS() {
         const data = await res.json();
         if (res.ok) {
             const link = document.getElementById('btnDescargaASS');
+            if (!audioSigueActual(version)) return;
             if (link) {
                 link.href = `${API_BASE}${data.assUrl}?t=${Date.now()}`;
                 link.setAttribute('download', `subtitulos_efectos_${Date.now()}.ass`);
@@ -724,17 +737,17 @@ function subirMusicaFondo() {
     });
 }
 
-function recargarAudio() {
+async function recargarAudio() {
     if (window.audioEditor && window.audioEditor._currentUrl) {
-        window.audioEditor.cargarAudio(window.audioEditor._currentUrl);
-        notificar('success', 'Audio recargado');
+        const ok = await window.audioEditor.cargarAudio(window.audioEditor._currentUrl, { conservarOriginal: true });
+        if (ok) notificar('success', 'Audio recargado');
     }
 }
 
 async function aplicarDucking() {
     const btnDescargar = document.getElementById('btnDescargar');
     let voiceAudioPath = await rutaVozPersistida();
-    if (!voiceAudioPath && btnDescargar && btnDescargar.href) voiceAudioPath = btnDescargar.href;
+    const version = versionAudioActual();
 
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
         notificar('warning', 'Primero genera un audio de voz.');
@@ -783,7 +796,8 @@ async function aplicarDucking() {
         body: JSON.stringify({ voiceAudioPath: cleanVoicePath, musicPath: cleanMusicPath, options })
     })
     .then(response => response.json())
-    .then((data) => {
+    .then(async (data) => {
+        if (!audioSigueActual(version)) return;
         if (data.url) {
             voiceAudioRealPath = data.url;
             window.voiceAudioRealPath = data.url;
@@ -799,7 +813,7 @@ async function aplicarDucking() {
             if (btnMP3) btnMP3.style.display = 'inline-block';
             
             if (typeof window.cargarYReproducir === 'function') {
-                window.cargarYReproducir(data.url, null, null, { conservarMarcadores: true });
+                await window.cargarYReproducir(data.url, null, null, { conservarMarcadores: true });
             }
             notificar('success', 'Mezcla aplicada correctamente.');
         } else {
@@ -819,6 +833,7 @@ function cambiarVolumenMusica(valor) { if (window.audioEditor) window.audioEdito
 
 async function exportarAMp3() {
     let voiceAudioPath = await rutaVozPersistida();
+    const version = versionAudioActual();
     
     if (!voiceAudioPath || voiceAudioPath === window.location.href) {
         notificar('warning', 'Primero genera un audio válido.');
@@ -836,7 +851,11 @@ async function exportarAMp3() {
     try {
         notificar('info', 'Convirtiendo a MP3...');
         let rutaLimpia = String(voiceAudioPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
-        let originalLimpia = voiceAudioOriginalPath ? String(voiceAudioOriginalPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0] : null;
+        const original = window.audioEditor?.asegurarOriginalPersistido
+            ? await window.audioEditor.asegurarOriginalPersistido()
+            : (window.voiceAudioOriginalPath || voiceAudioOriginalPath);
+        let originalLimpia = original ? String(original).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0] : null;
+        if (!audioSigueActual(version)) return;
         
         const respuesta = await fetch(`${API_BASE}/api/audio/convertir-mp3`, {
             method: 'POST',

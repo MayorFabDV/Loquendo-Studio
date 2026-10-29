@@ -29,9 +29,10 @@
         if (inst && typeof inst.asegurarAudioPersistido === 'function') {
             try {
                 var ruta = await inst.asegurarAudioPersistido();
-                if (ruta) return ruta;
+                return ruta || '';
             } catch (error) {
                 console.error('No se pudo preparar el audio para procesar:', error);
+                return '';
             }
         }
         return rutaActual();
@@ -160,6 +161,9 @@
 
         var opciones = leerOpciones();
         var receta = construirReceta(opciones);
+        var inst = editor();
+        var token = inst ? inst._loadToken : null;
+        var revision = inst ? inst._revisionAudio : null;
 
         setBusy(true);
         setStatus('Renderizando…');
@@ -167,13 +171,17 @@
 
         try {
             var datos = await window.apiClient.renderAudio(ruta, receta, opciones);
+            if (inst && (token !== inst._loadToken || revision !== inst._revisionAudio)) {
+                notificar('warning', 'El render terminó para un audio anterior; no se reemplazó la edición actual.');
+                return;
+            }
 
             window.voiceAudioRealPath = datos.url;
             window.voiceAudioOriginalPath = window.voiceAudioOriginalPath || ruta;
 
             actualizarDescarga(datos.url, datos.format);
             if (typeof window.cargarYReproducir === 'function') {
-                window.cargarYReproducir(datos.url, null, null, { conservarMarcadores: true });
+                await window.cargarYReproducir(datos.url, null, null, { conservarMarcadores: true });
             }
 
             var tamano = datos.size ? (datos.size / 1024).toFixed(1) + ' KB' : '';
