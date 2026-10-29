@@ -45,6 +45,7 @@ class AssetStore {
         this.cacheDir = asegurarDirectorio(path.join(this.dataDir, 'cache'));
         this.raicesPermitidas = (opciones.raicesPermitidas || []).map((r) => path.resolve(r));
         this.maxBytes = Number(opciones.maxBytes) > 0 ? Number(opciones.maxBytes) : 4 * 1024 * 1024 * 1024;
+        this.escrituras = new Map();
     }
 
     idValido(id) {
@@ -82,8 +83,8 @@ class AssetStore {
     }
 
     fuentePermitida(archivo) {
-        const abs = path.resolve(archivo);
-        return this.raicesPermitidas.some((raiz) => dentroDe(raiz, abs));
+        const abs = fs.realpathSync(archivo);
+        return this.raicesPermitidas.some((raiz) => fs.existsSync(raiz) && dentroDe(fs.realpathSync(raiz), abs));
     }
 
     async importarAsset(projectId, origen, opciones = {}) {
@@ -105,28 +106,37 @@ class AssetStore {
         if (stats.size === 0) throw new Error('El archivo está vacío');
 
         const sha256 = await hashArchivo(abs);
-        const nombreArchivo = sha256 + ext;
-        const relativo = path.posix.join('assets', nombreArchivo);
-        const destino = path.join(this.directorioAssets(projectId), nombreArchivo);
+        let nombreArchivo = sha256 + ext;
+        let destino = path.join(this.directorioAssets(projectId), nombreArchivo);
+        if (fs.existsSync(destino) && await hashArchivo(destino) !== sha256) {
+            // No sobrescribir un archivo dañado: conservarlo y crear una copia válida independiente.
+            nombreArchivo = `${sha256}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+            destino = path.join(this.directorioAssets(projectId), nombreArchivo);
+        }
 
         if (!fs.existsSync(destino)) {
-            const temporal = `${destino}.tmp-${process.pid}-${Date.now()}`;
+            const temporal = `${destino}.tmp-${crypto.randomUUID()}`;
             try {
                 await fsp.copyFile(abs, temporal);
-                await fsp.rename(temporal, destino);
+                if (await hashArchivo(temporal) !== sha256) throw new Error('El audio cambió durante la copia; vuelve a intentarlo');
+                try { await fsp.copyFile(temporal, destino, fs.constants.COPYFILE_EXCL); }
+                catch (error) {
+                    if (error.code !== 'EEXIST' || await hashArchivo(destino) !== sha256) throw error;
+                }
             } catch (error) {
-                await fsp.unlink(temporal).catch(() => {});
                 throw error;
+            } finally {
+                await fsp.unlink(temporal).catch(() => {});
             }
         }
 
         return {
-            asset: relativo,
+            asset: path.posix.join('assets', nombreArchivo),
             sha256,
             size: stats.size,
             ext,
             nombre: limpiarNombre(opciones.nombre || path.basename(abs)),
-            url: this.urlAsset(projectId, relativo)
+            url: this.urlAsset(projectId, path.posix.join('assets', nombreArchivo))
         };
     }
 
@@ -149,8 +159,27 @@ class AssetStore {
         return `/media/projects/${encodeURIComponent(projectId)}/${partes.join('/')}`;
     }
 
-    async guardarProyecto(id, datos) {
+    guardarProyecto(id, datos) {
         const projectId = id || this.nuevoId();
+        if (!this.idValido(projectId)) return Promise.reject(new Error('Identificador de proyecto inválido'));
+        if (!datos || typeof datos !== 'object' || Array.isArray(datos)
+            || (datos.clips !== undefined && !Array.isArray(datos.clips))) {
+            return Promise.reject(new Error('Documento de proyecto inválido'));
+        }
+        // Capturar el documento ahora, no después de otras escrituras pendientes.
+        let snapshot;
+        try { snapshot = JSON.parse(JSON.stringify(datos)); }
+        catch (error) { return Promise.reject(error); }
+        const anterior = this.escrituras.get(projectId) || Promise.resolve();
+        const trabajo = anterior.catch(() => {}).then(() => this._guardarProyecto(projectId, snapshot));
+        this.escrituras.set(projectId, trabajo);
+        trabajo.finally(() => {
+            if (this.escrituras.get(projectId) === trabajo) this.escrituras.delete(projectId);
+        }).catch(() => {});
+        return trabajo;
+    }
+
+    async _guardarProyecto(projectId, datos) {
         this.asegurarProyecto(projectId);
         const ahora = new Date().toISOString();
         const previo = this.leerProyecto(projectId, { silencioso: true });
@@ -161,21 +190,72 @@ class AssetStore {
             updatedAt: ahora
         };
         const ruta = this.rutaProyecto(projectId);
-        const temporal = `${ruta}.tmp-${process.pid}-${Date.now()}`;
-        await fsp.writeFile(temporal, JSON.stringify(documento, null, 2), 'utf8');
-        await fsp.rename(temporal, ruta);
+        const temporal = `${ruta}.tmp-${crypto.randomUUID()}`;
+        try {
+            await fsp.writeFile(temporal, JSON.stringify(documento, null, 2), 'utf8');
+            if (fs.existsSync(ruta)) {
+                let valida = false;
+                try { this._leerDocumento(ruta); valida = true; } catch (e) { /* conservar el archivo corrupto */ }
+                const copia = valida ? path.join(path.dirname(ruta), 'project.previous.json')
+                    : path.join(path.dirname(ruta), `project.corrupt-${crypto.randomUUID()}.json`);
+                const copiaTemp = `${copia}.tmp-${crypto.randomUUID()}`;
+                try { await fsp.copyFile(ruta, copiaTemp); await fsp.rename(copiaTemp, copia); }
+                finally { await fsp.unlink(copiaTemp).catch(() => {}); }
+            }
+            await fsp.rename(temporal, ruta);
+        } finally { await fsp.unlink(temporal).catch(() => {}); }
         return documento;
+    }
+
+    _leerDocumento(ruta) {
+        const datos = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+        if (!datos || typeof datos !== 'object' || Array.isArray(datos)
+            || (datos.clips !== undefined && !Array.isArray(datos.clips))) throw new Error('Proyecto dañado');
+        return datos;
+    }
+
+    leerConRespaldo(id) {
+        const ruta = this.rutaProyecto(id);
+        try { return { proyecto: this._leerDocumento(ruta), recuperado: false }; }
+        catch (error) {
+            const copia = path.join(this.directorioProyecto(id), 'project.previous.json');
+            if (fs.existsSync(copia)) return { proyecto: this._leerDocumento(copia), recuperado: true };
+            if (error.code === 'ENOENT') return { proyecto: null, recuperado: false };
+            throw error;
+        }
     }
 
     leerProyecto(id, opciones = {}) {
         try {
-            const ruta = this.rutaProyecto(id);
-            if (!fs.existsSync(ruta)) return null;
-            return JSON.parse(fs.readFileSync(ruta, 'utf8'));
+            return this.leerConRespaldo(id).proyecto;
         } catch (error) {
             if (opciones.silencioso) return null;
             throw error;
         }
+    }
+
+    async comprobarIntegridad(id, proyecto = this.leerProyecto(id)) {
+        if (!proyecto) throw new Error('Proyecto no encontrado');
+        const faltantes = [], danados = [], comprobados = new Map();
+        for (const clip of proyecto.clips || []) {
+            const ref = String(clip.asset || '');
+            if (!ref) { faltantes.push({ id: clip.id, asset: ref, src: clip.src || '' }); continue; }
+            let estado = comprobados.get(ref);
+            if (!estado) {
+                try {
+                    const archivo = this.resolverAsset(id, ref);
+                    if (!dentroDe(fs.realpathSync(this.directorioProyecto(id)), fs.realpathSync(archivo))) throw new Error('Asset fuera del proyecto');
+                    const stats = await fsp.stat(archivo);
+                    if (!stats.isFile() || !stats.size) throw new Error('Asset vacío');
+                    const esperado = /^([a-f0-9]{64})(?:-|\.)/.exec(path.basename(ref));
+                    estado = esperado && await hashArchivo(archivo) !== esperado[1] ? 'danado' : 'ok';
+                } catch (error) { estado = error.code === 'ENOENT' ? 'faltante' : 'danado'; }
+                comprobados.set(ref, estado);
+            }
+            if (estado === 'faltante') faltantes.push({ id: clip.id, asset: ref });
+            if (estado === 'danado') danados.push({ id: clip.id, asset: ref });
+        }
+        return { ok: !faltantes.length && !danados.length, faltantes, danados, assets: comprobados.size };
     }
 
     listarProyectos() {
@@ -189,10 +269,17 @@ class AssetStore {
         const proyectos = [];
         for (const entrada of entradas) {
             if (!entrada.isDirectory() || !this.idValido(entrada.name)) continue;
-            const datos = this.leerProyecto(entrada.name, { silencioso: true });
+            let lectura;
+            try { lectura = this.leerConRespaldo(entrada.name); }
+            catch (error) {
+                proyectos.push({ id: entrada.name, nombre: 'Proyecto ilegible (archivos conservados)', corrupto: true });
+                continue;
+            }
+            const datos = lectura.proyecto;
             if (!datos) continue;
             proyectos.push({
                 id: entrada.name,
+                recuperado: lectura.recuperado,
                 nombre: datos.nombre || 'Proyecto sin nombre',
                 createdAt: datos.createdAt || null,
                 updatedAt: datos.updatedAt || null,
