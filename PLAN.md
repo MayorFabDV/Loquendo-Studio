@@ -1,6 +1,6 @@
 # Plan — Mejoras de flujo y rediseño de Guion y Voz
 
-> **Actualización de estabilización 1.2.0 (2026-10-29):** la Fase 2 del mezclador está cerrada. Ver `ESTABILIZACION_FASE2.md` para cambios, pruebas reproducibles, limitaciones y pendientes. Las evaluaciones anteriores del mezclador que aparecen más abajo son históricas; no describen su implementación actual. La Fase 3 requiere aprobación del usuario.
+> **Actualización de estabilización 1.2.0 (2026-10-29):** índice de todas las etapas y su estado en [ESTABILIZACION.md](ESTABILIZACION.md). La Fase 2 del mezclador está cerrada y la Fase 3 fue aprobada por el usuario; aún no se inició su implementación. Ver `ESTABILIZACION_FASE2.md` para cambios y pruebas de la Fase 2. Las evaluaciones anteriores del mezclador que aparecen más abajo son históricas.
 
 Estado: mejoras de flujo, rediseño, ayudas y Ajustes implementados y validados en desarrollo. La sección 8 simplifica Ajustes y deja pendiente solo `npm run build:safe` y la verificación del asar, con autorización expresa.
 
