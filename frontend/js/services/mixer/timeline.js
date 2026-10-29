@@ -15,6 +15,53 @@
     let reconstruyendo = false;
     let pendienteRebuild = false;
     let tokenRebuild = 0;
+    let previewContext = null;
+    let previewNodes = [];
+    let posicionPendiente = 0;
+    let listo = false;
+
+    function liberarPreview() {
+        for (const item of previewNodes) {
+            for (const node of item.nodes) node.disconnect();
+        }
+        previewNodes = [];
+        if (previewContext) previewContext.close().catch(() => {});
+        previewContext = null;
+    }
+
+    function actualizarPreview() {
+        for (const item of previewNodes) {
+            const clip = app.store.buscarClip(item.id);
+            if (!clip) continue;
+            const track = state.tracks.get(clip.trackId) || {};
+            const pan = clamp((track.pan || 0) + clip.pan, -1, 1);
+            const gain = track.mute ? 0 : dbALineal((track.gainDb || 0) + (state.master.gainDb || 0));
+            item.left.gain.value = gain * (pan > 0 ? 1 - pan : 1);
+            item.right.gain.value = gain * (pan < 0 ? 1 + pan : 1);
+        }
+    }
+
+    function conectarPreview() {
+        if (previewContext || !multitrack) return;
+        previewContext = new (global.AudioContext || global.webkitAudioContext)();
+        clipsOrdenados().forEach((clip, i) => {
+            const audio = multitrack.audios[i];
+            if (!(audio instanceof global.HTMLMediaElement)) return;
+            const source = previewContext.createMediaElementSource(audio);
+            const split = previewContext.createChannelSplitter(2);
+            const stereo = previewContext.createGain();
+            stereo.channelCount = 2; stereo.channelCountMode = 'explicit';
+            const merge = previewContext.createChannelMerger(2);
+            const left = previewContext.createGain(), right = previewContext.createGain();
+            // Forzar stereo duplica mono antes de aplicar el balance usado por FFmpeg.
+            source.connect(stereo); stereo.connect(split);
+            split.connect(left, 0); split.connect(right, 1);
+            left.connect(merge, 0, 0); right.connect(merge, 0, 1);
+            merge.connect(previewContext.destination);
+            previewNodes.push({ id: clip.id, left, right, nodes: [source,stereo,split,merge,left,right] });
+        });
+        actualizarPreview();
+    }
 
     function inicializar(raiz) {
         contenedor = raiz;
@@ -166,7 +213,8 @@
         const pista = {
             id: clip.id,
             url: urlCompleta(clip.src),
-            startPosition: clip.start,
+            // Multitrack cuenta desde el inicio del archivo, el proyecto desde clip.in.
+            startPosition: clip.start - clip.in,
             volume: dbALineal(clip.gainDb),
             draggable: true,
             envelope: construirEnvelope(clip),
@@ -293,10 +341,9 @@
 
     function _actualizarDuraciones() {
         if (!multitrack || !multitrack.audios) return;
-        const clips = clipsOrdenados();
-        for (let i = 0; i < clips.length; i++) {
+        for (let i = 0; i < multitrack.tracks.length; i++) {
             const audio = multitrack.audios[i];
-            const clip = clips[i];
+            const clip = app.store.buscarClip(multitrack.tracks[i].id);
             if (!audio || !clip) continue;
             if (isFinite(audio.duration) && audio.duration > 0) {
                 clip.duration = Math.max(clip.duration || 0, audio.duration);
@@ -304,26 +351,34 @@
                 if (clip.in >= audio.duration) clip.in = 0;
             }
         }
-        app.store.guardarLocal();
+        app.store.guardarLocal({ historial: false });
         actualizarEstado();
     }
 
     function _bindEventos() {
-        multitrack.on('start-position-change', (detalle) => {
+        const instancia = multitrack;
+        const on = (nombre, callback) => instancia.on(nombre, (...args) => {
+            if (instancia === multitrack) callback(...args);
+        });
+        on('start-position-change', (detalle) => {
             const clip = app.store.buscarClip(detalle.id);
             if (!clip) return;
-            clip.start = Math.max(0, detalle.startPosition);
+            clip.start = Math.max(0, detalle.startPosition + clip.in);
             clip.startPosition = clip.start;
             app.store.guardarLocal();
             actualizarEstado();
         });
 
-        multitrack.on('canplay', () => {
+        on('canplay', () => {
+            if (pendienteRebuild) return;
             _actualizarDuraciones();
             decorarPistas();
+            conectarPreview();
+            listo = true;
+            multitrack.setTime(posicionPendiente);
         });
 
-        multitrack.on('envelope-points-change', (detalle) => {
+        on('envelope-points-change', (detalle) => {
             const clip = app.store.buscarClip(detalle.id);
             if (!clip) return;
             const puntos = Array.isArray(detalle.points) ? detalle.points : [];
@@ -349,21 +404,25 @@
             if (app.inspector) app.inspector.refresh();
         });
 
-        multitrack.on('start-cue-change', (detalle) => {
+        on('start-cue-change', (detalle) => {
             const clip = app.store.buscarClip(detalle.id);
             if (!clip) return;
+            if (Math.abs(clip.in - detalle.startCue) < 0.0001) return;
             clip.in = clamp(detalle.startCue, 0, clip.duration || detalle.startCue);
             if (clip.out > 0 && clip.in >= clip.out) clip.out = clip.duration || clip.out;
             app.store.guardarLocal();
             if (app.inspector) app.inspector.refresh();
+            rebuild();
         });
 
-        multitrack.on('end-cue-change', (detalle) => {
+        on('end-cue-change', (detalle) => {
             const clip = app.store.buscarClip(detalle.id);
             if (!clip) return;
+            if (Math.abs(clip.out - detalle.endCue) < 0.0001) return;
             clip.out = clamp(detalle.endCue, clip.in + 0.05, clip.duration || detalle.endCue);
             app.store.guardarLocal();
             if (app.inspector) app.inspector.refresh();
+            rebuild();
         });
     }
 
@@ -388,19 +447,38 @@
         }
         const token = ++tokenRebuild;
         reconstruyendo = true;
+        listo = false;
 
         try {
             const clips = clipsOrdenados();
             state.clips = clips;
 
             if (!clips.length) {
+                liberarPreview();
                 if (multitrack) {
                     try { multitrack.destroy(); } catch (e) { /* noop */ }
+                    multitrack.audioContext?.close().catch(() => {});
                     multitrack = null;
                 }
                 contenedor.innerHTML = '<div class="mezclador-vacio">AÃ±ade una pista de voz, mÃºsica o SFX para empezar.</div>';
                 actualizarEstado();
                 if (app.inspector) app.inspector.refresh();
+                return;
+            }
+
+            const disponibilidad = await Promise.all(clips.map(async clip => ({
+                clip, disponible: await app.util.head(clip.src)
+            })));
+            const faltantes = disponibilidad.filter(item => !item.disponible);
+            if (faltantes.length) {
+                if (multitrack) {
+                    multitrack.destroy();
+                    multitrack.audioContext?.close().catch(() => {});
+                    multitrack = null;
+                }
+                liberarPreview();
+                contenedor.textContent = 'Medios no disponibles: ' + faltantes.map(item => item.clip.nombre || item.clip.id).join(', ')
+                    + '. Los clips siguen en el proyecto. Recupera los archivos y vuelve a abrir el mezclador.';
                 return;
             }
 
@@ -420,10 +498,13 @@
             if (token !== tokenRebuild) return;
 
             clips.forEach(asegurarEndpoints);
-            app.store.guardarLocal();
+            app.store.guardarLocal({ historial: false });
 
             if (multitrack) {
+                posicionPendiente = multitrack.getCurrentTime();
+                liberarPreview();
                 try { multitrack.destroy(); } catch (e) { console.warn('Mixer: error al destruir instancia previa', e); }
+                multitrack.audioContext?.close().catch(() => {});
                 multitrack = null;
             }
             contenedor.innerHTML = '';
@@ -436,6 +517,14 @@
             });
 
             _bindEventos();
+            // No destruir una instancia mientras initAllAudios sigue cargando.
+            // Las ediciones rápidas se acumulan en pendienteRebuild.
+            await new Promise((resolve, reject) => {
+                const cancelar = multitrack.once('canplay', () => { clearTimeout(timer); resolve(); });
+                const timer = global.setTimeout(() => {
+                    cancelar(); reject(new Error('Tiempo de carga del mezclador agotado'));
+                }, 15000);
+            });
         } catch (error) {
             console.error('Mixer: error creando multitrack', error);
             notificar('error', 'No se pudo crear el mezclador');
@@ -494,6 +583,7 @@
         app.store.guardarLocal();
         if (app.inspector) app.inspector.refresh();
         decorarPistas();
+        actualizarPreview();
     }
 
     function aplicarFade(id, tipo, valor) {
@@ -510,7 +600,7 @@
         const clip = app.store.buscarClip(id);
         if (!clip) return;
         const tiempoTimeline = multitrack ? multitrack.getCurrentTime() : 0;
-        const t = clamp(tiempoTimeline - clip.start, 0, clip.duration || 0);
+        const t = clamp(tiempoTimeline - clip.start + clip.in, clip.in, clip.out || clip.duration || 0);
         const gain = dbALineal(clip.gainDb);
         clip.automation = clip.automation
             .filter((p) => Math.abs(p.t - t) > 0.02)
@@ -546,6 +636,8 @@
     }
 
     app.timeline = {
+        estaListo: () => listo && !reconstruyendo,
+        resumePreview: () => previewContext ? previewContext.resume() : Promise.resolve(),
         inicializar,
         rebuild,
         decorarPistas,
