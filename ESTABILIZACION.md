@@ -12,10 +12,10 @@ Este es el índice de las etapas operativas del trabajo. La misión original agr
 | 1 | Arranque, puertos, acceso local y cierre de Electron | Completada |
 | 2 | Pruebas, integridad de proyectos y edición en el mezclador | Completada; fallo de ondas corregido y confirmado por el usuario |
 | 3 | Estabilizar las sesiones del editor de voz legacy y su integración | Completada y verificada; límites en `ESTABILIZACION_FASE3.md` |
-| 4 | Gestión y recuperación de proyectos; investigación de exportación portable | Pendiente |
+| 4 | Gestión/recuperación de proyectos y exportación portable compatible | Completada; informe en `ESTABILIZACION_FASE4.md` |
 | 5 | Regresión completa, documentación y evaluación para entrega | Pendiente |
 
-La Fase 3 fue aprobada después de confirmar que las ondas del mezclador vuelven a verse y se ejecutó tras consolidar este registro. No se inició la Fase 4.
+Las Fases 3 y 4 fueron aprobadas y ejecutadas después de consolidar este registro. No se inició la Fase 5.
 
 ## Etapa 0 — Protección y auditoría
 
@@ -66,15 +66,17 @@ Referencias: `audioProcessor.js`, `audioSessionStore.js`, `audioPlayer.js`, `aud
 
 Resultado: 27 pruebas Node/FFmpeg aprobadas; smoke de sesiones con cinco procesos Electron separados; regresión del mezclador con HTML/CSS reales aprobada. El estado del editor se conserva en IndexedDB por origen: si cambia el puerto de la app, no se busca automáticamente la sesión del puerto anterior. Ese caso queda pendiente.
 
-## Etapa 4 — Proyectos y medios
+## Etapa 4 — Proyectos y medios (completada)
 
-- [ ] Completar la revisión de guardado/carga, integridad de assets y recuperación ante errores.
-- [ ] Evaluar recuperación/reasignación de medios faltantes, manteniendo los clips del proyecto.
-- [ ] Investigar un paquete portable adicional con JSON y medios incluidos.
-- [ ] Mantener compatibilidad con proyectos existentes. Pedir autorización si una solución exige cambios incompatibles o nuevas dependencias.
-- [ ] Probar ida y vuelta de proyectos y documentar lo que quede pendiente.
+- [x] Completar guardado/carga e integridad; guardar revisiones ordenadas y conservar copia anterior recuperable.
+- [x] Reasignar fuentes ausentes desde el mezclador sin cambiar recortes, tiempos ni FX.
+- [x] Añadir paquete `.loquendo.tar` opcional con JSON v2 y medios referenciados, hashes y activación bajo un ID nuevo.
+- [x] Mantener lectura de JSON legacy/v2 sin dependencias nuevas; rechazar documentos incompatibles en lugar de abrirlos parcialmente.
+- [x] Probar ida y vuelta y recuperación con Node y con Express/Electron/FFmpeg reales en un sandbox.
 
 Las protecciones contra pérdida de clips ya implementadas en la Etapa 2 no deben rehacerse ni retirarse.
+
+Resultado: 39 pruebas Node aprobadas; `PROJECTS_REAL_SERVER_PASS`, `PROJECTS_ELECTRON_PASS` y regresiones de Fases 2/3 aprobadas. Comandos, uso y límites en [ESTABILIZACION_FASE4.md](ESTABILIZACION_FASE4.md). La Fase 5 requiere aprobación antes de continuar; los builds siguen requiriendo autorización específica.
 
 ## Etapa 5 — Regresión y cierre
 
