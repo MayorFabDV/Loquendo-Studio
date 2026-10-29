@@ -1,6 +1,7 @@
 // services/audioRenderService.js - Render final con FFmpeg (Fase 2, PLAN 10)
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('crypto');
 const { ejecutar, duracion: duracionArchivo } = require('./audio/ffmpegProcess');
 const { numero, dbALineal } = require('./audio/audioMath');
 
@@ -138,11 +139,11 @@ class AudioRenderService {
         const fadeOut = numero(fades.out, 0, LIMITES.fade);
         const duracionProcesada = duracionEntrada > 0 ? duracionEntrada / numero(fx.rate, 1, LIMITES.rate) : 0;
         if (fadeIn > 0) {
-            filtros.push(`afade=t=in:st=0:d=${fadeIn}:curve=${fades.curve === 'linear' ? 'linear' : 'tri'}`);
+            filtros.push(`afade=t=in:st=0:d=${fadeIn}:curve=tri`);
         }
         if (fadeOut > 0 && duracionProcesada > 0) {
             const inicio = Math.max(0, duracionProcesada - fadeOut);
-            filtros.push(`afade=t=out:st=${inicio}:d=${fadeOut}:curve=${fades.curve === 'linear' ? 'linear' : 'tri'}`);
+            filtros.push(`afade=t=out:st=${inicio}:d=${fadeOut}:curve=tri`);
         }
 
         const gainDb = numero(fx.gainDb, 0, LIMITES.gainDb);
@@ -290,7 +291,7 @@ class AudioRenderService {
             salida = '[out]';
         }
 
-        const nombreSalida = `sel-${Date.now()}.wav`;
+        const nombreSalida = `sel-${Date.now()}-${randomUUID()}.wav`;
         const rutaSalida = path.join(this.audioFolder, nombreSalida);
 
         const args = [
@@ -371,7 +372,7 @@ class AudioRenderService {
         const filtros = this._cadena(recipe, duracionBase);
         const cadenaBase = filtros.join(',');
 
-        const nombreSalida = `render-${Date.now()}.${FORMATOS[formato].ext}`;
+        const nombreSalida = `render-${Date.now()}-${randomUUID()}.${FORMATOS[formato].ext}`;
         const rutaSalida = path.join(this.audioFolder, nombreSalida);
         let medicion = null;
 

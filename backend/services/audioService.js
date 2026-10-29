@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const { randomUUID } = require('crypto');
 
 class AudioService {
     constructor(pythonScript, audioFolder, ffmpegPath, pythonBinPath) {
@@ -280,7 +281,7 @@ class AudioService {
             console.log('🎬 [AudioService] INICIANDO PROCESAMIENTO');
             console.log('════════════════════════════════════════');
             
-            const nombreArchivo = `audio-${Date.now()}.wav`;
+            const nombreArchivo = `audio-${Date.now()}-${randomUUID()}.wav`;
             const rutaArchivo = path.join(this.audioFolder, nombreArchivo);
             const vozFinal = voz || 'Loquendo Jorge';
             
@@ -311,22 +312,24 @@ class AudioService {
             }
             const usarPython = !exeExiste;
 
-            if (usarPython && tieneTags) {
-                console.log(' [INFO] Tags detectados, usando Python 64-bit');
+            if (usarPython) {
+                console.log(' [INFO] Usando Python embebido de 32 bits');
             } else if (!usarPython) {
-                console.log(' [INFO] Sin tags, usando .exe 32-bit');
+                console.log(` [INFO] Usando .exe 32-bit${tieneTags ? ' con etiquetas de voz' : ''}`);
             }
 
             console.log(` Generando voz: ${vozFinal}`);
             let proceso;
 
             if (usarPython) {
-                const pythonCmd = this.pythonBin || 'python';
+                const pythonCmd = this.pythonBin;
+                if (!pythonCmd || !fs.existsSync(pythonCmd)) {
+                    return reject(new Error('Python embebido de 32 bits no disponible; no se usará el Python del sistema'));
+                }
                 try {
-                    const check = spawnSync(pythonCmd, ['--version'], { encoding: 'utf8' });
+                    const check = spawnSync(pythonCmd, ['-c', "import struct; assert struct.calcsize('P') == 4, 'SAPI requiere Python de 32 bits'"], { encoding: 'utf8', windowsHide: true });
                     if (check.error || check.status !== 0) {
-                        console.error('❌ Python no encontrado');
-                        return reject(new Error('Python no encontrado. Instale Python 3 o incluya python/ en el paquete.'));
+                        return reject(new Error('Python embebido no disponible o arquitectura incompatible (se requieren 32 bits)'));
                     }
                 } catch (e) {
                     console.error('❌ Python no disponible:', e.message);
@@ -383,18 +386,19 @@ class AudioService {
                     });
                 }
                 
-                const nombreSRT = `subtitulos-${Date.now()}.srt`;
+                const nombreSRT = `subtitulos-${Date.now()}-${randomUUID()}.srt`;
                 const rutaSRT = path.join(this.audioFolder, nombreSRT);
                 let srtUrl = null;
 
                 const usarWhisperCpp = fs.existsSync(this.whisperExe) && fs.existsSync(this.whisperModel);
-                const usarPythonSRT = !usarWhisperCpp && this.pythonScript && fs.existsSync(this.pythonScript);
+                const usarPythonSRT = !usarWhisperCpp && this.pythonScript && fs.existsSync(this.pythonScript)
+                    && this.pythonBin && fs.existsSync(this.pythonBin);
 
                 const generarASS = () => {
                     return new Promise((resolveASS) => {
                         console.log('\n[ASS] Generando subtítulos ASS...');
                         
-                        const nombreASS = `subtitulos-${Date.now()}.ass`;
+                        const nombreASS = `subtitulos-${Date.now()}-${randomUUID()}.ass`;
                         const rutaASS = path.join(this.audioFolder, nombreASS);
 
                         if (!fs.existsSync(this.assScript)) {
@@ -408,7 +412,8 @@ class AudioService {
                         }
                         assArgs.push(textoParaSubtitulosLimpio);
 
-                        const pythonCmd = this.pythonBin || 'python';
+                        const pythonCmd = this.pythonBin;
+                        if (!pythonCmd || !fs.existsSync(pythonCmd)) return resolveASS(null);
 
                         const assProcess = spawn(pythonCmd, assArgs, { windowsHide: true, shell: false });
                         let assOut = '', assErr = '';
@@ -474,7 +479,7 @@ class AudioService {
                         });
                 } else if (usarPythonSRT) {
                     console.log('\n [SRT] Estrategia: Whisper (Python)');
-                    const pythonCmd = this.pythonBin || 'python';
+                    const pythonCmd = this.pythonBin;
 
                     const pythonProcess = spawn(pythonCmd, [
                         this.pythonScript, rutaArchivo, rutaSRT, textoParaSubtitulosLimpio
@@ -552,7 +557,7 @@ class AudioService {
                 release = 300
             } = options;
 
-            const nombreSalida = `ducked-${Date.now()}.wav`;
+            const nombreSalida = `ducked-${Date.now()}-${randomUUID()}.wav`;
             const rutaSalida = path.join(this.audioFolder, nombreSalida);
 
             const voiceAudioCompleto = voiceAudioPathAbsoluta;
@@ -679,7 +684,7 @@ class AudioService {
                 return reject(new Error('WAV no existe: ' + wavCompleto));
             }
 
-            const nombreMp3 = `export-${Date.now()}.mp3`;
+            const nombreMp3 = `export-${Date.now()}-${randomUUID()}.mp3`;
             const rutaMp3 = path.join(outputFolder || this.audioFolder, nombreMp3);
 
             console.log(`  WAV: ${path.basename(wavCompleto)}`);

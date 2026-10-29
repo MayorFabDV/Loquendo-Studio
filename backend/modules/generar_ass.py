@@ -221,7 +221,7 @@ def generar_script_ass(segmentos, modo="normal", titulo="Loquendo Studio"):
     return '\n'.join(lines)
 
 def aplicar_efectos(texto, duracion, modo):
-    """
+    r"""
     Efectos ultra-ligeros optimizados para Kdenlive.
     Se eliminaron \k (karaoke por palabra) y \t (escalado) porque causan lagueo severo.
     Se usa solo \fad (fade in/out) que es nativo, rápido y se ve muy profesional.

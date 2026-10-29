@@ -71,7 +71,8 @@ const generarVozExe = path.join(BACKEND_DIR, 'bin', 'generar_voz.exe');
 });
 
 const bundledPython = path.join(BACKEND_DIR, 'python', 'python.exe');
-const pythonCmd = fs.existsSync(bundledPython) ? bundledPython : 'python';
+// No recurrir a un Python del PATH: puede ser x64 e incompatible con SAPI.
+const pythonCmd = bundledPython;
 
 // ==========================================
 // 2.5 VERIFICACIÃ“N DE COMPONENTES
