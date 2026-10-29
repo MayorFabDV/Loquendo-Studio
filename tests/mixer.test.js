@@ -146,3 +146,15 @@ test('una subida que termina tras editar otro audio no publica la ruta anterior'
     assert.equal(editor._dirty,true);
     assert.equal(editor._baseServidor,'/audios/original.wav');
 });
+
+test('pausar cancela una petición de play que todavía está preparando el audio', async () => {
+    const h = cargar(); let plays=0;
+    h.app.store.agregarClip('voz','/audios/a.wav',{duration:3,out:3});
+    const mt={audios:[],getCurrentTime:()=>0,play(){plays++;},pause(){}};
+    h.app.timeline={getMultitrack:()=>mt,estaListo:()=>true,resumePreview:async()=>{}};
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/services/mixer/transport.js'),'utf8'),h.ctx);
+    const pending=h.app.transport.play();
+    h.app.transport.pausa();
+    await pending;
+    assert.equal(plays,0);
+});

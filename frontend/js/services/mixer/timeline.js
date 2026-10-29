@@ -34,8 +34,8 @@
             const clip = app.store.buscarClip(item.id);
             if (!clip) continue;
             const track = state.tracks.get(clip.trackId) || {};
-            const pan = clamp((track.pan || 0) + clip.pan, -1, 1);
-            const gain = track.mute ? 0 : dbALineal((track.gainDb || 0) + (state.master.gainDb || 0));
+            const pan = clamp((Number(track.pan) || 0) + clip.pan, -1, 1);
+            const gain = track.mute ? 0 : dbALineal((Number(track.gainDb) || 0) + (Number(state.master.gainDb) || 0));
             item.left.gain.value = gain * (pan > 0 ? 1 - pan : 1);
             item.right.gain.value = gain * (pan < 0 ? 1 + pan : 1);
         }
@@ -636,7 +636,7 @@
     }
 
     app.timeline = {
-        estaListo: () => listo && !reconstruyendo,
+        estaListo: () => listo && !reconstruyendo && !!multitrack,
         resumePreview: () => previewContext ? previewContext.resume() : Promise.resolve(),
         inicializar,
         rebuild,

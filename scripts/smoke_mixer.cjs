@@ -89,10 +89,15 @@ async function run(){
     await wait(`mixer.app.timeline.estaListo()`);
     await evaluate(`mixer.irA(0); mixer.play();`);
     await wait(`mixer.app.transport.tiempoActual()>0.5`);
+    await wait(`stereoMeters.slice(-mixer.estado.clips.length).some(m => {const x=new Float32Array(2048);m.right.getFloatTimeDomainData(x);return x.some(v=>Math.abs(v)>0.001);})`);
     const ratio = await evaluate(`(() => {
-        const m=stereoMeters[stereoMeters.length-2], l=new Float32Array(2048), r=new Float32Array(2048);
-        m.left.getFloatTimeDomainData(l);m.right.getFloatTimeDomainData(r);
-        return Math.sqrt(l.reduce((sum,v)=>sum+v*v,0)/r.reduce((sum,v)=>sum+v*v,0));
+        let left=0,right=0;
+        for(const m of stereoMeters.slice(-mixer.estado.clips.length)){
+            const l=new Float32Array(2048),r=new Float32Array(2048);
+            m.left.getFloatTimeDomainData(l);m.right.getFloatTimeDomainData(r);
+            left+=l.reduce((sum,v)=>sum+v*v,0);right+=r.reduce((sum,v)=>sum+v*v,0);
+        }
+        return Math.sqrt(left/right);
     })()`);
     assert.ok(Math.abs(ratio-0.5)<0.02,'El preview debe aplicar el mismo balance estéreo que FFmpeg: '+ratio);
     const drift = await evaluate(`(() => {const mt=mixer.app.timeline.getMultitrack();return Math.abs(mt.audios[0].currentTime-0.5-mt.getCurrentTime());})()`);
