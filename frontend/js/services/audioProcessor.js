@@ -22,7 +22,6 @@ class AudioProcessor {
         this._engineFallback = false;
         this._syncingVisual = false;
         this._seleccionProcesando = false;
-        this._skipEdicionUrl = null;
         this._regionPendiente = null;
         this._selectionPlaybackTimer = null;
         this._clipboard = null;
@@ -32,8 +31,20 @@ class AudioProcessor {
         this._baseServidor = '';
         this._dirty = false;
         this._sesionEditada = false;
-        this._guardadoSesionTimer = null;
         this._restaurando = false;
+        this._originalBlob = null;
+        this._blobActual = null;
+        this._marcadoresOriginales = [];
+        this._originalServerUrl = '';
+        this._loadToken = 0;
+        this._revisionAudio = 0;
+        this._cargaEdicion = null;
+        this._errorCarga = false;
+        this._cargandoEdicion = false;
+        this._guardadoSesionPendiente = Promise.resolve();
+        this._versionGuardado = 0;
+        this._errorSesionNotificado = false;
+        this._subidaEnCurso = null;
 
         // Historial (Undo/Redo)
         this.historyStack = [];
@@ -135,10 +146,8 @@ class AudioProcessor {
             this.wavesurfer.on('ready', () => {
                 this.isReady = true;
                 console.log('✅ WaveSurfer listo');
-                if (this._currentUrl && this._currentUrl !== this._skipEdicionUrl) {
-                    this._cargarAudioParaEdicion(this._currentUrl);
-                }
-                this._skipEdicionUrl = null;
+                // El buffer se carga desde cargarAudio(), no desde eventos ready
+                // que también se emiten al redibujar, deshacer o recuperar un blob.
 
                 if (this._regionPendiente && this.regionsPlugin) {
                     const pendiente = this._regionPendiente;
@@ -289,6 +298,7 @@ class AudioProcessor {
     setRate(rate) {
         const motor = this._motor();
         if (motor) motor.setRate(rate);
+        this._programarGuardadoSesion();
         if (this.wavesurfer && this.wavesurfer.setPlaybackRate) {
             try { this.wavesurfer.setPlaybackRate(rate); } catch (error) { /* noop */ }
         }
@@ -300,29 +310,37 @@ class AudioProcessor {
     setPitch(semitones) {
         const motor = this._motor();
         if (motor) motor.setPitch(semitones);
+        this._programarGuardadoSesion();
     }
 
     setFX(fx) {
         const motor = this._motor();
         if (motor) motor.setFX(fx);
+        this._programarGuardadoSesion();
     }
 
     toggleBypass() {
         const motor = this._motor();
         if (!motor) return false;
-        return motor.toggleBypass();
+        const estado = motor.toggleBypass();
+        this._programarGuardadoSesion();
+        return estado;
     }
 
     resetFX() {
         const motor = this._motor();
         if (!motor) return null;
-        return motor.resetFX();
+        const estado = motor.resetFX();
+        this._programarGuardadoSesion();
+        return estado;
     }
 
     applyPreset(name) {
         const motor = this._motor();
         if (!motor) return null;
-        return motor.applyPreset(name);
+        const estado = motor.applyPreset(name);
+        this._programarGuardadoSesion();
+        return estado;
     }
 
     getFXState() {
@@ -336,6 +354,7 @@ class AudioProcessor {
     }
 
     getSeleccion() {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         const esMusica = this._esTargetMusica();
         const plugin = esMusica ? this.regionsPluginMusica : this.regionsPlugin;
         if (!plugin) return null;
@@ -443,15 +462,15 @@ class AudioProcessor {
     }
 
     puedeDeshacer() {
-        return this.historyIndex > 0;
+        return !this._cargandoEdicion && !this._restaurando && this.historyIndex > 0;
     }
 
     puedeRehacer() {
-        return this.historyIndex < this.historyStack.length - 1;
+        return !this._cargandoEdicion && !this._restaurando && this.historyIndex < this.historyStack.length - 1;
     }
 
     puedeRestaurarOriginal() {
-        return !!(this._fuenteOriginal && (this._sesionEditada || this.historyIndex > 0));
+        return !!(!this._cargandoEdicion && !this._restaurando && this._fuenteOriginal && (this._sesionEditada || this.historyIndex > 0));
     }
 
     _actualizarBotonesHistorial() {
@@ -478,7 +497,6 @@ class AudioProcessor {
 
     _actualizarRutaGlobal(url) {
         const limpia = this._normalizarFuente(url);
-        if (!limpia) return;
         window.voiceAudioRealPath = limpia;
         if (window.appState && window.appState.audio) {
             window.appState.audio.current = limpia;
@@ -487,20 +505,52 @@ class AudioProcessor {
     }
 
     _programarGuardadoSesion(blob) {
-        if (!this._fuenteOriginal || !this.audioBuffer || !this._sesionEditada) return;
-        if (!window.audioSessionStore) return;
-        if (this._guardadoSesionTimer) clearTimeout(this._guardadoSesionTimer);
-        this._guardadoSesionTimer = setTimeout(() => {
-            const datos = blob || this._bufferToWav(this.audioBuffer);
-            window.audioSessionStore.guardar(this._fuenteOriginal, {
-                blob: datos,
-                serverUrl: this._baseServidor,
-                dirty: this._dirty,
-                markers: window.audioMarkers ? window.audioMarkers.getMarkers() : []
-            }).catch((error) => {
-                console.warn('Audio: no se pudo guardar la sesion de edicion', error);
-            });
-        }, 250);
+        if (!this._fuenteOriginal || !this.audioBuffer || !window.audioSessionStore) return Promise.resolve(false);
+        const fuente = this._fuenteOriginal;
+        const token = this._loadToken;
+        const version = ++this._versionGuardado;
+        const datos = {
+            blob: blob || this._blobActual || this._bufferToWav(this.audioBuffer),
+            originalBlob: this._originalBlob,
+            originalMarkers: this._marcadoresOriginales.map(m => ({ ...m })),
+            serverUrl: this._baseServidor,
+            dirty: this._dirty,
+            edited: this._sesionEditada || this.historyIndex > 0,
+            fx: this.getEngineState(),
+            markers: window.audioMarkers ? window.audioMarkers.getMarkers() : []
+        };
+        this._estadoSesion('Guardando sesión…');
+        this._guardadoSesionPendiente = this._guardadoSesionPendiente.catch(() => {}).then(async () => {
+            // Un snapshot preparado antes de cargar otra fuente no debe activarse después.
+            if (token !== this._loadToken) return false;
+            await window.audioSessionStore.guardar(fuente, datos);
+            if (version === this._versionGuardado && token === this._loadToken) {
+                this._errorSesionNotificado = false;
+                this._estadoSesion('Sesión guardada');
+            }
+            return true;
+        }).catch((error) => {
+            console.warn('Audio: no se pudo guardar la sesión', error);
+            if (version !== this._versionGuardado || token !== this._loadToken) return false;
+            this._estadoSesion('Sesión sin guardar: descarga el audio para conservarlo');
+            if (!this._errorSesionNotificado && window.notifications) {
+                window.notifications.warning('No se pudo guardar la sesión. Descarga el audio antes de cerrar.');
+            }
+            this._errorSesionNotificado = true;
+            return false;
+        });
+        return this._guardadoSesionPendiente;
+    }
+
+    _extensionAudio(blob) {
+        const tipo = String(blob?.type || '').split(';')[0].toLowerCase();
+        return ({ 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/flac': 'flac',
+            'audio/x-flac': 'flac', 'audio/ogg': 'ogg', 'audio/opus': 'opus', 'audio/mp4': 'm4a' })[tipo] || 'wav';
+    }
+
+    _estadoSesion(texto) {
+        const estado = document.getElementById('estadoSesionAudio');
+        if (estado) estado.textContent = texto;
     }
 
     _mostrarBotonMP3() {
@@ -531,6 +581,8 @@ class AudioProcessor {
     }
 
     async asegurarAudioPersistido() {
+        if (this._cargaEdicion) await this._cargaEdicion;
+        if (this._errorCarga || this._restaurando) return null;
         if (!this.audioBuffer) return this._rutaAudioServidor();
 
         if (!this._dirty && this._baseServidor) {
@@ -538,12 +590,41 @@ class AudioProcessor {
         }
         if (!this.currentWavBlobUrl) return this._dirty ? null : this._rutaAudioServidor();
 
-        const persistida = await this.persistirAudioEditado();
-        return persistida;
+        const revision = this._revisionAudio;
+        if (this._subidaEnCurso && this._subidaEnCurso.revision === revision) return this._subidaEnCurso.promise;
+        const promise = this.persistirAudioEditado();
+        this._subidaEnCurso = { revision, promise };
+        try { return await promise; }
+        finally { if (this._subidaEnCurso?.promise === promise) this._subidaEnCurso = null; }
     }
 
     async _asegurarRutaServidor() {
         return this.asegurarAudioPersistido();
+    }
+
+    async asegurarOriginalPersistido() {
+        if (this._cargaEdicion) await this._cargaEdicion;
+        if (!this._originalBlob || this._errorCarga || this._restaurando) return null;
+        if (this._originalServerUrl) return this._originalServerUrl;
+        const token = this._loadToken;
+        const blob = this._originalBlob;
+        try {
+            const form = new FormData();
+            form.append('audio', blob, `original-${Date.now()}.${this._extensionAudio(blob)}`);
+            const respuesta = await fetch(`${window.CONFIG.API_BASE}/api/upload-audio-editado`, { method: 'POST', body: form });
+            if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+            const datos = await respuesta.json();
+            if (!datos.url) throw new Error('Falta la ruta del audio original');
+            if (token !== this._loadToken || blob !== this._originalBlob) return null;
+            this._originalServerUrl = this._normalizarFuente(datos.url);
+            window.voiceAudioOriginalPath = this._originalServerUrl;
+            if (window.appState?.audio) window.appState.audio.original = this._originalServerUrl;
+            return this._originalServerUrl;
+        } catch (error) {
+            console.error('No se pudo preparar el audio original:', error);
+            if (window.notifications) window.notifications.error('No se pudo preparar el audio original para exportar');
+            return null;
+        }
     }
 
     _recetaLimpia() {
@@ -597,6 +678,8 @@ class AudioProcessor {
     }
 
     async _aplicarResultadoSeleccion(url, sel) {
+        const token = this._loadToken;
+        const revision = this._revisionAudio;
         const base = window.CONFIG && window.CONFIG.API_BASE ? window.CONFIG.API_BASE : '';
         const completa = /^https?:/i.test(url) ? url : `${base}${url}`;
 
@@ -604,7 +687,7 @@ class AudioProcessor {
             window.musicaFondoPath = url;
             this._regionPendienteMusica = sel ? { start: sel.start, end: sel.end } : null;
             this.cargarMusica(completa);
-            return;
+            return true;
         }
 
         if (!this.audioContext) {
@@ -614,10 +697,13 @@ class AudioProcessor {
         const respuesta = await fetch(`${completa}${completa.includes('?') ? '&' : '?'}t=${Date.now()}`);
         if (!respuesta.ok) throw new Error('No se pudo descargar el audio procesado');
 
-        const arrayBuffer = await respuesta.arrayBuffer();
-        const nuevoBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        const blob = await respuesta.blob();
+        const nuevoBuffer = await this.audioContext.decodeAudioData(await blob.arrayBuffer());
+        if (token !== this._loadToken || revision !== this._revisionAudio) return false;
 
         this.audioBuffer = nuevoBuffer;
+        this._blobActual = blob;
+        this._revisionAudio++;
         this._baseServidor = this._normalizarFuente(url);
         this._dirty = false;
         this._sesionEditada = true;
@@ -625,6 +711,7 @@ class AudioProcessor {
         this._regionPendiente = sel ? { start: sel.start, end: sel.end } : null;
         this._cargarUrlEnUI(url);
         this._programarGuardadoSesion();
+        return true;
     }
 
     _cargarUrlEnUI(url) {
@@ -637,9 +724,10 @@ class AudioProcessor {
             URL.revokeObjectURL(this.currentWavBlobUrl);
         }
         this.currentWavBlobUrl = null;
-        this._skipEdicionUrl = completa;
 
-        if (this.wavesurfer) this.wavesurfer.load(completa);
+        if (this.wavesurfer) this.wavesurfer.load(completa).catch(error => {
+            if (error.name !== 'AbortError') console.warn('No se pudo cargar la onda procesada:', error);
+        });
         this._cargarEngine(completa);
 
         const btnDescargar = document.getElementById('btnDescargar');
@@ -673,6 +761,9 @@ class AudioProcessor {
             return null;
         }
         if (this._seleccionProcesando) return null;
+        const token = this._loadToken;
+        const revision = this._revisionAudio;
+        const target = this.targetSeleccion;
 
         let rutaFinal;
         if (this._esTargetMusica()) {
@@ -693,6 +784,7 @@ class AudioProcessor {
             }
         }
 
+        if (token !== this._loadToken || revision !== this._revisionAudio || target !== this.targetSeleccion) return null;
         this._setSeleccionBusy(true);
         try {
             const datos = await window.apiClient.procesarSeleccion(
@@ -702,7 +794,8 @@ class AudioProcessor {
                 receta,
                 opciones.normalize
             );
-            await this._aplicarResultadoSeleccion(datos.url, sel);
+            if (token !== this._loadToken || revision !== this._revisionAudio || target !== this.targetSeleccion) return null;
+            if (!await this._aplicarResultadoSeleccion(datos.url, sel)) return null;
             if (window.notifications) {
                 window.notifications.success(opciones.mensaje || 'Efecto aplicado a la selección');
             }
@@ -1000,12 +1093,13 @@ async persistirAudioEditado() {
     }
 
     const blobUrl = this.currentWavBlobUrl;
+    const revision = this._revisionAudio;
+    const token = this._loadToken;
     try {
-        const response = await fetch(blobUrl);
-        const blob = await response.blob();
+        const blob = this._blobActual || await (await fetch(blobUrl)).blob();
 
         const formData = new FormData();
-        formData.append('audio', blob, `edited-${Date.now()}.wav`);
+        formData.append('audio', blob, `edited-${Date.now()}.${this._extensionAudio(blob)}`);
 
         const res = await fetch(`${window.CONFIG.API_BASE}/api/upload-audio-editado`, {
             method: 'POST',
@@ -1014,7 +1108,7 @@ async persistirAudioEditado() {
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
         const data = await res.json();
         if (!data || !data.url) throw new Error('El servidor no devolvio la ruta del audio editado');
-        if (this.currentWavBlobUrl !== blobUrl) {
+        if (this.currentWavBlobUrl !== blobUrl || revision !== this._revisionAudio || token !== this._loadToken) {
             // Se editó/cargó otro audio durante la subida; no publicar el derivado anterior.
             return null;
         }
@@ -1022,8 +1116,12 @@ async persistirAudioEditado() {
         const ruta = this._normalizarFuente(data.url);
         this._baseServidor = ruta;
         this._dirty = false;
-        this._sesionEditada = true;
         this._actualizarRutaGlobal(ruta);
+        if (!this._sesionEditada) {
+            this._originalServerUrl = ruta;
+            window.voiceAudioOriginalPath = ruta;
+            if (window.appState?.audio) window.appState.audio.original = ruta;
+        }
 
         const btnDescargar = document.getElementById('btnDescargar');
         if (btnDescargar) {
@@ -1047,86 +1145,120 @@ async persistirAudioEditado() {
     // 6. CARGA Y REPRODUCCIÓN
     // ==========================================
 
-    cargarAudio(url) {
+    cargarAudio(url, opciones = {}) {
+        this._detenerTimerSeleccion();
+        const token = ++this._loadToken;
+        this._revisionAudio++;
+        this._errorCarga = false;
+        this._cargandoEdicion = true;
+        this._actualizarBotonesHistorial();
+        this._actualizarBotonesSeleccion();
         if (!this.wavesurfer) {
             this.inicializar('#waveform');
         }
         if (this.wavesurfer) {
             this._currentUrl = url;
-            this.wavesurfer.load(url);
+            this.wavesurfer.load(url).catch(error => {
+                if (error.name !== 'AbortError') console.warn('No se pudo dibujar el audio:', error);
+            });
             this._cargarEngine(url);
             console.log('🎵 Audio cargado en editor');
         }
+        this._cargaEdicion = this._cargarAudioParaEdicion(url, { ...opciones, token }).catch(error => {
+            if (token !== this._loadToken) return false;
+            this._errorCarga = true;
+            console.error('Error al cargar audio para edición:', error);
+            if (window.notifications) window.notifications.error('No se pudo cargar el audio para edición');
+            return false;
+        }).finally(() => {
+            if (token === this._loadToken) {
+                this._cargandoEdicion = false;
+                this._actualizarBotonesHistorial();
+                this._actualizarBotonesSeleccion();
+            }
+        });
+        return this._cargaEdicion;
     }
 
-    async _cargarAudioParaEdicion(url) {
-        try {
+    async _cargarAudioParaEdicion(url, opciones = {}) {
+            const token = opciones.token == null ? ++this._loadToken : opciones.token;
             if (!this.audioContext) {
                 this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
-
             const fuente = this._normalizarFuente(url);
-            const originalGlobal = this._normalizarFuente(window.voiceAudioOriginalPath || '');
-            const esBlob = /^(blob:|data:)/i.test(url);
-
-            if (fuente && !esBlob && (!this._fuenteOriginal || (originalGlobal && fuente === originalGlobal))) {
-                this._fuenteOriginal = fuente;
-                this._baseServidor = fuente;
-                this._dirty = false;
-                this._sesionEditada = false;
-                this._actualizarRutaGlobal(fuente);
-            }
-
             const response = await fetch(url);
-            const arrayBuffer = await response.arrayBuffer();
-            this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-            console.log('✅ Audio cargado en AudioContext para edición');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
+            const buffer = await this.audioContext.decodeAudioData(await blob.arrayBuffer());
+            if (token !== this._loadToken) return false;
 
-            let sesion = null;
-            if (this._fuenteOriginal && window.audioSessionStore) {
-                try {
-                    sesion = await window.audioSessionStore.obtener(this._fuenteOriginal);
-                } catch (errorSesion) {
-                    console.warn('Audio: no se pudo leer la sesion persistente', errorSesion);
-                }
+            if (!opciones.conservarOriginal || !this._fuenteOriginal) {
+                this._fuenteOriginal = fuente;
+                this._originalBlob = blob;
+                this._originalServerUrl = /^(blob:|data:)/i.test(fuente) ? '' : fuente;
+                this._marcadoresOriginales = window.audioMarkers ? window.audioMarkers.getMarkers() : [];
+                this._sesionEditada = false;
+                window.voiceAudioOriginalPath = this._originalServerUrl;
+            } else {
+                this._sesionEditada = true;
             }
-
-            if (sesion && sesion.blob) {
-                try {
-                    const datosSesion = await sesion.blob.arrayBuffer();
-                    const bufferSesion = await this.audioContext.decodeAudioData(datosSesion);
-                    this.audioBuffer = bufferSesion;
-                    this._baseServidor = this._normalizarFuente(sesion.serverUrl) || this._baseServidor;
-                    this._dirty = !!sesion.dirty || !sesion.serverUrl;
-                    this._sesionEditada = true;
-                    this._actualizarRutaGlobal(this._baseServidor || this._fuenteOriginal);
-
-                    if (window.audioMarkers && Array.isArray(sesion.markers)) {
-                        window.audioMarkers.setMarkers(sesion.markers, {
-                            historial: false,
-                            activarPrimero: false
-                        });
-                    }
-
-                    this.historyStack = [];
-                    this.historyIndex = -1;
-                    this._guardarEstado();
-                    await this._actualizarWaveSurfer({ marcarDirty: false, guardarSesion: false });
-                    console.log('Audio: sesion de edicion restaurada');
-                    return;
-                } catch (errorSesion) {
-                    console.warn('Audio: la sesion guardada no se pudo decodificar', errorSesion);
-                }
-            }
-
+            if (this.currentWavBlobUrl?.startsWith('blob:') && this.currentWavBlobUrl !== url) URL.revokeObjectURL(this.currentWavBlobUrl);
+            this.currentWavBlobUrl = /^(blob:)/i.test(url) ? url : null;
+            this.audioBuffer = buffer;
+            this._blobActual = blob;
+            this._baseServidor = /^(blob:|data:)/i.test(url) ? '' : fuente;
+            this._dirty = !this._baseServidor;
+            this._actualizarRutaGlobal(this._baseServidor);
+            if (window.appState?.audio) window.appState.audio.original = this._originalServerUrl;
             this.historyStack = [];
             this.historyIndex = -1;
             this._guardarEstado();
-        } catch (error) {
-            console.error('❌ Error al cargar audio para edición:', error);
-            if (window.notifications) {
-                window.notifications.error('Error al cargar el audio para edición');
+            await this._programarGuardadoSesion(blob);
+            return true;
+    }
+
+    async recuperarSesion(registro) {
+        if (!window.audioSessionStore || this.audioBuffer || this._cargaEdicion) return false;
+        const token = ++this._loadToken;
+        try {
+            const sesion = registro || await window.audioSessionStore.obtenerActiva();
+            if (!sesion || token !== this._loadToken) return false;
+            if (!sesion.blob?.size) throw new Error('La sesión guardada está incompleta');
+            if (!this.audioContext) this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = await this.audioContext.decodeAudioData(await sesion.blob.arrayBuffer());
+            if (token !== this._loadToken) return false;
+            this._fuenteOriginal = sesion.source;
+            this._originalBlob = sesion.originalBlob || null;
+            this._marcadoresOriginales = sesion.originalMarkers || [];
+            this._originalServerUrl = '';
+            this._baseServidor = '';
+            this._dirty = true; // Las rutas temporales guardadas pueden haber sido eliminadas.
+            this._sesionEditada = sesion.edited !== false;
+            this.audioBuffer = buffer;
+            this._blobActual = sesion.blob;
+            this._actualizarRutaGlobal('');
+            window.voiceAudioOriginalPath = '';
+            if (window.appState?.audio) window.appState.audio.original = null;
+            if (window.audioMarkers) window.audioMarkers.setMarkers(sesion.markers || [], { historial: false, sincronizar: false });
+            const motor = this._motor();
+            if (sesion.fx?.fx && motor) {
+                motor.setFX(sesion.fx.fx);
+                if (!!sesion.fx.bypass !== !!motor.getState().bypass) motor.toggleBypass();
             }
+            this.historyStack = []; this.historyIndex = -1;
+            this._guardarEstado();
+            await this._actualizarWaveSurfer({ marcarDirty: false, guardarSesion: false, blob: sesion.blob });
+            this._estadoSesion('Sesión recuperada');
+            if (!this._originalBlob && window.notifications) {
+                window.notifications.warning('Sesión antigua recuperada; su original depende del archivo de origen.');
+            }
+            if (window.audioEditorUI) window.audioEditorUI.syncFromEngine();
+            return true;
+        } catch (error) {
+            console.warn('No se pudo recuperar la sesión:', error);
+            this._estadoSesion('No se pudo recuperar la sesión guardada');
+            if (window.notifications) window.notifications.warning('No se pudo recuperar la sesión. El registro guardado no se ha eliminado.');
+            return false;
         }
     }
 
@@ -1250,7 +1382,6 @@ async persistirAudioEditado() {
             this.historyIndex++;
         }
         console.log(`💾 Estado guardado. Historial: ${this.historyIndex + 1}/${this.historyStack.length}`);
-        this._programarGuardadoSesion();
         this._actualizarBotonesHistorial();
     }
 
@@ -1259,10 +1390,17 @@ async persistirAudioEditado() {
         this.historyStack[this.historyIndex].markers = window.audioMarkers
             ? window.audioMarkers.getMarkers()
             : [];
+        if (!this._sesionEditada && this.historyIndex === 0) {
+            this._marcadoresOriginales = this.historyStack[this.historyIndex].markers.map(m => ({ ...m }));
+        }
+        this._programarGuardadoSesion();
     }
 
     registrarCambioMarcadores() {
-        if (this.audioBuffer) this._guardarEstado();
+        if (this.audioBuffer) {
+            this._guardarEstado();
+            this._programarGuardadoSesion();
+        }
     }
 
     _restaurarEstado(estado) {
@@ -1279,7 +1417,7 @@ async persistirAudioEditado() {
     }
 
     deshacer() {
-        if (this.historyIndex > 0) {
+        if (this.puedeDeshacer()) {
             this.historyIndex--;
             this._restaurarEstado(this.historyStack[this.historyIndex]);
             console.log('↩️ Deshacer aplicado');
@@ -1296,7 +1434,7 @@ async persistirAudioEditado() {
     }
 
     rehacer() {
-        if (this.historyIndex < this.historyStack.length - 1) {
+        if (this.puedeRehacer()) {
             this.historyIndex++;
             this._restaurarEstado(this.historyStack[this.historyIndex]);
             console.log('↪️ Rehacer aplicado');
@@ -1313,7 +1451,7 @@ async persistirAudioEditado() {
     }
 
     async restaurarOriginal() {
-        if (this._restaurando) return null;
+        if (this._restaurando || this._cargandoEdicion) return null;
         if (!this._fuenteOriginal) {
             if (window.notifications) {
                 window.notifications.warning('No hay un audio original registrado');
@@ -1322,42 +1460,39 @@ async persistirAudioEditado() {
         }
 
         this._restaurando = true;
+        const token = ++this._loadToken;
+        this._revisionAudio++;
         try {
-            const base = window.CONFIG && window.CONFIG.API_BASE ? window.CONFIG.API_BASE : '';
-            const url = /^https?:/i.test(this._fuenteOriginal)
-                ? this._fuenteOriginal
-                : `${base}${this._fuenteOriginal}`;
-            const respuesta = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`);
-            if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
-
-            const arrayBuffer = await respuesta.arrayBuffer();
-            const buffer = await this.audioContext.decodeAudioData(arrayBuffer);
-
-            if (this._guardadoSesionTimer) {
-                clearTimeout(this._guardadoSesionTimer);
-                this._guardadoSesionTimer = null;
+            let blob = this._originalBlob;
+            if (!blob) {
+                const base = window.CONFIG?.API_BASE || '';
+                const url = /^https?:/i.test(this._fuenteOriginal) ? this._fuenteOriginal : `${base}${this._fuenteOriginal}`;
+                const respuesta = await fetch(url);
+                if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+                blob = await respuesta.blob();
             }
+            if (!this.audioContext) this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = await this.audioContext.decodeAudioData(await blob.arrayBuffer());
+            if (token !== this._loadToken) return null;
 
             this.audioBuffer = buffer;
-            this._baseServidor = this._fuenteOriginal;
-            this._dirty = false;
+            this._originalBlob = blob;
+            this._blobActual = blob;
+            this._baseServidor = this._originalServerUrl;
+            this._dirty = !this._baseServidor;
             this._sesionEditada = false;
+            this._errorCarga = false;
             this._clipboard = null;
             this.historyStack = [];
             this.historyIndex = -1;
             if (this.regionsPlugin) this.regionsPlugin.clearRegions();
 
-            if (window.audioSessionStore) {
-                try {
-                    await window.audioSessionStore.eliminar(this._fuenteOriginal);
-                } catch (errorSesion) {
-                    console.warn('Audio: no se pudo borrar la sesion guardada', errorSesion);
-                }
-            }
+            if (window.audioMarkers) window.audioMarkers.setMarkers(this._marcadoresOriginales, { historial: false, sincronizar: false });
 
-            this._actualizarRutaGlobal(this._fuenteOriginal);
+            this._actualizarRutaGlobal(this._baseServidor);
             this._guardarEstado();
-            await this._actualizarWaveSurfer({ marcarDirty: false, guardarSesion: false });
+            await this._actualizarWaveSurfer({ marcarDirty: false, guardarSesion: false, blob });
+            await this._programarGuardadoSesion(blob);
 
             if (window.notifications) {
                 window.notifications.success('Audio original restaurado');
@@ -1380,6 +1515,7 @@ async persistirAudioEditado() {
     // ==========================================
 
     async eliminarSeleccion() {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         if (this._esTargetMusica()) {
             if (window.notifications) {
                 window.notifications.warning('El corte local solo está disponible en la pista de voz');
@@ -1464,6 +1600,7 @@ async persistirAudioEditado() {
     }
 
     async aplicarFadeIn(duration = 2) {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         if (!this.audioBuffer) {
             if (window.notifications) window.notifications.error('No hay audio cargado');
             return null;
@@ -1509,6 +1646,7 @@ async persistirAudioEditado() {
     }
 
     async aplicarFadeOut(duration = 2) {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         if (!this.audioBuffer) {
             if (window.notifications) window.notifications.error('No hay audio cargado');
             return null;
@@ -1554,6 +1692,7 @@ async persistirAudioEditado() {
     }
 
     async normalizarVolume(targetPeak = 0.95) {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         if (!this.audioBuffer) {
             if (window.notifications) window.notifications.error('No hay audio cargado');
             return null;
@@ -1606,6 +1745,7 @@ async persistirAudioEditado() {
     }
 
     async eliminarSilencios(threshold = 0.05, minSilenceDuration = 0.5) {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         if (!this.audioBuffer) {
             if (window.notifications) window.notifications.error('No hay audio cargado');
             return null;
@@ -1750,6 +1890,7 @@ async persistirAudioEditado() {
     }
 
     async pegarSeleccion() {
+        if (this._cargandoEdicion || this._restaurando || this._errorCarga) return null;
         if (this._esTargetMusica()) {
             if (window.notifications) window.notifications.warning('Pegar local solo está disponible en la pista de voz');
             return null;
@@ -1928,8 +2069,11 @@ async persistirAudioEditado() {
 
 async _actualizarWaveSurfer(opciones = {}) {
     if (!this.audioBuffer) return;
+    this._detenerTimerSeleccion();
 
-    const wavBlob = this._bufferToWav(this.audioBuffer);
+    this._revisionAudio++;
+    const wavBlob = opciones.blob || this._bufferToWav(this.audioBuffer);
+    this._blobActual = wavBlob;
 
     if (this.currentWavBlobUrl && this.currentWavBlobUrl.startsWith('blob:')) {
         URL.revokeObjectURL(this.currentWavBlobUrl);
@@ -1937,7 +2081,6 @@ async _actualizarWaveSurfer(opciones = {}) {
 
     this.currentWavBlobUrl = URL.createObjectURL(wavBlob);
     this._currentUrl = this.currentWavBlobUrl;
-    this._skipEdicionUrl = this.currentWavBlobUrl;
 
     if (opciones.marcarDirty !== false) {
         this._dirty = true;
@@ -1945,14 +2088,18 @@ async _actualizarWaveSurfer(opciones = {}) {
     }
 
     if (this.wavesurfer) {
-        this.wavesurfer.load(this.currentWavBlobUrl);
+        this.wavesurfer.load(this.currentWavBlobUrl).catch(error => {
+            if (error.name !== 'AbortError') console.warn('No se pudo actualizar la onda:', error);
+        });
     }
     this._cargarEngine(this.currentWavBlobUrl);
 
     const btnDescargar = document.getElementById('btnDescargar');
     if (btnDescargar) {
+        const extension = this._extensionAudio(wavBlob);
         btnDescargar.href = this.currentWavBlobUrl;
-        btnDescargar.setAttribute('download', `audio_editado_${Date.now()}.wav`);
+        btnDescargar.setAttribute('download', `audio_editado_${Date.now()}.${extension}`);
+        btnDescargar.style.display = 'inline-flex';
     }
 
     const audioNative = document.getElementById('audioReproductor');

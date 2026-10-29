@@ -40,6 +40,7 @@ const subtitlesWaveformSection = document.getElementById('subtitlesWaveformSecti
 
 let editorInicializado = false;
 let autoplayPendiente = false;
+let secuenciaCargaAudio = 0;
 
 function leerAjuste(clave, defecto) {
     try {
@@ -133,19 +134,22 @@ function asegurarEditorInicializado() {
 // ==========================================
 async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
     if (!urlAudio) return;
+    const secuencia = ++secuenciaCargaAudio;
     const conservarMarcadores = !!(opciones && opciones.conservarMarcadores);
     try {
         audio.pause();
         audio.currentTime = 0;
         
         // ✅ FIX: Usar API_BASE en lugar de localhost hardcodeado
-        const nuevaUrl = `${API_BASE}${urlAudio}?t=${Date.now()}`;
+        const absoluta = /^(https?:|blob:|data:)/i.test(urlAudio) ? urlAudio : `${API_BASE}${urlAudio}`;
+        const nuevaUrl = /^(blob:|data:)/i.test(absoluta) ? absoluta : `${absoluta}${absoluta.includes('?') ? '&' : '?'}t=${Date.now()}`;
         audio.src = nuevaUrl;
         
         if (btnDescargar) {
-            btnDescargar.innerHTML = `${ICONOS.download} Descargar WAV`;
+            const extension = /\.(wav|mp3|flac|opus|ogg|m4a)(?:[?#]|$)/i.exec(urlAudio)?.[1]?.toLowerCase() || 'wav';
+            btnDescargar.innerHTML = `${ICONOS.download} Descargar ${extension.toUpperCase()}`;
             btnDescargar.href = nuevaUrl;
-            btnDescargar.setAttribute('download', `audio_loquendo_${Date.now()}.wav`);
+            btnDescargar.setAttribute('download', `audio_loquendo_${Date.now()}.${extension}`);
             btnDescargar.style.display = 'inline-flex';
         }
 
@@ -188,10 +192,8 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
             else if (!conservarMarcadores) window.appState.subtitles.assUrl = null;
         }
         if (window.audioMarkers) {
-            if (urlSRT) {
-                window.audioMarkers.cargarDesdeApp({ silencioso: true, forzar: true });
-            } else if (!conservarMarcadores) {
-                window.audioMarkers.setMarkers([], { historial: false, activarPrimero: false });
+            if (!conservarMarcadores) {
+                window.audioMarkers.setMarkers([], { historial: false, activarPrimero: false, sincronizar: false });
             }
         }
 
@@ -203,17 +205,45 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
             window.tabs.irA('audio');
         }
 
-        setTimeout(() => {
-            if (window.audioEditor) {
-                autoplayPendiente = true;
-                window.audioEditor.cargarAudio(nuevaUrl);
-                setTimeout(() => { autoplayPendiente = false; }, 15000);
+        if (window.audioEditor) {
+            autoplayPendiente = true;
+            const cargada = await window.audioEditor.cargarAudio(nuevaUrl, { conservarOriginal: conservarMarcadores });
+            if (!cargada || secuencia !== secuenciaCargaAudio) {
+                if (secuencia === secuenciaCargaAudio) autoplayPendiente = false;
+                return false;
             }
-        }, 300);
+            if (urlSRT && window.audioMarkers) {
+                await window.audioMarkers.cargarDesdeApp({ silencioso: true, forzar: true });
+            }
+        }
+        return true;
     } catch (error) {
         console.error("Error al cargar el audio:", error);
     }
 }
+
+async function recuperarSesionAudio() {
+    if (!window.audioSessionStore || !window.audioEditor) return false;
+    const secuencia = secuenciaCargaAudio;
+    try {
+        const sesion = await window.audioSessionStore.obtenerActiva();
+        if (!sesion || secuencia !== secuenciaCargaAudio || window.audioEditor.audioBuffer) return false;
+        const contenedor = document.getElementById('contenedorReproductor');
+        if (contenedor) contenedor.style.display = 'block';
+        if (window.tabs) window.tabs.irA('audio');
+        asegurarEditorInicializado();
+        return await window.audioEditor.recuperarSesion(sesion);
+    } catch (error) {
+        console.warn('No se pudo leer la sesión de audio:', error);
+        window.notifications?.warning('No se pudo leer la sesión guardada. Puedes seguir trabajando y descargar el audio.');
+        return false;
+    }
+}
+
+window.recuperarSesionAudio = recuperarSesionAudio;
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { recuperarSesionAudio(); }, 0);
+});
 
 // ==========================================
 // ▶️ CONTROLES DE REPRODUCCIÓN

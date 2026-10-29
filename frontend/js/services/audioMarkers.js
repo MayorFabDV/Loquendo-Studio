@@ -8,10 +8,12 @@
         editor: null,
         attached: false,
         boundWaveSurfer: null,
-        renderPending: false
+        renderPending: false,
+        loadToken: 0
     };
 
     var nextId = 1;
+    var uiBound = false;
 
     function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -339,6 +341,7 @@
     }
 
     function setMarkers(marcadores, opciones) {
+        state.loadToken++;
         var opts = opciones || {};
         state.markers = normalizarMarcadores(marcadores);
         if (state.activeId && !activo()) state.activeId = null;
@@ -388,6 +391,8 @@
         var url = rutaAbsoluta(ruta);
         if (!url) return Promise.resolve([]);
         if (!opts.forzar && state.loadedUrl === url) return Promise.resolve(getMarkers());
+        var token = ++state.loadToken;
+        var fuenteToken = editor() ? editor()._loadToken : null;
 
         return fetch(url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now())
             .then(function (respuesta) {
@@ -395,6 +400,7 @@
                 return respuesta.text();
             })
             .then(function (texto) {
+                if (token !== state.loadToken || (editor() && fuenteToken !== editor()._loadToken)) return getMarkers();
                 state.loadedUrl = url;
                 var marcadores = parseSRT(texto);
                 setMarkers(marcadores, { historial: false, activarPrimero: true });
@@ -581,6 +587,8 @@
     }
 
     function bindUI() {
+        if (uiBound) return;
+        uiBound = true;
         var archivo = document.getElementById('audioMarkerFile');
         if (archivo) {
             archivo.addEventListener('change', function () {
@@ -654,14 +662,13 @@
         var ws = inst.wavesurfer;
         ws.on('ready', function () {
             render();
-            if (!state.markers.length) cargarDesdeApp({ silencioso: true });
         });
         ws.on('redraw', render);
         ws.on('zoom', render);
 
         actualizarUI();
         render();
-        cargarDesdeApp({ silencioso: true });
+        if (!inst._cargaEdicion) cargarDesdeApp({ silencioso: true });
     }
 
     function init() {
