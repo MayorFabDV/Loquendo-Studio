@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { randomUUID } = require('crypto');
 
 const BOB_AMPLITUDE = 8;    // px de balanceo vertical (respiración)
 const BOB_PERIOD = 3.0;     // segundos por ciclo
@@ -51,6 +52,14 @@ class VideoService {
     _blinkEnable(tiempos) {
         if (!tiempos || tiempos.length === 0) return null;
         return tiempos.map(x => `between(t\\,${x.toFixed(3)}\\,${(x + BLINK_DURATION).toFixed(3)})`).join('+');
+    }
+
+    _visibilidadExpresiones(habla, parpadeo) {
+        const talk = habla || '0';
+        const blink = parpadeo || '0';
+        // Prioridad exclusiva: parpadeo > habla > reposo. El alfa del PNG no
+        // debe revelar el sprite de una expresión que ya no está activa.
+        return { idle: `not(${talk})*not(${blink})`, talking: `(${talk})*not(${blink})`, blink };
     }
 
     normalizarRutaImagen(rutaImagen) {
@@ -137,6 +146,7 @@ class VideoService {
             let stderr = '';
             proceso.stderr.on('data', (data) => { stderr += data.toString(); });
             proceso.on('close', (code) => {
+                if (code !== 0) return reject(new Error('No se pudo analizar el audio PNGTuber: ' + stderr.slice(-600)));
                 const silenceStarts = [...stderr.matchAll(/silence_start:\s*([\d.]+)/g)].map(m => parseFloat(m[1]));
                 const silenceEnds = [...stderr.matchAll(/silence_end:\s*([\d.]+)/g)].map(m => parseFloat(m[1]));
                 const duracionMatch = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
@@ -144,7 +154,7 @@ class VideoService {
                 if (duracionMatch) {
                     duracionTotal = parseInt(duracionMatch[1]) * 3600 + parseInt(duracionMatch[2]) * 60 + parseFloat(duracionMatch[3]);
                 }
-                if (duracionTotal <= 0) duracionTotal = 60;
+                if (duracionTotal <= 0) return reject(new Error('No se pudo obtener la duración del audio PNGTuber'));
                 
                 const segmentosVoz = [];
                 let tiempoActual = 0;
@@ -157,7 +167,6 @@ class VideoService {
                     tiempoActual = silEnd;
                 }
                 if (tiempoActual < duracionTotal) segmentosVoz.push({ start: tiempoActual, end: duracionTotal });
-                if (segmentosVoz.length === 0 && duracionTotal > 0) segmentosVoz.push({ start: 0, end: duracionTotal });
                 
                 console.log(`[PNGTuber] Segmentos de voz detectados: ${segmentosVoz.length}`);
                 segmentosVoz.forEach((s, i) => {
@@ -250,7 +259,7 @@ class VideoService {
         const fondoColor = this._colorDeFondo(opciones.fondo);
         const transparente = fondoColor === null;
         const ext = transparente ? 'webm' : 'mp4';
-        const nombreVideo = `pngtuber-${Date.now()}.${ext}`;
+        const nombreVideo = `pngtuber-${Date.now()}-${randomUUID()}.${ext}`;
         const rutaVideo = path.join(this.audioFolder, nombreVideo);
         const usarTalking = talkingImage && fs.existsSync(talkingImage) && talkingImage !== idleImage;
         const optOverlay = ':format=auto';
@@ -301,19 +310,20 @@ class VideoService {
         if (usarBlink) partes.push(`[${idxBlink}:v]${escalaBlink}[blink];`);
 
         let prev = 'bg';
-        partes.push(`[${prev}][idle]${this._overlayFiltro(optOverlay, null, amplitud)}[s1];`);
+        const visible = this._visibilidadExpresiones(enableExprTalking, enableExprBlink);
+        partes.push(`[${prev}][idle]${this._overlayFiltro(optOverlay, visible.idle, amplitud)}[s1];`);
         prev = 's1';
         if (usarTalking) {
-            partes.push(`[${prev}][talking]${this._overlayFiltro(optOverlay, enableExprTalking, amplitud)}[s2];`);
+            partes.push(`[${prev}][talking]${this._overlayFiltro(optOverlay, visible.talking, amplitud)}[s2];`);
             prev = 's2';
         }
         if (usarBlink) {
-            partes.push(`[${prev}][blink]${this._overlayFiltro(optOverlay, enableExprBlink, amplitud)}[s3];`);
+            partes.push(`[${prev}][blink]${this._overlayFiltro(optOverlay, visible.blink, amplitud)}[s3];`);
             prev = 's3';
         }
         partes.push(`[${prev}]null[video]`);
 
-        const filterScript = path.join(this.audioFolder, `filter-${Date.now()}.txt`);
+        const filterScript = path.join(this.audioFolder, `filter-${Date.now()}-${randomUUID()}.txt`);
         fs.writeFileSync(filterScript, partes.join('\n'), 'utf8');
         console.log(`[PNGTuber] Fondo: ${transparente ? 'transparente' : fondoColor} | lienzo: ${canvas.ancho}x${canvas.alto} | escala: ${Math.round(escalaUsuario * 100)}% | habla: ${usarTalking} | parpadeo: ${usarBlink ? tiemposParpadeo.length + ' veces' : 'no'}`);
 
@@ -393,19 +403,20 @@ class VideoService {
         if (usarBlink) partes.push(`[${idxBlink}:v]${escalaBlink}[blink];`);
 
         let prev = 'bg';
-        partes.push(`[${prev}][idle]${this._overlayFiltro(optOverlay, null, amplitud)}[s1];`);
+        const visible = this._visibilidadExpresiones(enableExprTalking, enableExprBlink);
+        partes.push(`[${prev}][idle]${this._overlayFiltro(optOverlay, visible.idle, amplitud)}[s1];`);
         prev = 's1';
         if (usarTalking) {
-            partes.push(`[${prev}][talking]${this._overlayFiltro(optOverlay, enableExprTalking, amplitud)}[s2];`);
+            partes.push(`[${prev}][talking]${this._overlayFiltro(optOverlay, visible.talking, amplitud)}[s2];`);
             prev = 's2';
         }
         if (usarBlink) {
-            partes.push(`[${prev}][blink]${this._overlayFiltro(optOverlay, enableExprBlink, amplitud)}[s3];`);
+            partes.push(`[${prev}][blink]${this._overlayFiltro(optOverlay, visible.blink, amplitud)}[s3];`);
             prev = 's3';
         }
         partes.push(`[${prev}]null[video]`);
 
-        const filterScript = path.join(this.audioFolder, `preview-filter-${Date.now()}.txt`);
+        const filterScript = path.join(this.audioFolder, `preview-filter-${Date.now()}-${randomUUID()}.txt`);
         fs.writeFileSync(filterScript, partes.join('\n'), 'utf8');
         console.log(`[Preview] Generando vista previa (${transparente ? 'transparente' : fondoColor}) | lienzo: ${canvas.ancho}x${canvas.alto} | escala: ${Math.round(escalaUsuario * 100)}%`);
 
