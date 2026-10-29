@@ -78,14 +78,16 @@ async function renderer(){
             window.testFixture=await (await fetch('/audios/fixture.wav')).blob();
             await mixer.app.media.subirYAgregar('voz',new File([testFixture],'voz.wav',{type:'audio/wav'}));await mixer.app.media.persistirAssets();`);
         await wait(`mixer.app.timeline.estaListo() && !!mixer.estado.clips[0]?.asset`);
-        await run(`mixer.editar('dividir',1);mixer.app.timeline.aplicarPan(mixer.estado.clips[0].id,0.5);`);
+        await run(`mixer.editar('dividir',1);mixer.app.timeline.aplicarPan(mixer.estado.clips[0].id,0.5);mixer.app.timeline.zoom(120);`);
         const original=await run('mixer.guardarEnEquipo()');
         const doc=await run(`(async()=>(await (await fetch('/api/proyectos/'+mixer.estado.projectId)).json()).proyecto)()`);
         assert.equal(doc.clips.length,2);assert.equal(doc.clips[0].pan,0.5);
+        assert.equal(doc.zoomPx,120);
         assert.ok((await run('mixer.app.project.listarGuardados()')).some(p=>p.id===original));
         await action(`const route=await mixer.exportarPortable();const blob=await (await fetch(route)).blob();await mixer.importarPortable(new File([blob],'test.loquendo.tar',{type:'application/x-tar'}));`);
         await wait(`mixer.app.timeline.estaListo()`);
         const imported=await run('mixer.estado.projectId');assert.notEqual(imported,original);
+        assert.equal(await run('mixer.estado.zoomPx'),120);
         await action(`await mixer.abrirGuardado(${JSON.stringify(original)});await mixer.abrirGuardado(${JSON.stringify(imported)});`);
         await wait(`mixer.app.timeline.estaListo()`);
         const before=await run('mixer.app.store.aProyecto()');
