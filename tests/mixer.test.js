@@ -117,3 +117,32 @@ test('split no altera silenciosamente un fade atravesado por el corte', () => {
     assert.equal(s.state.clips.length,1);
     assert.ok(s.dividirClip(c.id,2.5));
 });
+
+test('pistas vacías conservan sus ajustes y el fallo de almacenamiento no borra el estado', () => {
+    const h = cargar();
+    const avisos = [];
+    h.ctx.window.notifications = {error: mensaje => avisos.push(mensaje)};
+    h.app.store.importarProyecto({clips:[],tracks:[{id:'musica',gainDb:-12,mute:true}]});
+    assert.equal(h.app.store.aProyecto().tracks[0].gainDb,-12);
+    h.app.store.agregarClip('voz','/audios/a.wav');
+    h.ctx.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    h.flush();
+    assert.equal(h.app.state.clips.length,1);
+    assert.equal(h.app.state.tracks.get('musica').gainDb,-12);
+    assert.equal(avisos.length,1);
+});
+
+test('una subida que termina tras editar otro audio no publica la ruta anterior', async () => {
+    const h = cargar();
+    h.ctx.FormData = FormData;
+    h.ctx.window.CONFIG = {API_BASE:''};
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/services/audioProcessor.js'),'utf8'),h.ctx);
+    const editor = h.ctx.window.audioEditor;
+    editor.currentWavBlobUrl='blob:first'; editor._dirty=true; editor._baseServidor='/audios/original.wav';
+    h.ctx.fetch = async (url, opciones) => opciones ? {
+        ok:true, json:async()=>{editor.currentWavBlobUrl='blob:second';return {url:'/audios/stale.wav'};}
+    } : {blob:async()=>new Blob(['wav'],{type:'audio/wav'})};
+    assert.equal(await editor.persistirAudioEditado(),null);
+    assert.equal(editor._dirty,true);
+    assert.equal(editor._baseServidor,'/audios/original.wav');
+});

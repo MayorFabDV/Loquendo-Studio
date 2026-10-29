@@ -197,7 +197,8 @@
 
     function reconstruirTracks() {
         const previas = state.tracks;
-        state.tracks = new Map();
+        // Una pista vacía también puede tener ajustes que el usuario quiera conservar.
+        state.tracks = new Map(previas);
         for (const clip of state.clips) {
             if (!state.tracks.has(clip.trackId)) {
                 state.tracks.set(clip.trackId, previas.get(clip.trackId) || {
