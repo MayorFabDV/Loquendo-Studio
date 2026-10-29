@@ -27,6 +27,7 @@ test('round-trip conserva múltiples clips, parámetros de pista, efectos y mast
         tracks: [{ id:'voz', gainDb:-9, pan:0.5, mute:true, effects:{eq:{low:2}} }], master:{gainDb:-3,limiter:false} };
     project.clips[0].effects = { filter:{highpass:120} };
     h.app.store.importarProyecto(project);
+    h.app.state.zoomPx=160;
     h.app.store.agregarClip('sfx','/audios/other.wav');
     h.app.store.guardarLocal(); h.flush();
     const next = cargar(h.storage); next.app.store.cargarLocal();
@@ -35,6 +36,7 @@ test('round-trip conserva múltiples clips, parámetros de pista, efectos y mast
     assert.deepEqual(out.tracks.find(t=>t.id==='voz'),project.tracks[0]);
     assert.deepEqual(out.master,project.master);
     assert.deepEqual(out.clips[0].effects,project.clips[0].effects);
+    assert.equal(out.zoomPx,160);
 });
 
 test('proyecto legacy y proyecto vacío conservan compatibilidad', () => {
@@ -157,4 +159,89 @@ test('pausar cancela una petición de play que todavía está preparando el audi
     h.app.transport.pausa();
     await pending;
     assert.equal(plays,0);
+});
+
+function proyectos(h) {
+    h.ctx.FormData=FormData;
+    h.ctx.document={getElementById:()=>null};
+    h.app.timeline={rebuild(){}};
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/services/mixer/project.js'),'utf8'),h.ctx);
+    return h.app.project;
+}
+
+test('reasignar fuente compartida conserva recortes/FX y rechaza un audio demasiado corto',async()=>{
+    const h=cargar(),s=h.app.store,p=proyectos(h);
+    s.state.projectId='p-test';
+    const a=s.agregarClip('voz','/missing.wav',{in:1,out:4,duration:6,start:2,pan:0.5,fadeIn:0.2,effects:{eq:{mid:2}}});
+    const b=s.agregarClip('voz','/missing.wav',{in:2,out:5,duration:6,start:8});
+    let duration=3;
+    h.ctx.fetch=async url=>({ok:true,json:async()=>url.includes('/upload')
+        ? {asset:'assets/new.wav',url:'/media/projects/p-test/assets/new.wav'}
+        : url.includes('/peaks') ? {duration,peaks:[0.1,0.2]} : {ok:true}});
+    const file=new File(['audio'],'replacement.wav',{type:'audio/wav'});
+    await assert.rejects(p.recuperarFuente(file,a.id),/corto/);
+    assert.equal(a.src,'/missing.wav');assert.equal(b.out,5);
+    duration=6;
+    assert.equal(await p.recuperarFuente(file,a.id),2);
+    assert.equal(a.in,1);assert.equal(a.out,4);assert.equal(a.start,2);assert.equal(a.pan,0.5);assert.equal(a.fadeIn,0.2);
+    assert.deepEqual(plain(a.effects),{eq:{mid:2}});
+    assert.equal(b.src,a.src);assert.equal(b.start,8);
+    s.deshacer();assert.equal(s.buscarClip(a.id).src,'/missing.wav');
+});
+
+test('guardado remoto serializa snapshots y no mezcla proyectos al cambiar el actual',async()=>{
+    const h=cargar(),p=proyectos(h),requests=[];
+    h.ctx.fetch=async(url,options)=>{requests.push({url,doc:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true})};};
+    const doc={id:'p-first',clips:[clip('a')],nombre:'Primero'};
+    const first=p.guardarEnServidor('p-first',doc);doc.nombre='Cambio posterior';
+    await p.guardarEnServidor('p-other',{id:'p-other',clips:[],nombre:'Otro'});await first;
+    assert.equal(requests[0].doc.nombre,'Primero');assert.ok(requests[0].url.endsWith('/p-first'));
+    assert.equal(requests[1].doc.id,'p-other');
+    await p.guardarEnServidor('p-other',{id:'p-other',clips:[],nombre:'Otro'});
+    assert.equal(requests.length,2,'Una copia idéntica ya confirmada no genera escrituras repetidas');
+});
+
+test('una reasignación tardía no cambia los clips de otro proyecto',async()=>{
+    const h=cargar(),p=proyectos(h);h.app.state.projectId='p-first';
+    const c=h.app.store.agregarClip('voz','/missing.wav',{duration:2,out:2});
+    h.ctx.fetch=async url=>({ok:true,json:async()=>{
+        if(url.includes('/upload')){h.app.state.projectId='p-other';return {asset:'assets/new.wav',url:'/media/projects/p-first/assets/new.wav'};}
+        return {duration:2,peaks:[0.2]};
+    }});
+    await assert.rejects(p.recuperarFuente(new File(['x'],'a.wav',{type:'audio/wav'}),c.id),/cambió/);
+    assert.equal(c.src,'/missing.wav');
+});
+
+test('abrir un proyecto no descarta cambios hechos mientras se comprueban sus fuentes',async()=>{
+    const h=cargar(),p=proyectos(h);let resolver;
+    h.app.media={persistirAssets:async()=>{}};
+    h.app.util.head=()=>new Promise(resolve=>{resolver=resolve;});
+    const apertura=p.importarProyecto({text:async()=>JSON.stringify({clips:[clip('importado')]})});
+    await new Promise(resolve=>setImmediate(resolve));
+    h.app.store.agregarClip('sfx','/trabajo-nuevo.wav',{id:'trabajo'});
+    resolver(true);await apertura;
+    assert.equal(h.app.state.clips[0].id,'trabajo');
+    assert.equal(h.app.state.clips.length,1);
+});
+
+test('exportar JSON sigue disponible si el servidor no responde',async()=>{
+    const h=cargar(),p=proyectos(h),downloads=[];
+    h.app.state.projectId='p-test';h.app.store.agregarClip('voz','/source.wav',{id:'original'});
+    h.app.util.head=async()=>false;
+    h.ctx.fetch=async()=>{throw new Error('offline');};
+    h.ctx.Blob=Blob;
+    h.ctx.URL={createObjectURL:blob=>{downloads.push(blob);return 'blob:test';},revokeObjectURL(){}};
+    h.ctx.document={getElementById:()=>null,createElement:()=>({click(){},remove(){}}),body:{appendChild(){}}};
+    await p.exportarProyecto();
+    assert.equal(downloads.length,1);
+    const saved=JSON.parse(await downloads[0].text());
+    assert.equal(saved.version,2);assert.equal(saved.clips[0].id,'original');
+});
+
+test('abrir JSON incompatible se rechaza completo sin descartar clips ni tocar la mezcla actual',async()=>{
+    const h=cargar(),p=proyectos(h);
+    h.app.store.agregarClip('voz','/current.wav',{id:'actual'});
+    h.ctx.fetch=async()=>{throw new Error('No debe guardar ni cargar un documento inválido');};
+    await p.importarProyecto({text:async()=>JSON.stringify({version:2,clips:[clip('válido'),clip('no-soportado','pista-desconocida')]})});
+    assert.equal(h.app.state.clips.length,1);assert.equal(h.app.state.clips[0].id,'actual');
 });

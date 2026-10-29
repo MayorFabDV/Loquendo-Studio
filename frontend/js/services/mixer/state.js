@@ -246,6 +246,7 @@
             } catch (e) {
                 notificar('error', 'No se pudo guardar la mezcla localmente; exporta el proyecto para conservar los cambios');
             }
+            if (app.project && state.projectId) app.project.autoguardar();
         }, 350);
     }
 
@@ -457,6 +458,7 @@
             id: state.projectId || undefined,
             projectId: state.projectId || undefined,
             nombre: state.nombre,
+            zoomPx: state.zoomPx,
             duration: Number(duracionProyecto().toFixed(3)),
             master: state.master,
             tracks: [...state.tracks.values()],

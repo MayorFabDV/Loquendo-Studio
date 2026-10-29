@@ -57,6 +57,50 @@
             btn.addEventListener('click', () => editar(accion, document.getElementById('mixerPosicion').value));
             barra.appendChild(btn);
         }
+        const estado = document.createElement('small'); estado.id = 'estadoProyectoMezcla';
+        const ejecutar = fn => async () => {
+            try { await fn(); }
+            catch (error) { app.util.notificar('error', error.message || 'No se pudo completar la operación de proyecto'); }
+        };
+        const boton = (texto, accion) => {
+            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn-mixer'; btn.textContent = texto;
+            btn.addEventListener('click', ejecutar(accion)); barra.appendChild(btn); return btn;
+        };
+        const proyectos = document.createElement('select'); proyectos.id = 'mixerProyectosGuardados';
+        proyectos.setAttribute('aria-label', 'Proyectos guardados en este equipo');
+        const refrescar = async () => {
+            const items = await app.project.listarGuardados(); proyectos.replaceChildren();
+            const vacio = document.createElement('option'); vacio.value = ''; vacio.textContent = 'Proyectos guardados…'; proyectos.appendChild(vacio);
+            for (const item of items) {
+                const option = document.createElement('option'); option.value = item.id;
+                option.textContent = `${item.nombre} (${item.id})${item.recuperado ? ' — copia recuperable' : ''}`;
+                option.disabled = !!item.corrupto; proyectos.appendChild(option);
+            }
+        };
+        boton('Guardar en equipo', async () => { await app.project.guardarEnEquipo(); await refrescar(); });
+        barra.appendChild(proyectos);
+        boton('Actualizar lista', refrescar);
+        boton('Abrir guardado', () => proyectos.value ? app.project.abrirGuardado(proyectos.value) : Promise.reject(new Error('Selecciona un proyecto guardado')));
+        boton('Exportar portable', () => app.project.exportarPortable());
+        const paquete = document.createElement('input'); paquete.type = 'file'; paquete.accept = '.tar'; paquete.hidden = true;
+        paquete.addEventListener('change', ejecutar(async () => {
+            const file = paquete.files[0]; paquete.value = ''; if (file) await app.project.importarPortable(file);
+        }));
+        barra.appendChild(paquete); boton('Abrir portable', () => paquete.click());
+        const fuente = document.createElement('input'); fuente.type = 'file'; fuente.accept = 'audio/*'; fuente.hidden = true;
+        let recuperarId = '';
+        fuente.addEventListener('change', ejecutar(async () => {
+            const file = fuente.files[0]; fuente.value = ''; if (file) await app.project.recuperarFuente(file, recuperarId);
+        }));
+        barra.appendChild(fuente);
+        const recuperar = boton('Recuperar fuente', () => {
+            recuperarId = app.store.state.selectedId;
+            if (!recuperarId) throw new Error('Selecciona el clip cuya fuente quieres recuperar');
+            fuente.click();
+        });
+        recuperar.title = 'Reasigna el archivo de audio de todos los clips que comparten esta fuente. Conserva recortes y efectos.';
+        barra.appendChild(estado);
+        refrescar().catch(error => console.warn('No se pudo listar los proyectos guardados:', error));
         // La barra no es una columna de la fila flex de ondas + biblioteca.
         // Si se inserta junto a ellas, puede consumir todo el ancho de la onda.
         (raiz.closest('.mezclador-cuerpo') || raiz).before(barra);
@@ -101,6 +145,11 @@
         guardarProyecto: app.project.exportarProyecto,
         importarProyecto: app.project.importarProyecto,
         renderizarMezcla,
+        guardarEnEquipo: app.project.guardarEnEquipo,
+        abrirGuardado: app.project.abrirGuardado,
+        exportarPortable: app.project.exportarPortable,
+        importarPortable: app.project.importarPortable,
+        recuperarFuente: app.project.recuperarFuente,
         estado: app.store.state,
         app
     };

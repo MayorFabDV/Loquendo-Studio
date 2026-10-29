@@ -14,10 +14,12 @@
             try {
                 const id = app.project.asegurarProjectId();
                 await app.project.importarAssets(id);
+                if (state.projectId !== id) return;
+                await app.project.guardarEnServidor(id, app.store.aProyecto());
                 app.store.guardarLocal();
             } catch (error) {
                 console.error('Mixer: no se pudieron persistir los assets', error);
-                notificar('warning', 'La mezcla se guardó, pero no se pudieron copiar los audios al proyecto');
+                notificar('warning', 'La mezcla sigue en pantalla, pero falta confirmar su copia en el almacenamiento de proyectos');
             }
         }).catch(() => {});
         return persistencia;
