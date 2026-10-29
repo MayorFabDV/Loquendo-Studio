@@ -5,6 +5,7 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const os = require('os');
 const path = require('path');
+const { randomUUID } = require('crypto');
 const { ejecutar, duracion: duracionArchivo } = require('./ffmpegProcess');
 const { numero, dbALineal, limitar, formatearNumero } = require('./audioMath');
 
@@ -136,7 +137,7 @@ class ProjectRenderService {
 
         let puntos = automation
             .map((p) => {
-                const t = numero(p && p.t, 0, [0, duracion]);
+                const t = numero(p && p.t, 0);
                 if (p && p.gain != null) {
                     const ganancia = numero(p.gain, 1, [0, 1]);
                     const db = ganancia <= 0.000001 ? -60 : Math.max(-60, Math.min(24, 20 * Math.log10(ganancia)));
@@ -158,6 +159,23 @@ class ProjectRenderService {
             }
         }
         puntos = compactos;
+
+        // Interpolar antes de recortar: clamping de puntos exteriores altera rampas
+        // cuando el clip tiene offset o se divide en varios clips de la misma fuente.
+        const dbEn = (t) => {
+            if (t <= puntos[0].t) return puntos[0].db;
+            for (let i = 1; i < puntos.length; i++) {
+                if (t <= puntos[i].t) {
+                    const a = puntos[i - 1], b = puntos[i];
+                    const ratio = (t - a.t) / (b.t - a.t);
+                    const gain = dbALineal(a.db) + (dbALineal(b.db) - dbALineal(a.db)) * ratio;
+                    return 20 * Math.log10(Math.max(0.000001, gain));
+                }
+            }
+            return puntos[puntos.length - 1].db;
+        };
+        const entrada = dbEn(0), salida = dbEn(duracion);
+        puntos = [{ t: 0, db: entrada }, ...puntos.filter(p => p.t > 0 && p.t < duracion), { t: duracion, db: salida }];
 
         if (puntos.length > 240) {
             const paso = (puntos.length - 1) / 239;
@@ -290,12 +308,15 @@ class ProjectRenderService {
                 )
                 : null;
             if (automatizacion) {
+                // La ganancia se evalúa por frame: bloques pequeños evitan saltos
+                // audibles y diferencias grandes al dividir una misma rampa.
+                filtros.push('asetnsamples=n=128:p=0');
                 filtros.push(`volume='${automatizacion}':eval=frame`);
             } else if (Math.abs(base - 1) > 0.0001) {
                 filtros.push(`volume=${formatearNumero(base, 8)}`);
             }
 
-            const curva = CURVAS_FADE.has(clip.fadeCurve) ? clip.fadeCurve : 'tri';
+            const curva = clip.fadeCurve === 'linear' ? 'tri' : (CURVAS_FADE.has(clip.fadeCurve) ? clip.fadeCurve : 'tri');
             if (clip.fadeIn > 0) {
                 filtros.push(`afade=t=in:st=0:d=${formatearNumero(clip.fadeIn)}:curve=${curva}`);
             }
@@ -344,7 +365,7 @@ class ProjectRenderService {
 
         const duracion = Math.max(...activos.map((c) => c.start + c._dur));
         const marca = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-        const nombre = `proyecto-${marca}.${cfgFormato.ext}`;
+        const nombre = `proyecto-${marca}-${randomUUID()}.${cfgFormato.ext}`;
         const rutaSalida = path.join(this.assetStore.directorioRenders(projectId), nombre);
         const rutaFiltros = path.join(os.tmpdir(), `loquendo-filtros-${process.pid}-${Date.now()}.txt`);
         await fsp.writeFile(rutaFiltros, lineas.join(';\n'), 'utf8');
