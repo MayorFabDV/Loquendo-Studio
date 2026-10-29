@@ -13,6 +13,7 @@
         projectId: '',
         nombre: 'Mezcla',
         selectedId: '',
+        master: { gainDb: 0, limiter: true, loudness: { enabled: false } },
         dirty: false
     };
 
@@ -76,8 +77,8 @@
         let outSec = Math.max(0, numero(raw.out, 0));
         let duration = Math.max(0, numero(raw.duration, 0));
         if (outSec > 0 && outSec <= inSec) outSec = 0;
-        if (!outSec && duration > 0) outSec = inSec + duration;
-        if (outSec > 0) duration = Math.max(duration, outSec - inSec);
+        if (!outSec && duration > 0) outSec = duration;
+        if (outSec > 0) duration = Math.max(duration, outSec);
 
         const gainDb = raw.gainDb != null
             ? clamp(numero(raw.gainDb, 0), -60, 24)
@@ -103,6 +104,7 @@
             fadeIn: Math.max(0, numero(raw.fadeIn, 0)),
             fadeOut: Math.max(0, numero(raw.fadeOut, 0)),
             fadeCurve: raw.fadeCurve || 'tri',
+            effects: raw.effects && typeof raw.effects === 'object' ? JSON.parse(JSON.stringify(raw.effects)) : {},
             automation: normalizarAutomatizacion(raw.automation),
             peaks: Array.isArray(raw.peaks) ? raw.peaks : null,
             peaksPoints: Array.isArray(raw.peaks) ? raw.peaks.length : 0,
@@ -112,17 +114,11 @@
 
     function normalizarClips(lista) {
         const resultado = [];
-        const vistos = new Set();
         const ids = new Set();
-        const pistasUnicas = new Set(['voz', 'musica']);
 
         for (let i = 0; i < lista.length; i++) {
             const clip = normalizarClip(lista[i], i);
             if (!clip) continue;
-            if (pistasUnicas.has(clip.trackId)) {
-                if (vistos.has(clip.trackId)) continue;
-                vistos.add(clip.trackId);
-            }
             if (ids.has(clip.id)) clip.id = uid('clip');
             ids.add(clip.id);
             resultado.push(clip);
@@ -154,10 +150,12 @@
         }
 
         const vivos = clips.filter((clip) => clip.src);
-        if (!vivos.length) return null;
+        if (clips.length && !vivos.length) return null;
 
         return {
             clips: vivos,
+            tracks: Array.isArray(data.tracks) ? data.tracks : [],
+            master: data.master || { gainDb: 0, limiter: true, loudness: { enabled: false } },
             zoomPx: clamp(numero(data.zoomPx, ZOOM_INICIAL), ZOOM_MIN, ZOOM_MAX),
             projectId,
             nombre: typeof data.nombre === 'string' && data.nombre ? data.nombre : 'Mezcla'
@@ -165,10 +163,11 @@
     }
 
     function reconstruirTracks() {
+        const previas = state.tracks;
         state.tracks = new Map();
         for (const clip of state.clips) {
             if (!state.tracks.has(clip.trackId)) {
-                state.tracks.set(clip.trackId, {
+                state.tracks.set(clip.trackId, previas.get(clip.trackId) || {
                     id: clip.trackId,
                     nombre: app.config.NOMBRE_TITULO[clip.trackId] || clip.trackId,
                     gainDb: 0,
@@ -185,6 +184,8 @@
         state.zoomPx = estado.zoomPx;
         state.projectId = estado.projectId || state.projectId;
         state.nombre = estado.nombre || state.nombre;
+        state.master = estado.master || state.master;
+        state.tracks = new Map((estado.tracks || []).map((t) => [t.id, JSON.parse(JSON.stringify(t))]));
         if (state.selectedId && !state.clips.some((c) => c.id === state.selectedId)) state.selectedId = '';
         reconstruirTracks();
         if (opciones.guardar) guardarLocal();
@@ -202,10 +203,12 @@
                     projectId: state.projectId,
                     nombre: state.nombre,
                     zoomPx: state.zoomPx,
-                    clips: state.clips
+                    clips: state.clips,
+                    tracks: [...state.tracks.values()],
+                    master: state.master
                 }));
             } catch (e) {
-                /* noop */
+                notificar('error', 'No se pudo guardar la mezcla localmente; exporta el proyecto para conservar los cambios');
             }
         }, 350);
     }
@@ -247,6 +250,8 @@
             fadeIn: opciones.fadeIn || 0,
             fadeOut: opciones.fadeOut || 0,
             automation: opciones.automation || [],
+            effects: opciones.effects || {},
+            fadeCurve: opciones.fadeCurve || 'tri',
             peaks: opciones.peaks || null
         }, state.clips.length);
 
@@ -326,6 +331,7 @@
             fadeIn: Number(c.fadeIn.toFixed(3)),
             fadeOut: Number(c.fadeOut.toFixed(3)),
             fadeCurve: c.fadeCurve,
+            effects: c.effects || {},
             automation: c.automation.map((p) => ({
                 id: p.id,
                 t: Number(p.t.toFixed(3)),
@@ -349,7 +355,7 @@
             projectId: state.projectId || undefined,
             nombre: state.nombre,
             duration: Number(duracionProyecto().toFixed(3)),
-            master: { gainDb: 0, limiter: true, loudness: { enabled: false } },
+            master: state.master,
             tracks: [...state.tracks.values()],
             clips,
             assets

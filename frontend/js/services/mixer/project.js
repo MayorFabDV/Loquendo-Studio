@@ -39,7 +39,8 @@
             const id = asegurarProjectId();
             const estadoUI = document.getElementById('mezcladorEstado');
             if (estadoUI) estadoUI.textContent = 'Guardando assets del proyecto...';
-            await importarAssets(id);
+            const disponibles = await comprobarFuentes(state.clips);
+            if (disponibles.length === state.clips.length) await importarAssets(id);
             const datos = {
                 ...app.store.aProyecto(),
                 id,
@@ -89,18 +90,13 @@
             }
 
             const vivos = await comprobarFuentes(estado.clips);
-            if (!vivos.length) {
-                notificar('error', 'Los audios del proyecto ya no existen en el servidor');
-                return;
-            }
-
             const descartados = estado.clips.length - vivos.length;
-            app.store.aplicarEstado({ ...estado, clips: vivos }, { guardar: true });
-            state.selectedId = vivos[0].id;
+            app.store.aplicarEstado(estado, { guardar: true });
+            state.selectedId = estado.clips.length ? estado.clips[0].id : '';
             app.timeline.rebuild();
-            void app.media.persistirAssets();
-            notificar('success', descartados > 0
-                ? `Proyecto cargado (${descartados} clip(s) no encontrados)`
+            if (!descartados) void app.media.persistirAssets();
+            notificar(descartados ? 'warning' : 'success', descartados > 0
+                ? `Proyecto conservado completo: faltan medios de ${descartados} clip(s). Recupera sus archivos antes de renderizar.`
                 : 'Proyecto de mezcla cargado');
         } catch (error) {
             console.error('Mixer: error importando proyecto', error);
@@ -161,6 +157,10 @@
         if (estadoUI) estadoUI.textContent = 'Preparando assets del proyecto...';
 
         try {
+            const disponibles = await comprobarFuentes(state.clips);
+            if (disponibles.length !== state.clips.length) {
+                throw new Error('Faltan medios del proyecto. Recupera los archivos o retira sus clips explícitamente antes de renderizar.');
+            }
             const id = asegurarProjectId();
             const importados = await importarAssets(id);
             if (importados && estadoUI) estadoUI.textContent = `Assets importados (${importados}) Â· renderizando...`;
