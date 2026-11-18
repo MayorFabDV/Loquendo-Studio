@@ -1121,6 +1121,20 @@
 
         <!-- ==================== PESTAÑA: VIDEO ==================== -->
         <div id="tab-video" class="tab-panel" role="tabpanel">
+            <section class="video-audio-input">
+                <label for="videoAudioSource">Audio del video</label>
+                <select id="videoAudioSource">
+                    <option value="studio">Audio generado por Loquendo Studio</option>
+                    <option value="external">Importar audio externo (WAV / MP3)</option>
+                </select>
+                <div id="videoAudioExternal" hidden>
+                    <label class="btn-preview">Seleccionar / cambiar archivo <input id="videoAudioFile" type="file" accept=".wav,.mp3,audio/wav,audio/mpeg"></label>
+                    <span id="videoAudioStatus" role="status">Sin archivo seleccionado</span>
+                    <button id="videoAudioRemove" type="button" class="btn-preview" disabled>Quitar archivo</button>
+                    <audio id="videoAudioPlayer" controls hidden></audio>
+                    <p>Solo para este video. El archivo original se conserva y no se añade al mezclador.</p>
+                </div>
+            </section>
             <section class="controles-video" data-help-section="video-pngtuber" data-help-anchor=".controles-video-left">
                 <div class="controles-video-left">
                     <label for="fondoPNGTuber">
@@ -1173,13 +1187,13 @@
             <section class="pngtuber-visual">
                 <section class="preview-pngtuber" data-help="previewPngtuber">
                     <div class="preview-frame">
-                        <video id="previewPngtuberVideo" loop muted autoplay playsinline hidden></video>
+                        <video id="previewPngtuberVideo" loop muted autoplay controls playsinline hidden></video>
                         <div id="previewPngtuberPlaceholder" class="preview-placeholder">
                             Sube una imagen en reposo para ver la vista previa.
                         </div>
                     </div>
                     <div class="preview-acciones">
-                        <span class="preview-nota">Vista previa: el personaje alterna entre reposo y habla.</span>
+                        <span class="preview-nota">Con audio: primeros 4 segundos sincronizados (activa el sonido en el reproductor). Sin audio: animación de demostración.</span>
                         <button type="button" data-help="btnActualizarPreview" id="btnActualizarPreview" class="btn-preview" onclick="actualizarPreviewPNGTuber()">
                             Actualizar vista previa
                         </button>
@@ -1235,6 +1249,7 @@
     <script src="js/ui/audioEditorUI.js"></script>
     <script src="js/ui/audioRenderUI.js"></script>
     <script src="js/ui/sessionRecovery.js"></script>
+    <script src="js/ui/videoAudioInput.js"></script>
 
     <!-- MODAL DE AYUDA -->
     <div id="modalAyuda" class="modal-overlay" style="display: none;">

@@ -3425,6 +3425,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: #fbbf24;
   background: rgba(245, 158, 11, 0.14);
 }
+.video-audio-input { padding: 14px; margin-bottom: 14px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }
+.video-audio-input audio { display: block; margin-top: 10px; max-width: 100%; }
+.video-audio-input audio[hidden] { display: none; }
+.video-audio-input p { font-size: 12px; }
 .mezclador-alpha-nota { display: block; margin-top: 4px; color: var(--text-muted); font-size: 11px; }
 [data-theme="light"] .mezclador-alpha { color: #92400e; background: #fef3c7; }
 .session-recovery-notice { margin: 8px 0 14px; padding: 10px 14px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }

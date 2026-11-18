@@ -606,10 +606,13 @@ async function actualizarPreviewPNGTuber() {
     const { resolucion, escala } = obtenerOpcionesPNGTuber();
 
     try {
+        const audioPath = window.videoAudioInput ? await window.videoAudioInput.ruta({ preview: true }) : null;
+        const versionFuente = window.videoAudioInput?.version();
         const res = await fetch(`${API_BASE}/api/pngtuber/preview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                audioPath,
                 idleImagePath: pngtuberIdlePath,
                 talkingImagePath: pngtuberTalkingPath || null,
                 blinkImagePath: pngtuberBlinkPath || null,
@@ -620,6 +623,7 @@ async function actualizarPreviewPNGTuber() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al generar la vista previa');
+        if (versionFuente !== window.videoAudioInput?.version()) return;
 
         video.src = `${API_BASE}${data.url}?t=${Date.now()}`;
         video.hidden = false;
@@ -639,7 +643,10 @@ async function actualizarPreviewPNGTuber() {
 }
 
 async function generarVideoPNGTuber() {
-    let audioPath = await rutaVozPersistida();
+    let audioPath;
+    try { audioPath = window.videoAudioInput ? await window.videoAudioInput.ruta() : await rutaVozPersistida(); }
+    catch (error) { notificar('warning', error.message); return; }
+    const versionFuente = window.videoAudioInput?.version();
     if (!audioPath || audioPath.startsWith('blob:')) {
         notificar('warning', 'Primero genera un audio válido (no ediciones temporales).');
         return;
@@ -671,6 +678,7 @@ async function generarVideoPNGTuber() {
             })
         });
         const data = await res.json();
+        if (versionFuente !== window.videoAudioInput?.version()) return;
         if (res.ok) {
             notificar('success', '¡Video PNGTuber generado con éxito!');
             const ext = (data.video || '').toLowerCase().endsWith('.webm') ? 'webm' : 'mp4';

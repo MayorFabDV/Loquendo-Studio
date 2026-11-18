@@ -283,11 +283,10 @@ class VideoService {
         const escalaBlink = dimsBlink ? this._filtroEscala(dimsBlink.ancho, dimsBlink.alto) : null;
 
         // Duración y expresión de habla
-        let duracionTotal = 0;
+        const info = await this.detectarSegmentosVoz(audioPathAbsoluto);
+        let duracionTotal = opciones.preview ? Math.min(4, info.duracionTotal) : info.duracionTotal;
         let enableExprTalking = null;
         if (usarTalking || usarBlinkImg) {
-            const info = await this.detectarSegmentosVoz(audioPathAbsoluto);
-            duracionTotal = info.duracionTotal;
             if (usarTalking) enableExprTalking = this._construirEnableExpression(info.segmentosVoz);
         }
         const duracionBase = duracionTotal > 0 ? duracionTotal : 1000;
@@ -336,6 +335,7 @@ class VideoService {
             '-map', '0:a',
             ...this._argsVideo(transparente, true),
             '-shortest',
+            '-t', String(duracionTotal),
             '-y',
             rutaVideo
         );

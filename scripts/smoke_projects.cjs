@@ -58,13 +58,14 @@ async function coordinator(){
                 if(Date.now()-start>30000)return reject(new Error('Timeout de Express: '+output));setTimeout(poll,50);};poll();
         });
         await new Promise((resolve,reject)=>{
-            const childEnv={...process.env,PROJECT_TEST_URL:'http://localhost:'+bound,PROJECT_TEST_ROOT:root,PROJECT_TEST_SAPI:nativeVoice?'1':'0'};delete childEnv.ELECTRON_RUN_AS_NODE;
+            const childEnv={...process.env,PROJECT_TEST_URL:'http://localhost:'+bound,PROJECT_TEST_ROOT:root,PROJECT_TEST_SAPI:nativeVoice?'1':'0',PROJECT_TEST_EXTERNAL:process.argv.includes('--external-audio')?'1':'0'};delete childEnv.ELECTRON_RUN_AS_NODE;
             const child=spawn(require('electron'),[__filename],{env:childEnv,stdio:'inherit',windowsHide:true});
             const timeout=setTimeout(()=>{child.kill();reject(new Error('Timeout de Electron'));},120000);
             child.on('error',error=>{clearTimeout(timeout);reject(error);});
             child.on('exit',code=>{clearTimeout(timeout);code===0?resolve():reject(new Error('Electron terminó con '+code+'\n'+output.slice(-5000)));});
         });
-        console.log(nativeVoice ? 'SAPI_HTTP_ELECTRON_PASS: generación de voz, calidad, edición, persistencia y mezclador con APIs reales'
+        console.log(process.argv.includes('--external-audio') ? 'EXTERNAL_AUDIO_REAL_SERVER_PASS: importación, preview y exportación desde Electron'
+            : nativeVoice ? 'SAPI_HTTP_ELECTRON_PASS: generación de voz, calidad, edición, persistencia y mezclador con APIs reales'
             : 'PROJECTS_REAL_SERVER_PASS: guardar, catálogo, portable, relink, copia recuperable y render real');
     } finally {
         if(server&&server.exitCode===null){const exited=new Promise(resolve=>server.once('exit',resolve));server.kill();await exited;}
@@ -164,6 +165,11 @@ async function renderer(){
         const run=code=>win.webContents.executeJavaScript(code,true);
         const action=code=>run(`(async()=>{${code}})()`);
         const wait=async expr=>{for(let i=0;i<400;i++){if(await run(expr))return;await new Promise(r=>setTimeout(r,50));}throw new Error('Timeout '+expr+' '+await run('JSON.stringify(projectErrors)'));};
+        if(process.env.PROJECT_TEST_EXTERNAL==='1'){
+            await require('./smoke_external_audio.cjs')({run,action,wait,root});
+            assert.deepEqual(await run('projectErrors'),[]);
+            win.destroy();app.exit(0);return;
+        }
         if(process.env.PROJECT_TEST_SAPI==='1'){
             await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.value==='Jorge')`);
             await action(`document.getElementById('vozSeleccionada').value='Jorge';document.getElementById('resultado').value='Prueba de voz generada desde Electron.';

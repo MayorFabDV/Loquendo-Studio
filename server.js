@@ -7,6 +7,7 @@ const multer = require('multer');
 const { spawn } = require('child_process');
 const { randomUUID } = require('crypto');
 const { pipeline } = require('stream/promises');
+const { validarAudio } = require('./backend/services/audioFileValidation');
 const APP_VERSION = require('./package.json').version;
 const { escucharConFallback, origenLocalPermitido } = require('./backend/services/serverNetwork');
 
@@ -225,6 +226,15 @@ appExpress.use((req, res, next) => {
         return res.status(403).json({ error: 'Origen no permitido' });
     }
     next();
+});
+
+const uploadVideoAudio = multer({
+    storage: multer.diskStorage({
+        destination: audioFolder,
+        filename: (req, file, cb) => cb(null, `video-audio-${randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+    }),
+    limits: { fileSize: 1024 ** 3 },
+    fileFilter: (req, file, cb) => cb(null, ['.wav', '.mp3'].includes(path.extname(file.originalname).toLowerCase()))
 });
 appExpress.use(cors({
     origin: (origin, callback) => {
@@ -710,6 +720,17 @@ appExpress.post('/api/audio/analyze', async (req, res) => {
 });
 
 // --- Video y Uploads ---
+appExpress.post('/api/pngtuber/audio', uploadVideoAudio.single('audio'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Selecciona un archivo WAV o MP3' });
+    try {
+        const info = await validarAudio(req.file.path, ffprobePath, ffmpegPath);
+        res.json({ url: `/audios/${req.file.filename}`, name: req.file.originalname, ...info });
+    } catch (error) {
+        await fs.promises.unlink(req.file.path).catch(() => {});
+        res.status(400).json({ error: error.message });
+    }
+});
+
 appExpress.post('/api/generar-video-pngtuber', async (req, res) => {
     const { audioPath, idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala } = req.body;
     if (!audioPath) return res.status(400).json({ error: 'Falta audio' });
@@ -727,9 +748,16 @@ appExpress.post('/api/generar-video-pngtuber', async (req, res) => {
 });
 
 appExpress.post('/api/pngtuber/preview', async (req, res) => {
-    const { idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala } = req.body;
+    const { audioPath, idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala } = req.body;
     try {
-        const resultado = await videoService.generarPreviewPNGTuber({ idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala });
+        const opciones = { idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala };
+        let resultado;
+        if (audioPath) {
+            const limpia = sanitizarRutaAudio(audioPath);
+            if (!limpia) return res.status(403).json({ error: 'Ruta no permitida' });
+            const video = await videoService.generarPNGTuber(path.join(PUBLIC_FOLDER, limpia), { ...opciones, preview: true });
+            resultado = { url: video.video };
+        } else resultado = await videoService.generarPreviewPNGTuber(opciones);
         res.json({ ...resultado, mensaje: 'Vista previa generada' });
     } catch (error) {
         console.error('âŒ Error vista previa PNGTuber:', error.message);
