@@ -1,6 +1,6 @@
 # Loquendo Studio 1.2.0 — Seguimiento de estabilización
 
-Última actualización: 2026-10-29.
+Última actualización: 2026-11-18.
 
 Este es el índice de las etapas operativas del trabajo. La misión original agrupaba auditoría, implementación, pruebas y entrega en fases generales; aquí se registra la secuencia incremental usada en las sesiones. Las pruebas y la documentación forman parte de cada etapa, no se posponen hasta el final.
 
@@ -97,9 +97,15 @@ Se verificaron píxeles de sprites transparentes en MP4 y WebM con alfa, incluid
 
 ## Reglas vigentes
 
-- Trabajar exclusivamente en `feature/estabilizacion-1.2.0`, preservando cambios ajenos.
+- La estabilización base está en `feature/estabilizacion-1.2.0`; la mejora posterior aprobada de UX se trabaja en `feature/recuperacion-sesiones-alpha`, preservando cambios ajenos.
 - Pruebas y commits locales pequeños después de cada bloque verificable.
 - Resumir cada fase antes de continuar con la siguiente.
 - No tocar respaldos, datos del usuario o ramas remotas.
 - No instalar dependencias, ejecutar builds de distribución ni introducir incompatibilidades sin autorización específica.
 - No confundir verificación histórica o sintáctica con una prueba funcional actual.
+
+## Mejora posterior — Recuperación explícita y etiqueta Alpha
+
+Implementada y verificada en desarrollo: recuperación independiente de voz y mezcla, decisión explícita al arrancar, conservación al permanecer y protección del trabajo nuevo antes de recuperar. Informe y límites en [RECUPERACION_SESIONES.md](RECUPERACION_SESIONES.md).
+
+Resultado actualizado: **51 pruebas Node aprobadas**, smoke de UX con siete procesos Electron y regresiones de sesiones, proyectos y mezclador aprobadas.
