@@ -43,6 +43,7 @@ class AudioProcessor {
         this._cargandoEdicion = false;
         this._guardadoSesionPendiente = Promise.resolve();
         this._versionGuardado = 0;
+        this._ultimaVersionGuardada = 0;
         this._errorSesionNotificado = false;
         this._subidaEnCurso = null;
 
@@ -526,6 +527,7 @@ class AudioProcessor {
             await window.audioSessionStore.guardar(fuente, datos);
             if (version === this._versionGuardado && token === this._loadToken) {
                 this._errorSesionNotificado = false;
+                this._ultimaVersionGuardada = version;
                 this._estadoSesion('Sesión guardada');
             }
             return true;
@@ -551,6 +553,11 @@ class AudioProcessor {
     _estadoSesion(texto) {
         const estado = document.getElementById('estadoSesionAudio');
         if (estado) estado.textContent = texto;
+    }
+
+    estaSesionGuardada() {
+        return !this._errorSesionNotificado && this._versionGuardado > 0
+            && this._ultimaVersionGuardada === this._versionGuardado;
     }
 
     _mostrarBotonMP3() {
@@ -1217,8 +1224,9 @@ async persistirAudioEditado() {
             return true;
     }
 
-    async recuperarSesion(registro) {
-        if (!window.audioSessionStore || this.audioBuffer || this._cargaEdicion) return false;
+    async recuperarSesion(registro, opciones = {}) {
+        if (!window.audioSessionStore || this._cargandoEdicion || this._restaurando
+            || (!opciones.reemplazar && (this.audioBuffer || this._cargaEdicion))) return false;
         const token = ++this._loadToken;
         try {
             const sesion = registro || await window.audioSessionStore.obtenerActiva();
@@ -1227,6 +1235,10 @@ async persistirAudioEditado() {
             if (!this.audioContext) this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const buffer = await this.audioContext.decodeAudioData(await sesion.blob.arrayBuffer());
             if (token !== this._loadToken) return false;
+            if (opciones.comprobarActual && !opciones.comprobarActual()) return false;
+            if (opciones.antesDeAplicar) await opciones.antesDeAplicar();
+            if (token !== this._loadToken || (opciones.comprobarActual && !opciones.comprobarActual())) return false;
+            this._cargaEdicion = null;
             this._fuenteOriginal = sesion.source;
             this._originalBlob = sesion.originalBlob || null;
             this._marcadoresOriginales = sesion.originalMarkers || [];

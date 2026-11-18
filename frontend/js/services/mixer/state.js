@@ -231,9 +231,15 @@
         else if (!restaurando) historial[indiceHistorial] = snapshot();
         state.dirty = true;
         if (guardadoTimer) clearTimeout(guardadoTimer);
-        guardadoTimer = setTimeout(() => {
-            guardadoTimer = null;
+        guardadoTimer = setTimeout(() => { guardadoTimer = null; persistirLocal(); }, 350);
+    }
+
+    async function persistirLocal() {
             try {
+                if (global.sessionRecovery) {
+                    await global.sessionRecovery.preparar();
+                    if (global.sessionRecovery.bloqueaGuardado('mixer')) throw new Error('No se pudo conservar la recuperación anterior');
+                }
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
                     version: VERSION,
                     projectId: state.projectId,
@@ -245,12 +251,19 @@
                 }));
             } catch (e) {
                 notificar('error', 'No se pudo guardar la mezcla localmente; exporta el proyecto para conservar los cambios');
+                return false;
             }
             if (app.project && state.projectId) app.project.autoguardar();
-        }, 350);
+            return true;
     }
 
-    function cargarLocal() {
+    function guardarLocalAhora() {
+        if (guardadoTimer) clearTimeout(guardadoTimer);
+        guardadoTimer = null;
+        return persistirLocal();
+    }
+
+    function leerLocal() {
         let datos = null;
         try { datos = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { datos = null; }
         if (!datos) {
@@ -258,6 +271,14 @@
         }
         const estado = normalizarEstado(datos);
         if (!estado) return null;
+        return { datos, estado };
+    }
+
+    function cargarLocal() {
+        if (global.sessionRecovery?.tienePendiente('mixer') || global.sessionRecovery?.detectando()) return null;
+        const lectura = leerLocal();
+        if (!lectura) return null;
+        const { estado } = lectura;
         aplicarEstado(estado, { guardar: false });
         return estado;
     }
@@ -486,6 +507,7 @@
 
     registrarEstado();
     app.store = {
+        leerLocal, guardarLocalAhora,
         moverClip, recortarClip, dividirClip, copiarClip, pegarClip, cortarClip, duplicarClip,
         deshacer: () => restaurarHistorial(-1),
         rehacer: () => restaurarHistorial(1),

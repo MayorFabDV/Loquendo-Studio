@@ -3415,6 +3415,28 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-weight: 600;
 }
 
+.mezclador-alpha {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.14);
+}
+.mezclador-alpha-nota { display: block; margin-top: 4px; color: var(--text-muted); font-size: 11px; }
+[data-theme="light"] .mezclador-alpha { color: #92400e; background: #fef3c7; }
+.session-recovery-notice { margin: 8px 0 14px; padding: 10px 14px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }
+.session-recovery-notice[hidden] { display: none !important; }
+.session-recovery-notice summary { cursor: pointer; font-weight: 600; }
+.session-recovery-notice p, .session-recovery-dialog p { font-size: 12px; color: var(--text-muted); }
+.session-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.session-recovery-dialog { max-width: min(560px, calc(100vw - 48px)); border-radius: 12px; border: 1px solid #64748b; padding: 22px; color: var(--text-color, #e2e8f0); background: var(--bg-color, #18202e); }
+.session-recovery-dialog h2 { font-size: 17px; line-height: 1.5; margin: 0; }
+.session-recovery-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+[data-theme="light"] .session-recovery-dialog { background: #fff; color: #0f172a; }
+
 .mezclador-subtitulo {
   display: block;
   margin-top: 2px;

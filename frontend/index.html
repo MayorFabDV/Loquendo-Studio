@@ -153,6 +153,21 @@
         </div>
     </header>
 
+    <details id="sesionesRecuperables" class="session-recovery-notice" hidden>
+        <summary>Recuperar sesiones anteriores</summary>
+        <p>Las sesiones del editor de voz y del mezclador se recuperan por separado. También se conserva el trabajo guardado antes de una recuperación.</p>
+        <div id="listaRecuperaciones" class="session-recovery-actions"></div>
+        <button type="button" id="btnReintentarRecuperacion" class="btn-mixer" hidden>Reintentar detección</button>
+    </details>
+    <dialog id="dialogRecuperacion" class="session-recovery-dialog" aria-labelledby="recuperacionPregunta" aria-describedby="recuperacionNota">
+        <h2 id="recuperacionPregunta"></h2>
+        <p id="recuperacionNota"></p>
+        <div class="session-recovery-actions">
+            <button type="button" id="btnAceptarRecuperacion" class="btn-mixer">Recuperar</button>
+            <button type="button" id="btnPermanecerRecuperacion" class="btn-mixer">Permanecer aquí</button>
+        </div>
+    </dialog>
+
     <!-- MAIN CONTENT -->
     <main class="contenedor-flexible">
         <!-- NAVEGACIÓN POR PESTAÑAS -->
@@ -527,7 +542,8 @@
                 <div class="audio-fx-panel mezclador-panel" data-audio-group="mezclador" data-help-section="mezclador">
                     <div class="mezclador-cabecera">
                         <div>
-                            <h4 class="mezclador-titulo">Mezclador de pistas</h4>
+                            <h4 class="mezclador-titulo">Mezclador de pistas <span class="mezclador-alpha">Alpha</span></h4>
+                            <small class="mezclador-alpha-nota">Herramienta en desarrollo. Te recomendamos guardar tus proyectos con frecuencia.</small>
                             <span class="mezclador-subtitulo">Arrastra cada pista para moverla. Inserta efectos de sonido soltándolos en la zona punteada.</span>
                         </div>
                         <div class="mezclador-toolbar">
@@ -1218,6 +1234,7 @@
     <script src="js/ui/settings.js"></script>
     <script src="js/ui/audioEditorUI.js"></script>
     <script src="js/ui/audioRenderUI.js"></script>
+    <script src="js/ui/sessionRecovery.js"></script>
 
     <!-- MODAL DE AYUDA -->
     <div id="modalAyuda" class="modal-overlay" style="display: none;">

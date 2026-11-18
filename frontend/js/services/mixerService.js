@@ -114,12 +114,12 @@
         }, true);
     }
 
-    function init() {
+    function init(opciones = {}) {
         const raiz = document.getElementById('mezcladorPistas');
         if (!raiz) return;
         montarControles(raiz);
         app.inspector.init();
-        app.timeline.inicializar(raiz);
+        app.timeline.inicializar(raiz, opciones);
     }
 
     function renderizarMezcla(formato) {

@@ -88,8 +88,10 @@ async function ejecutarCoordinador() {
     });
     try {
         await new Promise(resolve=>server.listen(0,'localhost',resolve));
-        for(const phase of ['storage','create','recover','restored','corrupt']) {
-            if(phase==='recover') files.delete('/audios/source.wav'); // Simula limpieza al cerrar, solo en memoria.
+        const phases=process.argv.includes('--recovery-ux') ? ['storage','ux-empty','ux-seed','ux-stay','ux-accept','ux-later','ux-corrupt']
+            : ['storage','create','recover','restored','corrupt'];
+        for(const phase of phases) {
+            if(phase==='recover'||phase==='ux-stay') files.delete('/audios/source.wav'); // Simula limpieza al cerrar, solo en memoria.
             await new Promise((resolve,reject)=>{
                 const env={...process.env,SESSION_TEST_URL:'http://localhost:'+server.address().port,
                     SESSION_TEST_PROFILE:path.join(root,'profile'),SESSION_TEST_PHASE:phase};
@@ -99,6 +101,10 @@ async function ejecutarCoordinador() {
                 child.on('error',error=>{clearTimeout(timeout);reject(error);});
                 child.on('exit',code=>{clearTimeout(timeout);code===0?resolve():reject(new Error('Electron '+phase+' terminó con '+code));});
             });
+        }
+        if(process.argv.includes('--recovery-ux')) {
+            console.log('RECOVERY_UX_ELECTRON_PASS: decisiones, snapshots separados, errores de guardado y reinicios reales');
+            return;
         }
         const upload=requests.find(r=>r.type==='upload').route;
         for(const route of ['/api/generar-srt','/api/generar-ass','/api/generar-video-pngtuber']) {
@@ -124,7 +130,10 @@ async function ejecutarElectron() {
         const phase=process.env.SESSION_TEST_PHASE;
         win=new BrowserWindow({show:false,width:1200,height:800,webPreferences:{nodeIntegration:false,contextIsolation:true,backgroundThrottling:false}});
         win.webContents.session.on('will-download',(event,item)=>{event.preventDefault();item.cancel();});
-        const evaluate=code=>win.webContents.executeJavaScript(code,true);
+        const evaluate=async code=>{
+            try { return await win.webContents.executeJavaScript(code,true); }
+            catch(error) { throw new Error(`${phase}: ${code}\n${error.message}`); }
+        };
         const wait=async expression=>{
             for(let i=0;i<200;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}
             throw new Error('Timeout '+phase+': '+expression);
@@ -154,9 +163,123 @@ async function ejecutarElectron() {
                 await audioSessionStore.eliminar('/new');
                 if(await audioSessionStore.obtenerActiva())throw Error('Debe respetar índice vacío');
             })()`);
+        } else if(phase.startsWith('ux-')) {
+            await win.loadURL(url);
+            await evaluate(`sessionRecovery.preparar()`);
+            const pending=type=>`audioSessionStore.leerRecuperacion('recovery.pending.${type}')`;
+            const stay=async()=>{
+                await wait(`document.getElementById('dialogRecuperacion').open`);
+                await evaluate(`document.getElementById('btnPermanecerRecuperacion').click()`);
+            };
+            const decide=async(type,yes=true)=>{
+                const job=evaluate(`sessionRecovery.recuperar('${type}')`);
+                await wait(`document.getElementById('dialogRecuperacion').open`);
+                assert.equal(await evaluate(`document.getElementById('btnAceptarRecuperacion').textContent`),'Guardar y recuperar');
+                await evaluate(`document.getElementById('${yes?'btnAceptarRecuperacion':'btnPermanecerRecuperacion'}').click()`);
+                return job;
+            };
+            if(phase==='ux-empty') {
+                await evaluate(`sessionRecovery.iniciar()`);
+                assert.equal(await evaluate(`document.getElementById('dialogRecuperacion').open`),false);
+                assert.equal(await evaluate(`document.querySelector('.tab-panel-activo').id`),'tab-guion');
+            } else if(phase==='ux-seed') {
+                await evaluate(`(async()=>{
+                    await cargarYReproducir('/audios/source.wav','/subtitulos/original.srt');
+                    await audioEditor.aplicarFadeIn(0.4);
+                    audioMarkers.setMarkers([{id:'v',start:0,end:1,text:'Voz anterior'}],{historial:true});
+                    audioEditor.setFX({eqHigh:3});await audioEditor._guardadoSesionPendiente;
+                    const datos={version:2,projectId:'p-ux-old',nombre:'Mezcla anterior',zoomPx:100,
+                        tracks:[{id:'voz',gainDb:-3,pan:0.2}],master:{gainDb:-1},clips:[
+                        {id:'old-voice',trackId:'voz',src:'/audios/source.wav',start:1.3,in:0.2,out:1.4,duration:2,pan:0.3,fadeIn:0.1,effects:{eq:{mid:2}},automation:[{t:0.2,gain:0.7},{t:1.4,gain:0.5}]},
+                        {id:'old-music',trackId:'musica',src:'/audios/music.wav',start:0.5,in:0,out:2,duration:2}]};
+                    MixerApp.store.aplicarEstado(MixerApp.store.normalizarEstado(datos));await MixerApp.store.guardarLocalAhora();
+                })()`);
+            } else if(phase==='ux-stay') {
+                const raw=await evaluate(`localStorage.getItem('loquendo.mezcla.v2')`);
+                assert.equal(await evaluate(`document.querySelector('.tab-panel-activo').id`),'tab-guion');
+                await wait(`document.getElementById('dialogRecuperacion').open`);
+                assert.equal(await evaluate(`document.getElementById('recuperacionPregunta').textContent`),'Encontramos una sesión anterior del mezclador. ¿Quieres recuperarla y abrir el mezclador?');
+                assert.equal(await evaluate(`document.getElementById('btnAceptarRecuperacion').textContent`),'Recuperar y abrir el mezclador');
+                const original=await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`);
+                await stay();
+                assert.equal(await evaluate(`document.querySelector('.tab-panel-activo').id`),'tab-guion');
+                assert.equal(await evaluate(`localStorage.getItem('loquendo.mezcla.v2')`),raw);
+                await evaluate(`mixer.init();MixerApp.store.guardarLocalAhora()`);
+                assert.equal(await evaluate(`mixer.estado.clips.length`),0);
+                assert.equal(await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`),original);
+                assert.equal(await evaluate(`sessionRecovery.tienePendiente('voice')`),true);
+                await evaluate(`sessionRecovery.iniciar()`);
+                assert.equal(await evaluate(`document.getElementById('dialogRecuperacion').open`),false);
+                await new Promise(resolve=>{win.webContents.once('did-finish-load',resolve);win.reload();});
+                await evaluate(`sessionRecovery.preparar();`);await evaluate(`sessionRecovery.iniciar()`);
+                assert.equal(await evaluate(`document.getElementById('dialogRecuperacion').open`),false,'Reload no duplica la pregunta en el mismo arranque');
+                assert.equal(await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`),original);
+            } else if(phase==='ux-accept') {
+                await wait(`document.getElementById('dialogRecuperacion').open`);
+                await evaluate(`document.getElementById('btnAceptarRecuperacion').click()`);
+                await wait(`!sessionRecovery.tienePendiente('mixer')`);
+                assert.equal(await evaluate(`document.querySelector('.tab-panel-activo').id`),'tab-audio');
+                assert.equal(await evaluate(`document.querySelector('[data-audio-subtab="mezclador"]').getAttribute('aria-selected')`),'true');
+                assert.equal(await evaluate(`audioEditor.audioBuffer===null`),true,'No se recuperó la voz al aceptar solo la mezcla');
+                assert.equal(await evaluate(`sessionRecovery.tienePendiente('voice')`),true);
+                const clips=await evaluate(`mixer.app.store.aProyecto().clips`);
+                assert.equal(clips.length,2);assert.equal(clips[0].in,0.2);assert.equal(clips[0].out,1.4);assert.equal(clips[0].start,1.3);
+                assert.deepEqual(clips[0].effects,{eq:{mid:2}});assert.equal(clips[0].src,'/audios/source.wav');
+                await wait(`document.getElementById('mezcladorPistas').textContent.includes('Medios no disponibles')`);
+                assert.equal(await evaluate(`document.querySelector('.mezclador-alpha').textContent`),'Alpha');
+                assert.ok(await evaluate(`document.querySelector('.mezclador-alpha').getBoundingClientRect().width>0`));
+            } else if(phase==='ux-later') {
+                await stay();
+                const mixerBefore=await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`);
+                await evaluate(`cargarYReproducir('/audios/music.wav')`);
+                // Abortar transacciones reales de voz para provocar el fallo de guardado.
+                await evaluate(`window.transactionOriginal=IDBDatabase.prototype.transaction;
+                    IDBDatabase.prototype.transaction=function(...args){const tx=transactionOriginal.apply(this,args);
+                         if(args[1]==='readwrite'&&Array.from(args[0]).includes('sessions'))queueMicrotask(()=>tx.abort());return tx;};void 0;`);
+                await evaluate(`(async()=>{await audioEditor.aplicarFadeOut(0.2);await audioEditor._guardadoSesionPendiente;})()`);
+                const voiceBefore=await evaluate(`audioEditor._fuenteOriginal`),rev=await evaluate(`audioEditor._revisionAudio`);
+                assert.equal(await decide('voice',false),false);
+                assert.equal(await decide('voice',true),false);
+                assert.equal(await evaluate(`audioEditor._fuenteOriginal`),voiceBefore);assert.equal(await evaluate(`audioEditor._revisionAudio`),rev);
+                assert.equal(await evaluate(`sessionRecovery.tienePendiente('voice')`),true);
+                await evaluate(`IDBDatabase.prototype.transaction=transactionOriginal;void 0;`);
+                assert.equal(await decide('voice',true),true);
+                assert.equal(await evaluate(`audioMarkers.getMarkers()[0].text`),'Voz anterior');
+                assert.equal(await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`),mixerBefore);
+                assert.ok(await evaluate(`(async()=>(await audioSessionStore.listarRecuperaciones()).some(r=>r.key.startsWith('recovery.saved.voice.')))()`));
+                await evaluate(`audioEditorUI.setMode('avanzado');audioEditorUI.setSubtab('mezclador');
+                    mixer.estado.projectId='p-ux-new';MixerApp.store.agregarClip('musica','/audios/music.wav',{id:'new-work',duration:2,out:2});mixer.app.timeline.rebuild();`);
+                await evaluate(`mixer.app.media.persistirAssets()`);await wait(`mixer.app.timeline.estaListo()`);
+                await evaluate(`window.fetchOriginal=fetch;window.fetch=(url,opts)=>opts?.method==='PUT'&&String(url).includes('/api/proyectos/')
+                    ?Promise.resolve(new Response('{"error":"fallo de guardado simulado"}',{status:503,headers:{'Content-Type':'application/json'}})):fetchOriginal(url,opts);
+                    MixerApp.store.moverClip('new-work',5);`);
+                const newWork=await evaluate(`JSON.stringify(mixer.app.store.aProyecto())`);
+                assert.equal(await decide('mixer',false),false);
+                assert.equal(await decide('mixer',true),false);
+                assert.equal(await evaluate(`JSON.stringify(mixer.app.store.aProyecto())`),newWork);
+                assert.equal(await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`),mixerBefore);
+                await evaluate(`window.fetch=fetchOriginal;void 0;`);
+                assert.equal(await decide('mixer',true),true);
+                assert.equal(await evaluate(`mixer.estado.clips[0].id`),'old-voice');
+                assert.equal(await evaluate(`audioMarkers.getMarkers()[0].text`),'Voz anterior');
+                assert.ok(await evaluate(`(async()=>(await audioSessionStore.listarRecuperaciones()).some(r=>r.key.startsWith('recovery.saved.mixer.')))()`));
+                await evaluate(`audioSessionStore.guardar('/broken',{blob:new Blob(['not audio'])})`);
+            } else if(phase==='ux-corrupt') {
+                if(await evaluate(`sessionRecovery.tienePendiente('mixer')`))await stay();
+                assert.equal(await evaluate(`sessionRecovery.tienePendiente('voice')`),false);
+                assert.equal(await evaluate(`audioEditor.audioBuffer===null`),true);
+                assert.equal(await evaluate(`(async()=>(await audioSessionStore.obtenerActiva()).source)()`),'/broken');
+                assert.ok(await evaluate(`(async()=>(await audioSessionStore.listarRecuperaciones()).filter(r=>r.key.startsWith('recovery.saved.')).length>=2)()`));
+            }
+            assert.deepEqual(await evaluate(`sessionErrors`),[]);
         } else {
             await win.loadURL(url);
             await wait(`!!window.audioEditorUI && !!window.audioSessionStore`);
+            await evaluate(`sessionRecovery.preparar()`);
+            if (await evaluate(`sessionRecovery.tienePendiente('mixer')`)) {
+                await wait(`document.getElementById('dialogRecuperacion').open`);
+                await evaluate(`document.getElementById('btnPermanecerRecuperacion').click()`);
+            }
             if(phase==='create') {
                 assert.equal(await evaluate(`cargarYReproducir('/audios/source.wav','/subtitulos/original.srt')`),true);
                 await evaluate(`(async()=>{
@@ -168,6 +291,7 @@ async function ejecutarElectron() {
                     if(s.markers[0]?.text!=='Editado' || !s.edited)throw Error('Falta edición');
                 })()`);
             } else if(phase==='recover') {
+                assert.equal(await evaluate(`sessionRecovery.recuperar('voice')`),true);
                 await wait(`audioEditor.audioBuffer && document.getElementById('estadoSesionAudio').textContent==='Sesión recuperada'`);
                 assert.equal(await evaluate(`audioEditor._dirty && !voiceAudioRealPath && audioMarkers.getMarkers()[0].text==='Editado'`),true);
                 assert.equal(await evaluate(`audioEditor.getEngineState().fx.rate`),1.2);
@@ -187,12 +311,13 @@ async function ejecutarElectron() {
                 assert.equal(await evaluate(`!audioEditor._sesionEditada && audioEditor.historyStack.length===1 && audioMarkers.getMarkers()[0].text==='Original'`),true);
                 await evaluate(`audioEditor._guardadoSesionPendiente`);
             } else if(phase==='restored') {
+                assert.equal(await evaluate(`sessionRecovery.recuperar('voice')`),true);
                 await wait(`audioEditor.audioBuffer && document.getElementById('estadoSesionAudio').textContent==='Sesión recuperada'`);
                 assert.equal(await evaluate(`!audioEditor._sesionEditada && audioMarkers.getMarkers()[0].text==='Original'`),true);
                 // Solo se corrompe un registro dentro del perfil temporal exclusivo de este smoke.
                 await evaluate(`audioSessionStore.guardar('/broken',{blob:new Blob(['not audio']),originalBlob:audioEditor._originalBlob})`);
             } else if(phase==='corrupt') {
-                await wait(`document.getElementById('estadoSesionAudio').textContent==='No se pudo recuperar la sesión guardada'`);
+                assert.equal(await evaluate(`sessionRecovery.tienePendiente('voice')`),false);
                 assert.equal(await evaluate(`audioEditor.audioBuffer===null`),true);
                 assert.equal(await evaluate(`(async()=> (await audioSessionStore.obtenerActiva()).source)()`),'/broken');
             }

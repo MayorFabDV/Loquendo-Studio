@@ -223,6 +223,7 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
 }
 
 async function recuperarSesionAudio() {
+    if (window.sessionRecovery) return window.sessionRecovery.recuperar('voice');
     if (!window.audioSessionStore || !window.audioEditor) return false;
     const secuencia = secuenciaCargaAudio;
     try {
@@ -241,9 +242,7 @@ async function recuperarSesionAudio() {
 }
 
 window.recuperarSesionAudio = recuperarSesionAudio;
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => { recuperarSesionAudio(); }, 0);
-});
+window.asegurarEditorInicializado = asegurarEditorInicializado;
 
 // ==========================================
 // ▶️ CONTROLES DE REPRODUCCIÓN

@@ -45,14 +45,14 @@
         if (state.projectId || state.clips.length || state.tracks.size) await guardarEnEquipo(false);
     }
 
-    async function abrirDatos(datos, token = ++carga) {
+    async function abrirDatos(datos, token = ++carga, opciones = {}) {
         if (token !== carga) return false;
         if (![1, VERSION].includes(Number(datos.version == null ? 1 : datos.version))) throw new Error('Versión de proyecto no compatible; no se modificó la mezcla actual');
         const estado = app.store.normalizarEstado(Array.isArray(datos) ? { clips: datos } : datos);
         if (!estado) throw new Error('El archivo no contiene un proyecto compatible');
         const originales = Array.isArray(datos) ? datos : datos.clips;
         if (estado.clips.length !== originales.length) throw new Error('El proyecto contiene clips no compatibles; no se descartó ninguno');
-        await protegerActual();
+        if (!opciones.actualProtegido) await protegerActual();
         const protegido = JSON.stringify(app.store.aProyecto());
         const vivos = await comprobarFuentes(estado.clips);
         if (token !== carga) return false;
@@ -321,6 +321,9 @@
     }
 
     app.project = {
+        // Uso del coordinador después de confirmar/guardar/archivar el trabajo actual.
+        abrirSesion: datos => abrirDatos(datos, undefined, { actualProtegido: true }),
+        estaGuardado: () => !!state.projectId && firmas.get(state.projectId) === JSON.stringify(app.store.aProyecto()),
         autoguardar, guardarEnEquipo, listarGuardados, abrirGuardado, recuperarFuente, exportarPortable, importarPortable,
         exportarProyecto,
         importarProyecto,

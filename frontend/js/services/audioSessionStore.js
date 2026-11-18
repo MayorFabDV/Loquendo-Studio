@@ -91,6 +91,10 @@
     }
 
     async function guardar(url, datos) {
+        if (global.sessionRecovery) {
+            await global.sessionRecovery.preparar();
+            if (global.sessionRecovery.bloqueaGuardado('voice')) throw new Error('La recuperación anterior aún no tiene una copia segura');
+        }
         const source = normalizar(url);
         if (!source) return null;
         if (!datos || !datos.blob || !datos.blob.size) throw new Error('La sesión no contiene audio válido');
@@ -132,11 +136,71 @@
         });
     }
 
+    // Metadatos independientes: no cambian el documento de voz, el índice
+    // activo ni el JSON de los proyectos del mezclador.
+    async function leerRecuperacion(key) {
+        const db = await abrir();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(META, 'readonly'); let dato = null;
+            const r = tx.objectStore(META).get(key); r.onsuccess = () => { dato = r.result || null; };
+            tx.oncomplete = () => resolve(dato);
+            tx.onerror = tx.onabort = () => reject(tx.error || new Error('No se pudo leer la recuperación'));
+        });
+    }
+
+    async function guardarRecuperacion(key, tipo, datos, soloSiAusente = false, huella = null) {
+        if (!key.startsWith('recovery.') || !['voice', 'mixer'].includes(tipo)) throw new Error('Identificador de recuperación inválido');
+        const db = await abrir();
+        const nuevo = { tipo, datos, fecha: Date.now(), huella };
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(META, 'readwrite'); let resultado = nuevo;
+            const store = tx.objectStore(META);
+            if (soloSiAusente) {
+                const r = store.get(key); r.onsuccess = () => {
+                    if (r.result) resultado = r.result;
+                    else store.put(nuevo, key);
+                };
+            } else store.put(nuevo, key);
+            tx.oncomplete = () => resolve(resultado);
+            tx.onerror = tx.onabort = () => reject(tx.error || new Error('No se pudo conservar la recuperación'));
+        });
+    }
+
+    async function listarRecuperaciones() {
+        const db = await abrir();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(META, 'readonly'), lista = [];
+            const r = tx.objectStore(META).openCursor(); r.onsuccess = () => {
+                const c = r.result; if (!c) return;
+                if (String(c.key).startsWith('recovery.')) {
+                    const v = c.value;
+                    lista.push({ key: String(c.key), tipo: v.tipo, fecha: v.fecha, huella: v.huella || null,
+                        nombre: v.tipo === 'mixer' ? v.datos?.nombre || 'Mezcla' : v.datos?.source || 'Audio' });
+                }
+                c.continue();
+            };
+            tx.oncomplete = () => resolve(lista);
+            tx.onerror = tx.onabort = () => reject(tx.error || new Error('No se pudieron listar las recuperaciones'));
+        });
+    }
+
+    async function consumirRecuperacion(key) {
+        if (!key.startsWith('recovery.pending.')) return;
+        const db = await abrir();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(META, 'readwrite');
+            tx.objectStore(META).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = tx.onabort = () => reject(tx.error || new Error('No se pudo confirmar la recuperación'));
+        });
+    }
+
     global.audioSessionStore = {
         normalizar,
         obtener,
         obtenerActiva,
         guardar,
-        eliminar
+        eliminar,
+        leerRecuperacion, guardarRecuperacion, listarRecuperaciones, consumirRecuperacion
     };
 })(window);

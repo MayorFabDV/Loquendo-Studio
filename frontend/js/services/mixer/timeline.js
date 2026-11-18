@@ -63,7 +63,7 @@
         actualizarPreview();
     }
 
-    function inicializar(raiz) {
+    function inicializar(raiz, opciones = {}) {
         contenedor = raiz;
         if (!contenedor) return;
         if (contenedor.dataset.mezcladorIniciado === '1') {
@@ -79,7 +79,7 @@
         });
         contenedor.addEventListener('drop', (evento) => app.media.onDropArchivo(evento));
 
-        app.store.cargarLocal();
+        if (opciones.cargarLocal !== false) app.store.cargarLocal();
         rebuild();
         app.media.cargarBiblioteca();
     }
