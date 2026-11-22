@@ -171,10 +171,12 @@ async function ejecutarElectron() {
                 await wait(`document.getElementById('dialogRecuperacion').open`);
                 await evaluate(`document.getElementById('btnPermanecerRecuperacion').click()`);
             };
-            const decide=async(type,yes=true)=>{
+            const decide=async(type,yes=true,antesDeDecidir=null)=>{
                 const job=evaluate(`sessionRecovery.recuperar('${type}')`);
-                await wait(`document.getElementById('dialogRecuperacion').open`);
+                try { await wait(`document.getElementById('dialogRecuperacion').open`); }
+                catch (error) { throw new Error(`${error.message}; ${await evaluate(`JSON.stringify({voiceSaved:audioEditor.estaSesionGuardada(),mixerSaved:MixerApp.project.estaGuardado(),errors:sessionErrors})`)}; result=${await job}`); }
                 assert.equal(await evaluate(`document.getElementById('btnAceptarRecuperacion').textContent`),'Guardar y recuperar');
+                if (antesDeDecidir) await antesDeDecidir();
                 await evaluate(`document.getElementById('${yes?'btnAceptarRecuperacion':'btnPermanecerRecuperacion'}').click()`);
                 return job;
             };
@@ -242,14 +244,14 @@ async function ejecutarElectron() {
                 assert.equal(await decide('voice',true),false);
                 assert.equal(await evaluate(`audioEditor._fuenteOriginal`),voiceBefore);assert.equal(await evaluate(`audioEditor._revisionAudio`),rev);
                 assert.equal(await evaluate(`sessionRecovery.tienePendiente('voice')`),true);
-                await evaluate(`IDBDatabase.prototype.transaction=transactionOriginal;void 0;`);
-                assert.equal(await decide('voice',true),true);
+                assert.equal(await decide('voice',true,()=>evaluate(`IDBDatabase.prototype.transaction=transactionOriginal;void 0;`)),true);
                 assert.equal(await evaluate(`audioMarkers.getMarkers()[0].text`),'Voz anterior');
                 assert.equal(await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`),mixerBefore);
                 assert.ok(await evaluate(`(async()=>(await audioSessionStore.listarRecuperaciones()).some(r=>r.key.startsWith('recovery.saved.voice.')))()`));
                 await evaluate(`audioEditorUI.setMode('avanzado');audioEditorUI.setSubtab('mezclador');
                     mixer.estado.projectId='p-ux-new';MixerApp.store.agregarClip('musica','/audios/music.wav',{id:'new-work',duration:2,out:2});mixer.app.timeline.rebuild();`);
                 await evaluate(`mixer.app.media.persistirAssets()`);await wait(`mixer.app.timeline.estaListo()`);
+                await evaluate(`MixerApp.project.guardarEnEquipo(false)`); // Terminar guardados previos antes de inyectar el fallo.
                 await evaluate(`window.fetchOriginal=fetch;window.fetch=(url,opts)=>opts?.method==='PUT'&&String(url).includes('/api/proyectos/')
                     ?Promise.resolve(new Response('{"error":"fallo de guardado simulado"}',{status:503,headers:{'Content-Type':'application/json'}})):fetchOriginal(url,opts);
                     MixerApp.store.moverClip('new-work',5);`);
@@ -258,8 +260,7 @@ async function ejecutarElectron() {
                 assert.equal(await decide('mixer',true),false);
                 assert.equal(await evaluate(`JSON.stringify(mixer.app.store.aProyecto())`),newWork);
                 assert.equal(await evaluate(`(async()=>JSON.stringify((await ${pending('mixer')}).datos))()`),mixerBefore);
-                await evaluate(`window.fetch=fetchOriginal;void 0;`);
-                assert.equal(await decide('mixer',true),true);
+                assert.equal(await decide('mixer',true,()=>evaluate(`window.fetch=fetchOriginal;void 0;`)),true);
                 assert.equal(await evaluate(`mixer.estado.clips[0].id`),'old-voice');
                 assert.equal(await evaluate(`audioMarkers.getMarkers()[0].text`),'Voz anterior');
                 assert.ok(await evaluate(`(async()=>(await audioSessionStore.listarRecuperaciones()).some(r=>r.key.startsWith('recovery.saved.mixer.')))()`));

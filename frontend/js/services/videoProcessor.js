@@ -43,4 +43,4 @@ const videoProcessor = {
 };
 
 window.videoProcessor = videoProcessor;
-console.log('🎥 videoProcessor.js cargado');
+console.log('videoProcessor.js cargado');

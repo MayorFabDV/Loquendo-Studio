@@ -97,7 +97,7 @@ Se verificaron píxeles de sprites transparentes en MP4 y WebM con alfa, incluid
 
 ## Reglas vigentes
 
-- La estabilización base está en `feature/estabilizacion-1.2.0`; la mejora posterior aprobada de UX se trabaja en `feature/recuperacion-sesiones-alpha`, preservando cambios ajenos.
+- La estabilización base está en `feature/estabilizacion-1.2.0`; la recuperación explícita está en `feature/recuperacion-sesiones-alpha`. Las mejoras posteriores aprobadas de audio externo y biblioteca se trabajan en `feature/audio-externo-biblioteca-1.2.0`, preservando cambios ajenos.
 - Pruebas y commits locales pequeños después de cada bloque verificable.
 - Resumir cada fase antes de continuar con la siguiente.
 - No tocar respaldos, datos del usuario o ramas remotas.
@@ -109,3 +109,9 @@ Se verificaron píxeles de sprites transparentes en MP4 y WebM con alfa, incluid
 Implementada y verificada en desarrollo: recuperación independiente de voz y mezcla, decisión explícita al arrancar, conservación al permanecer y protección del trabajo nuevo antes de recuperar. Informe y límites en [RECUPERACION_SESIONES.md](RECUPERACION_SESIONES.md).
 
 Resultado actualizado: **51 pruebas Node aprobadas**, smoke de UX con siete procesos Electron y regresiones de sesiones, proyectos y mezclador aprobadas.
+
+## Mejoras posteriores — Audio externo PNGTuber y biblioteca de ducking
+
+Implementadas y verificadas en desarrollo. PNGTuber admite WAV/MP3 con preview sincronizada; ducking incorpora Recientes/Mi biblioteca mediante referencias persistentes, selector nativo y localización de originales ausentes. Informe: [MEJORAS_AUDIO_1_2.md](MEJORAS_AUDIO_1_2.md).
+
+Resultado actualizado: **54 pruebas Node aprobadas**, exportaciones PNGTuber MP4/WebM reales con audio y silencio, biblioteca comprobada entre dos arranques de Electron con ducking real y regresiones de proyectos/sesiones/mezclador aprobadas. Distribución pendiente.

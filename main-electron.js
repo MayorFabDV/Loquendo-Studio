@@ -177,6 +177,21 @@ ipcMain.on('abrir-enlace-externo', (event, url) => {
     abrirEnNavegador(url);
 });
 
+ipcMain.handle('seleccionar-musica', async (event, id = null) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame
+        || new URL(event.senderFrame.url).origin !== appOrigin()) throw new Error('Origen no permitido');
+    if (id !== null && (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))) throw new Error('Entrada inválida');
+    const { dialog } = require('electron');
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: id ? 'Localizar archivo musical' : 'Seleccionar música de fondo',
+        properties: ['openFile'],
+        filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'opus', 'aac'] }]
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    try { return await serverModule.musicLibrary.registrar(result.filePaths[0], id); }
+    catch (error) { return { error: error.message }; }
+});
+
 // --- CICLO DE VIDA ---
 const tieneInstanciaUnica = app.requestSingleInstanceLock();
 

@@ -787,6 +787,15 @@
                                 <input type="file" id="backgroundMusicInput" data-help="backgroundMusicInput" accept="audio/*">
                                 <button type="button" data-help="btnCargarPista" onclick="subirMusicaFondo()">Cargar Pista</button>
                             </div>
+                            <p id="musicSelected" role="status">Sin música seleccionada</p>
+                            <details class="music-library-panel">
+                                <summary>Recientes y Mi biblioteca</summary>
+                                <p>Se conservan referencias a los originales, sin copiar música. Quitar u olvidar una entrada no borra el archivo.</p>
+                                <button type="button" id="musicLibraryRefresh">Actualizar lista</button>
+                                <span id="musicLibraryStatus" role="status"></span>
+                                <h5>Recientes</h5><div id="musicRecent"></div>
+                                <h5>Mi biblioteca</h5><div id="musicSaved"></div>
+                            </details>
                             <div class="controls-musica">
                                 <label class="opcion-card" data-help="chkLoopMusica">
                                     <input type="checkbox" id="chkLoopMusica">
@@ -1250,6 +1259,14 @@
     <script src="js/ui/audioRenderUI.js"></script>
     <script src="js/ui/sessionRecovery.js"></script>
     <script src="js/ui/videoAudioInput.js"></script>
+    <script src="js/ui/musicLibrary.js"></script>
+    <dialog id="musicSaveDialog" class="session-recovery-dialog" aria-labelledby="musicSaveQuestion">
+        <h2 id="musicSaveQuestion">¿Quieres guardar esta canción en tu biblioteca para usarla más adelante?</h2>
+        <div class="session-recovery-actions">
+            <button type="button" id="musicSaveYes" class="btn-mixer">Sí, guardar</button>
+            <button type="button" id="musicSaveNo" class="btn-mixer">No, continuar</button>
+        </div>
+    </dialog>
 
     <!-- MODAL DE AYUDA -->
     <div id="modalAyuda" class="modal-overlay" style="display: none;">

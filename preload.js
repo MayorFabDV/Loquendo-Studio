@@ -2,5 +2,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    openExternal: (url) => ipcRenderer.send('abrir-enlace-externo', url)
+    openExternal: (url) => ipcRenderer.send('abrir-enlace-externo', url),
+    selectMusic: (id = null) => ipcRenderer.invoke('seleccionar-musica', id)
 });

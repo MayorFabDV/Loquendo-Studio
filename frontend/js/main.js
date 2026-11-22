@@ -716,6 +716,7 @@ async function generarVideoPNGTuber() {
 // 6. AUDIO AVANZADO
 // ==========================================
 function subirMusicaFondo() {
+    if (window.electronAPI?.selectMusic && window.musicLibrary) return window.musicLibrary.elegir();
     const input = document.getElementById('backgroundMusicInput');
     if (!input || !input.files || input.files.length === 0) {
         notificar('warning', 'Selecciona un archivo de audio primero.');
@@ -765,6 +766,8 @@ async function aplicarDucking() {
         notificar('warning', 'El audio actual es una versión editada temporal.');
         return;
     }
+    if (window.musicLibrary && !await window.musicLibrary.prepararDucking()) return;
+    if (!audioSigueActual(version)) return;
     const musicaActual = window.musicaFondoPath || musicaFondoPath;
     if (!musicaActual) {
         notificar('warning', 'Primero sube una música de fondo.');
@@ -798,10 +801,10 @@ async function aplicarDucking() {
     
     notificar('info', 'Mezclando voz y música...');
     
-    fetch(`${API_BASE}/api/audio/apply-ducking`, {
+    return fetch(`${API_BASE}/api/audio/apply-ducking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voiceAudioPath: cleanVoicePath, musicPath: cleanMusicPath, options })
+        body: JSON.stringify({ voiceAudioPath: cleanVoicePath, musicPath: cleanMusicPath, musicReferenceId: window.musicLibrary?.referencia() || undefined, options })
     })
     .then(response => response.json())
     .then(async (data) => {

@@ -3429,6 +3429,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .video-audio-input audio { display: block; margin-top: 10px; max-width: 100%; }
 .video-audio-input audio[hidden] { display: none; }
 .video-audio-input p { font-size: 12px; }
+.music-library-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }
+.music-library-panel p { font-size: 12px; }
+.music-library-entry { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0; }
+.music-library-entry span { flex: 1; min-width: 120px; overflow-wrap: anywhere; }
 .mezclador-alpha-nota { display: block; margin-top: 4px; color: var(--text-muted); font-size: 11px; }
 [data-theme="light"] .mezclador-alpha { color: #92400e; background: #fef3c7; }
 .session-recovery-notice { margin: 8px 0 14px; padding: 10px 14px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }

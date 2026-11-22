@@ -54,6 +54,8 @@ const PUBLIC_FOLDER = path.join(BACKEND_DIR, 'public');
 const DATA_DIR = process.env.LOQUENDO_DATA_DIR
     || path.join(process.env.APPDATA || process.env.LOCALAPPDATA || require('os').homedir(), 'Loquendo Studio', 'data');
 const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
+const { MusicLibrary } = require('./backend/services/musicLibrary');
+const musicLibrary = new MusicLibrary(DATA_DIR, ffprobePath, ffmpegPath);
 
 // âœ… Rutas de LanguageTool
 const javaPath = path.join(BACKEND_DIR, 'bin', 'jre', 'bin', 'java.exe');
@@ -597,15 +599,16 @@ appExpress.post('/api/generar-ass', async (req, res) => {
 
 // --- Audio Avanzado ---
 appExpress.post('/api/audio/apply-ducking', async (req, res) => {
-    const { voiceAudioPath, musicPath, options } = req.body;
-    if (!voiceAudioPath || !musicPath) return res.status(400).json({ error: 'Faltan rutas' });
+    const { voiceAudioPath, musicPath, musicReferenceId, options } = req.body;
+    if (!voiceAudioPath || (!musicPath && !musicReferenceId)) return res.status(400).json({ error: 'Faltan rutas' });
     
     const vozLimpia = sanitizarRutaAudio(voiceAudioPath);
-    const musLimpia = sanitizarRutaAudio(musicPath);
-    if (!vozLimpia || !musLimpia) return res.status(403).json({ error: 'Ruta no permitida' });
+    const musLimpia = musicReferenceId ? null : sanitizarRutaAudio(musicPath);
+    if (!vozLimpia || (!musicReferenceId && !musLimpia)) return res.status(403).json({ error: 'Ruta no permitida' });
     
     try {
-        const resultado = await audioService.aplicarDucking(path.join(PUBLIC_FOLDER, vozLimpia), path.join(PUBLIC_FOLDER, musLimpia), options);
+        const musica = musicReferenceId ? await musicLibrary.resolver(musicReferenceId) : path.join(PUBLIC_FOLDER, musLimpia);
+        const resultado = await audioService.aplicarDucking(path.join(PUBLIC_FOLDER, vozLimpia), musica, options);
         res.json(resultado);
     } catch (error) {
         console.error('âŒ Error ducking:', error.message);
@@ -805,6 +808,18 @@ appExpress.post('/api/upload-audio-editado', upload.single('audio'), (req, res) 
 // PROYECTOS PERSISTENTES, ASSETS, PICOS Y RENDER
 // ==========================================
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// Solo IDs registrados mediante el selector nativo. La API no acepta rutas arbitrarias.
+appExpress.get('/api/music-library', asyncHandler(async (req, res) => res.json({ items: await musicLibrary.listar() })));
+appExpress.post('/api/music-library/:id/select', asyncHandler(async (req, res) => res.json(await musicLibrary.seleccionar(req.params.id))));
+appExpress.put('/api/music-library/:id', asyncHandler(async (req, res) => {
+    if (typeof req.body.saved !== 'boolean') return res.status(400).json({ error: 'Estado inválido' });
+    res.json(await musicLibrary.guardar(req.params.id, req.body.saved));
+}));
+appExpress.delete('/api/music-library/:id', asyncHandler(async (req, res) => {
+    await musicLibrary.eliminar(req.params.id); res.json({ ok: true });
+}));
+appExpress.get('/media/music/:id', asyncHandler(async (req, res) => res.sendFile(await musicLibrary.resolver(req.params.id))));
 
 appExpress.get('/api/proyectos', (req, res) => {
     res.json({ ok: true, items: assetStore.listarProyectos() });
@@ -1060,4 +1075,4 @@ if (process.env.LOQUENDO_NO_AUTOSTART !== '1') {
         startServer(PORT);
     })();
 }
-module.exports = { expressApp: appExpress, getServer, getPort };
+module.exports = { expressApp: appExpress, getServer, getPort, musicLibrary };

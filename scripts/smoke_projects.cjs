@@ -87,7 +87,8 @@ async function desktopCoordinator(root){
         const env={...process.env,PROJECT_TEST_DESKTOP:'1',PROJECT_TEST_ROOT:root,NODE_ENV:'test',
             LOQUENDO_NO_AUTOSTART:'0',LOQUENDO_DATA_DIR:path.join(root,'data'),PORT:String(blocker.address().port)};
         delete env.ELECTRON_RUN_AS_NODE;
-        await new Promise((resolve,reject)=>{
+        for (const phase of process.argv.includes('--music-library') ? ['create','restart'] : ['default']) await new Promise((resolve,reject)=>{
+            env.PROJECT_TEST_MUSIC = process.argv.includes('--music-library') ? phase : '';
             const child=spawn(require('electron'),[__filename],{env,stdio:'inherit',windowsHide:true});
             const timeout=setTimeout(()=>{child.kill();reject(new Error('Timeout desktop'));},60000);
             child.on('error',error=>{clearTimeout(timeout);reject(error);});
@@ -149,6 +150,7 @@ async function desktop(){
         for(let i=0;i<40&&!external.includes('https://example.invalid/navigation');i++)await new Promise(resolve=>setTimeout(resolve,25));
         assert.ok(external.includes('https://example.invalid/navigation'));
         assert.equal(new URL(win.webContents.getURL()).port,String(port));
+        if (process.env.PROJECT_TEST_MUSIC) await require('./smoke_music_library.cjs')({win,run,root,electron,phase:process.env.PROJECT_TEST_MUSIC});
         assert.deepEqual(await run('projectErrors'),[]);
         verified=true;win.close();
     } catch(error){console.error(error);app.exit(1);}
