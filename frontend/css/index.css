@@ -3429,6 +3429,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .video-audio-input audio { display: block; margin-top: 10px; max-width: 100%; }
 .video-audio-input audio[hidden] { display: none; }
 .video-audio-input p { font-size: 12px; }
+.maintenance-notice { padding: 10px 14px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; font-size: 12px; }
+.maintenance-notice[hidden], #subtitleFilesInAudio[hidden] { display: none; }
+.tab-btn[aria-disabled="true"], .flow-step[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+#subtitleFilesInAudio { padding: 12px; margin-top: 14px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }
 .music-library-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--panel-border, #64748b); border-radius: 8px; }
 .music-library-panel p { font-size: 12px; }
 .music-library-entry { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0; }

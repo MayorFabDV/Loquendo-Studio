@@ -39,6 +39,8 @@ if ffmpeg_path:
     print(f"[OK] FFmpeg encontrado para ASS: {ffmpeg_path}")
 
 try:
+    if os.environ.get('LOQUENDO_TRANSCRIPTION_ENABLED') == '0':
+        raise ImportError('Transcripcion deshabilitada por la aplicacion')
     import whisper
     WHISPER_DISPONIBLE = True
 except ImportError:

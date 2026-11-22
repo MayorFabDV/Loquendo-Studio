@@ -45,6 +45,9 @@ AudioContext.prototype.createChannelMerger=function(...args){
 ${scripts.map(s=>`<script src="/js/${s}"></script>`).join('')}`;
 const server = http.createServer((req,res)=>{
     const url = new URL(req.url,'http://localhost');
+    if(url.pathname==='/api/features.js'){
+        res.setHeader('Content-Type','application/javascript');return res.end(`window.appFeatures=Object.freeze(${JSON.stringify(require('../backend/services/featurePolicy'))});`);
+    }
     if(url.pathname==='/'){
         res.setHeader('Content-Type','text/html');
         if (fullPage) {

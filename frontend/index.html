@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loquendo Studio</title>
+    <script src="api/features.js"></script>
 
     <link rel="stylesheet" href="css/index.css">
     <link rel="stylesheet" href="css/output.css">
@@ -174,9 +175,11 @@
         <nav class="tab-bar" role="tablist" aria-label="Módulos">
             <button type="button" class="tab-btn tab-btn-activo" data-tab="tab-guion" role="tab" aria-selected="true">Guion y Voz</button>
             <button type="button" class="tab-btn" data-tab="tab-audio" role="tab" aria-selected="false">Audio</button>
-            <button type="button" class="tab-btn" data-tab="tab-subtitulos" role="tab" aria-selected="false">Subtítulos</button>
+            <button type="button" class="tab-btn" data-tab="tab-subtitulos" role="tab" aria-selected="false" aria-disabled="true" disabled>Subtítulos · Mantenimiento</button>
             <button type="button" class="tab-btn" data-tab="tab-video" role="tab" aria-selected="false">Video</button>
         </nav>
+
+        <p id="subtitlesMaintenanceNotice" class="maintenance-notice" role="status">Subtítulos está temporalmente en mantenimiento. Los archivos existentes se conservan.</p>
 
         <!-- BARRA DE FLUJO -->
         <div class="flow-bar" role="group" aria-label="Flujo de trabajo">
@@ -184,7 +187,7 @@
             <span class="flow-arrow">→</span>
             <span class="flow-step" data-tab="tab-audio">Audio</span>
             <span class="flow-arrow">→</span>
-            <span class="flow-step" data-tab="tab-subtitulos">Subtítulos</span>
+            <span class="flow-step" data-tab="tab-subtitulos" aria-disabled="true">Subtítulos · Mantenimiento</span>
             <span class="flow-arrow">→</span>
             <span class="flow-step" data-tab="tab-video">Video</span>
         </div>
@@ -1015,6 +1018,11 @@
                 <audio id="audioReproductor"></audio>
             </div>
             <div class="tab-placeholder" id="audioPlaceholder">Genera un audio (pestaña «Guion y Voz») para editarlo aquí.</div>
+            <details id="subtitleFilesInAudio" hidden>
+                <summary>Archivos SRT existentes</summary>
+                <p>La transcripción está en mantenimiento. Puedes cargar, editar y descargar tus marcadores SRT sin transcribir audio.</p>
+                <div id="subtitleFilesDock"></div>
+            </details>
         </div>
 
         <!-- ==================== PESTAÑA: SUBTÍTULOS ==================== -->

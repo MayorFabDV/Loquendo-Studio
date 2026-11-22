@@ -235,7 +235,10 @@
         var dinamicos = document.getElementById('chkSubtitulosDinamicos');
         if (dinamicos) dinamicos.checked = state.subtitleDynamic;
         var srtIA = document.getElementById('chkSRT_IA');
-        if (srtIA) srtIA.checked = state.subtitleSRTIA;
+        if (srtIA) {
+            srtIA.checked = window.appFeatures?.transcription === true && state.subtitleSRTIA;
+            srtIA.disabled = window.appFeatures?.transcription !== true;
+        }
     }
 
     function aplicarModoAudio() {

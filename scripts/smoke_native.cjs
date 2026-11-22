@@ -7,12 +7,13 @@ const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const AudioService=require('../backend/services/audioService');
 const AudioRenderService=require('../backend/services/audioRenderService');
+const features=require('../backend/services/featurePolicy');
 const repo=path.resolve(__dirname,'..');
 const bin=path.join(repo,'backend/bin');
 const python=path.join(repo,'backend/python/python.exe');
 function execute(exe,args,timeout=60000,cwd){
     return new Promise((resolve,reject)=>{
-        const child=spawn(exe,args,{windowsHide:true,shell:false,cwd,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let stdout='',stderr='';
+        const child=spawn(exe,args,{windowsHide:true,shell:false,cwd,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',LOQUENDO_TRANSCRIPTION_ENABLED:features.transcription?'1':'0'}});let stdout='',stderr='';
         const timer=setTimeout(()=>{child.kill();reject(new Error('Timeout: '+path.basename(exe)));},timeout);
         child.stdout.on('data',d=>{if(stdout.length<2*1024*1024)stdout+=d.toString();});
         child.stderr.on('data',d=>{if(stderr.length<2*1024*1024)stderr+=d.toString();});
@@ -97,14 +98,18 @@ async function run(){
         console.log('AUDIO_REAL_PASS: WAV24/MP3/FLAC/Opus, pitch/rate/fades/LUFS y ducking con loop');
 
         const srt=path.join(root,'whisper.srt');
-        await audio.generarSRTWhisperCpp(wav,srt,7);
+        if(features.transcription) await audio.generarSRTWhisperCpp(wav,srt,7);
+        else {
+            await assert.rejects(audio.generarSRTWhisperCpp(wav,srt,7),/mantenimiento/);
+            assert.equal(audio.generarSRTMatematico('Hola. Esta es una prueba de Loquendo Studio. La voz conserva los acentos de edición.',wav,srt),true);
+        }
         const content=fs.readFileSync(srt,'utf8');assert.match(content,/\d{2}:\d{2}:\d{2},\d{3} -->/);
-        assert.ok(content.replace(/\d|[:>,\-\s]/g,'').length>10,'Whisper produjo texto, no solo tiempos');
+        assert.ok(content.replace(/\d|[:>,\-\s]/g,'').length>10,'SRT contiene texto, no solo tiempos');
         const ass=path.join(root,'subtitulos.ass');
         await execute(python,[path.join(repo,'backend/modules/generar_ass.py'),wav,ass,'normal',srt,'Hola. Esta es una prueba de Loquendo Studio. La voz cambia y conserva los acentos de edición.']);
         const assText=fs.readFileSync(ass,'utf8');assert.match(assText,/\[Events\]/);assert.match(assText,/Dialogue:/);assert.doesNotMatch(assText,/\[Sin subtitulos\]/);
-        console.log('SUBTITLES_REAL_PASS: Whisper.cpp con modelo local y ASS con Python embebido');
-        await languageTool();
+        console.log(features.transcription?'SUBTITLES_REAL_PASS: Whisper.cpp y ASS con Python embebido':'SUBTITLE_FILES_REAL_PASS: transcripción bloqueada, plantilla SRT y ASS con Python embebido');
+        if(features.languageTool) await languageTool();
         console.log('NATIVE_SMOKE_PASS: solo se usaron salidas temporales aisladas');
     } finally {fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 }

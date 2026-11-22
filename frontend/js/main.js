@@ -384,7 +384,7 @@ async function generarAudio(event) {
             body: JSON.stringify({
                 texto: textoFinal,
                 voz: vozSelect?.value || 'Jorge',
-                usarIA: chkSRT?.checked || false,
+                usarIA: window.appFeatures?.transcription === true && (chkSRT?.checked || false),
                 modo: modoSelect?.value || 'normal',
                 opciones: opciones
             })
@@ -427,6 +427,10 @@ async function automatizarTodo() {
 // 4. SUBTÍTULOS
 // ==========================================
 async function generarYDescargarSRT() {
+    if (window.appFeatures?.subtitlesUI !== true) {
+        notificar('warning', window.appFeatures?.subtitlesMaintenanceMessage || 'Subtítulos está temporalmente en mantenimiento.');
+        return;
+    }
     const audioPath = await rutaVozPersistida();
     const version = versionAudioActual();
     const textoOriginal = document.getElementById('resultado')?.value || '';
@@ -475,6 +479,10 @@ async function generarYDescargarSRT() {
 }
 
 async function generarYDescargarASS() {
+    if (window.appFeatures?.subtitlesUI !== true) {
+        notificar('warning', window.appFeatures?.subtitlesMaintenanceMessage || 'Subtítulos está temporalmente en mantenimiento.');
+        return;
+    }
     const audioPath = await rutaVozPersistida();
     const version = versionAudioActual();
     const textoOriginal = document.getElementById('resultado')?.value || '';

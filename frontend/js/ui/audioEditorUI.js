@@ -187,6 +187,7 @@
     }
 
     function montarOndaEn(tabId) {
+        if (tabId === 'tab-subtitulos' && window.appFeatures?.subtitlesUI !== true) tabId = 'tab-audio';
         var onda = document.querySelector('.audio-waveform-main');
         if (!onda) return;
 
@@ -357,6 +358,13 @@
     function init() {
         var inst = editor();
         if (!inst) return;
+        // Mantener accesible el editor existente de archivos, sin habilitar transcripción.
+        if (window.appFeatures?.subtitlesUI !== true) {
+            var dock = document.getElementById('subtitleFilesDock');
+            var archivos = document.getElementById('subtitleFilesInAudio');
+            var panel = document.querySelector('.audio-marker-panel');
+            if (dock && archivos && panel) { dock.appendChild(panel); archivos.hidden = false; }
+        }
         bindModeSwitcher();
         bindBasicControls();
         bindSubtabs();

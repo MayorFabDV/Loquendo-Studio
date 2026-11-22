@@ -1,6 +1,7 @@
 // node scripts/smoke_projects.cjs
 // --desktop: main/preload reales, puerto ocupado, IPC y cierre de Electron.
 // --sapi: voces instaladas + Python/binario x86 reales, UI de voz y PNGTuber.
+// --maintenance: bloqueo de transcripción y operaciones SRT/ASS independientes reales.
 // Express/server.js y Electron reales en un sandbox; ningún dato del usuario se modifica.
 'use strict';
 const fs=require('node:fs');
@@ -22,10 +23,12 @@ async function coordinator(){
         fs.symlinkSync(path.join(repo,'backend/services'),path.join(root,'backend/services'),'junction');
         for(const file of ['server.js','package.json','main-electron.js','preload.js'])fs.copyFileSync(path.join(repo,file),path.join(root,file));
         for(const file of ['ffmpeg.exe','ffprobe.exe'])fs.copyFileSync(path.join(repo,'backend/bin',file),path.join(root,'backend/bin',file));
-        if(nativeVoice){
+        if(nativeVoice || process.argv.includes('--maintenance')){
             fs.mkdirSync(path.join(root,'backend/modules'),{recursive:true});
             for(const file of ['generar_voz.py','generar_srt.py','generar_ass.py','listar_voces.py'])fs.copyFileSync(path.join(repo,'backend/modules',file),path.join(root,'backend/modules',file));
             fs.symlinkSync(path.join(repo,'backend/python'),path.join(root,'backend/python'),'junction');extraLinks.push('backend/python');
+        }
+        if(nativeVoice){
             for(const e of fs.readdirSync(path.join(repo,'backend/bin'),{withFileTypes:true})){
                 if(e.isDirectory()&&!['jre','languagetool'].includes(e.name.toLowerCase())){
                     const rel='backend/bin/'+e.name;fs.symlinkSync(path.join(repo,rel),path.join(root,rel),'junction');extraLinks.push(rel);
@@ -50,7 +53,13 @@ async function coordinator(){
         await new Promise(resolve=>probe.listen(0,'localhost',resolve));const port=probe.address().port;
         await new Promise(resolve=>probe.close(resolve));
         const env={...process.env,PORT:String(port),NODE_ENV:'test',LOQUENDO_NO_AUTOSTART:'0',LOQUENDO_DATA_DIR:path.join(root,'data'),PYTHONDONTWRITEBYTECODE:'1'};
-        server=spawn(process.execPath,['server.js'],{cwd:root,env,windowsHide:true});
+        const guarded = `const cp=require('child_process'),original=cp.spawn;
+            cp.spawn=function(file,args,options){
+                if(/whisper/i.test(file)||(args||[]).some(a=>/generar_srt\\.py$/i.test(a)))throw Error('Se intentó iniciar transcripción durante mantenimiento');
+                if((args||[]).some(a=>/generar_ass\\.py$/i.test(a))&&options?.env?.LOQUENDO_TRANSCRIPTION_ENABLED!=='0')throw Error('ASS debe ejecutarse sin transcripción');
+                return original(file,args,options);
+            };require('./server.js');`;
+        server=spawn(process.execPath,process.argv.includes('--maintenance')?['-e',guarded]:['server.js'],{cwd:root,env,windowsHide:true});
         let output='';server.stdout.on('data',d=>output+=d);server.stderr.on('data',d=>output+=d);
         const bound=await new Promise((resolve,reject)=>{
             const start=Date.now();const poll=()=>{const m=output.match(/Servidor escuchando en: http:\/\/localhost:(\d+)/);
@@ -58,13 +67,14 @@ async function coordinator(){
                 if(Date.now()-start>30000)return reject(new Error('Timeout de Express: '+output));setTimeout(poll,50);};poll();
         });
         await new Promise((resolve,reject)=>{
-            const childEnv={...process.env,PROJECT_TEST_URL:'http://localhost:'+bound,PROJECT_TEST_ROOT:root,PROJECT_TEST_SAPI:nativeVoice?'1':'0',PROJECT_TEST_EXTERNAL:process.argv.includes('--external-audio')?'1':'0'};delete childEnv.ELECTRON_RUN_AS_NODE;
+            const childEnv={...process.env,PROJECT_TEST_URL:'http://localhost:'+bound,PROJECT_TEST_ROOT:root,PROJECT_TEST_SAPI:nativeVoice?'1':'0',PROJECT_TEST_EXTERNAL:process.argv.includes('--external-audio')?'1':'0',PROJECT_TEST_MAINTENANCE:process.argv.includes('--maintenance')?'1':'0'};delete childEnv.ELECTRON_RUN_AS_NODE;
             const child=spawn(require('electron'),[__filename],{env:childEnv,stdio:'inherit',windowsHide:true});
             const timeout=setTimeout(()=>{child.kill();reject(new Error('Timeout de Electron'));},120000);
             child.on('error',error=>{clearTimeout(timeout);reject(error);});
             child.on('exit',code=>{clearTimeout(timeout);code===0?resolve():reject(new Error('Electron terminó con '+code+'\n'+output.slice(-5000)));});
         });
-        console.log(process.argv.includes('--external-audio') ? 'EXTERNAL_AUDIO_REAL_SERVER_PASS: importación, preview y exportación desde Electron'
+        console.log(process.argv.includes('--maintenance') ? 'SUBTITLE_MAINTENANCE_REAL_SERVER_PASS: transcripción bloqueada y SRT/ASS sin IA'
+            : process.argv.includes('--external-audio') ? 'EXTERNAL_AUDIO_REAL_SERVER_PASS: importación, preview y exportación desde Electron'
             : nativeVoice ? 'SAPI_HTTP_ELECTRON_PASS: generación de voz, calidad, edición, persistencia y mezclador con APIs reales'
             : 'PROJECTS_REAL_SERVER_PASS: guardar, catálogo, portable, relink, copia recuperable y render real');
     } finally {
@@ -167,6 +177,11 @@ async function renderer(){
         const run=code=>win.webContents.executeJavaScript(code,true);
         const action=code=>run(`(async()=>{${code}})()`);
         const wait=async expr=>{for(let i=0;i<400;i++){if(await run(expr))return;await new Promise(r=>setTimeout(r,50));}throw new Error('Timeout '+expr+' '+await run('JSON.stringify(projectErrors)'));};
+        if(process.env.PROJECT_TEST_MAINTENANCE==='1'){
+            await require('./smoke_subtitles_maintenance.cjs')({win,run,action,wait,root});
+            assert.deepEqual(await run('projectErrors'),[]);
+            win.destroy();app.exit(0);return;
+        }
         if(process.env.PROJECT_TEST_EXTERNAL==='1'){
             await require('./smoke_external_audio.cjs')({run,action,wait,root});
             assert.deepEqual(await run('projectErrors'),[]);
@@ -175,8 +190,10 @@ async function renderer(){
         if(process.env.PROJECT_TEST_SAPI==='1'){
             await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.value==='Jorge')`);
             await action(`document.getElementById('vozSeleccionada').value='Jorge';document.getElementById('resultado').value='Prueba de voz generada desde Electron.';
-                document.getElementById('calidadSeleccionada').value='16k';document.getElementById('chkSRT_IA').checked=false;await generarAudio();`);
+                document.getElementById('calidadSeleccionada').value='16k';document.getElementById('chkSRT_IA').checked=true;await generarAudio();`);
             await wait(`audioEditor.audioBuffer && !audioEditor._cargandoEdicion`);
+            const soloVoz=await run(`(async()=>{const r=await fetch('/api/generar-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'Prueba de voz sin transcripción durante mantenimiento.',voz:'Jorge',usarIA:true})});if(!r.ok)throw Error(await r.text());return r.json();})()`);
+            assert.equal(soloVoz.srt,null);assert.equal(soloVoz.ass,null,'La API ignora usarIA:true durante mantenimiento');
             const url=await run('voiceAudioRealPath');
             const file=path.join(root,'backend/public',url.replace(/^\//,''));
             const info=spawnSync(path.join(root,'backend/bin/ffprobe.exe'),['-v','error','-show_entries','stream=sample_rate,channels','-of','json',file],{encoding:'utf8',windowsHide:true});

@@ -102,6 +102,7 @@ test('snapshot corrupto no se elimina ni reemplaza; una carga nueva cancela recu
 
 test('salidas de subtítulos, video, ducking, MP3 y render no usan una ruta antigua tras fallo de subida',async()=>{
     const h=preparar();let solicitudes=0;
+    h.ctx.window.appFeatures={subtitlesUI:true,transcription:true}; // Verificar también los handlers conservados para reactivación.
     h.ctx.window.voiceAudioRealPath='/audios/stale.wav';
     h.editor.asegurarAudioPersistido=async()=>null;
     h.ctx.fetch=async()=>{solicitudes++;throw new Error('No debe llamar al backend');};

@@ -8,6 +8,7 @@ const { spawn } = require('child_process');
 const { randomUUID } = require('crypto');
 const { pipeline } = require('stream/promises');
 const { validarAudio } = require('./backend/services/audioFileValidation');
+const features = require('./backend/services/featurePolicy');
 const APP_VERSION = require('./package.json').version;
 const { escucharConFallback, origenLocalPermitido } = require('./backend/services/serverNetwork');
 
@@ -249,6 +250,10 @@ appExpress.use(cors({
 appExpress.use(express.json({ limit: '25mb' }));
 
 const FRONTEND_PATH = fs.existsSync(FRONTEND_DIR) ? FRONTEND_DIR : ROOT_DIR;
+appExpress.get('/api/features.js', (req, res) => {
+    res.set('Cache-Control', 'no-store').type('application/javascript')
+        .send(`window.appFeatures = Object.freeze(${JSON.stringify(features)});`);
+});
 appExpress.use(express.static(FRONTEND_PATH));
 appExpress.use('/audios', express.static(audioFolder));
 appExpress.use('/pngtuber', express.static(pngtuberFolder));
@@ -356,7 +361,8 @@ appExpress.get('/api/health', (req, res) => {
             whispermodel: fs.existsSync(whisperModel)
         },
         puerto: boundPort || PORT,
-        languageToolPort: LT_PORT
+        languageToolPort: LT_PORT,
+        capabilities: features
     });
 });
 
@@ -478,7 +484,7 @@ appExpress.post('/api/generar-audio', async (req, res) => {
             ...(opciones || {}),
             maxPalabras: opciones?.maxPalabras || 7
         };
-        const resultado = await audioService.procesar(texto, voz, usarIA ?? false, dbService, modo, opcionesConMax);
+        const resultado = await audioService.procesar(texto, voz, features.transcription ? (usarIA ?? false) : false, dbService, modo, opcionesConMax);
         res.json(resultado);
     } catch (error) {
         console.error('âŒ Error generar-audio:', error.message);
@@ -487,14 +493,23 @@ appExpress.post('/api/generar-audio', async (req, res) => {
 });
 
 appExpress.post('/api/generar-srt', async (req, res) => {
-    const { audioPath, textoOriginal, maxPalabras } = req.body;
+    const { audioPath, textoOriginal, maxPalabras, metodo } = req.body;
+    if (!features.transcription && metodo !== 'plantilla') return res.status(503).json({
+        code: 'TRANSCRIPTION_DISABLED', error: features.subtitlesMaintenanceMessage
+    });
     const audioLimpio = sanitizarRutaAudio(audioPath);
     if (!audioLimpio) return res.status(403).json({ error: 'Ruta de audio no permitida' });
 
-    const nombreSRT = `subtitulos-${Date.now()}.srt`;
+    const nombreSRT = `subtitulos-${Date.now()}-${randomUUID()}.srt`;
     const rutaSRT = path.join(audioFolder, nombreSRT);
     const audioAbsoluto = path.join(PUBLIC_FOLDER, audioLimpio);
     const palabrasMax = parseInt(maxPalabras) || 7;
+
+    if (metodo === 'plantilla') {
+        if (typeof textoOriginal !== 'string' || !textoOriginal.trim()) return res.status(400).json({ error: 'Falta texto para la plantilla SRT' });
+        if (!audioService.generarSRTMatematico(textoOriginal, audioAbsoluto, rutaSRT)) return res.status(400).json({ error: 'No se pudo generar la plantilla SRT' });
+        return res.json({ srtUrl: `/audios/${nombreSRT}`, metodo: 'plantilla', mensaje: 'SRT aproximado desde el texto, sin transcripción' });
+    }
 
     try {
         console.log('[SRT] Intentando con Whisper.cpp...');
@@ -523,11 +538,14 @@ appExpress.post('/api/generar-srt', async (req, res) => {
 });
 
 appExpress.post('/api/generar-ass', async (req, res) => {
-    const { audioPath, textoOriginal, modo, srtPath, maxPalabras } = req.body;
+    const { audioPath, textoOriginal, modo, srtPath, maxPalabras, metodo } = req.body;
+    if (!features.transcription && !srtPath && metodo !== 'plantilla') return res.status(503).json({
+        code: 'TRANSCRIPTION_DISABLED', error: features.subtitlesMaintenanceMessage
+    });
     const audioLimpio = sanitizarRutaAudio(audioPath);
     if (!audioLimpio) return res.status(403).json({ error: 'Ruta de audio no permitida' });
 
-    const nombreASS = `subtitulos-${Date.now()}.ass`;
+    const nombreASS = `subtitulos-${Date.now()}-${randomUUID()}.ass`;
     const rutaASS = path.join(audioFolder, nombreASS);
     const audioAbsoluto = path.join(PUBLIC_FOLDER, audioLimpio);
     const palabrasMax = parseInt(maxPalabras) || 7;
@@ -540,7 +558,10 @@ appExpress.post('/api/generar-ass', async (req, res) => {
         if (rutaSRTParaAss) argsASS.push(rutaSRTParaAss);
         argsASS.push(textoOriginal || '');
 
-        const procesoASS = spawn(pythonCmd, argsASS, { windowsHide: true });
+        const procesoASS = spawn(pythonCmd, argsASS, {
+            windowsHide: true,
+            env: { ...process.env, LOQUENDO_TRANSCRIPTION_ENABLED: features.transcription ? '1' : '0' }
+        });
         let stderrASS = '';
         procesoASS.stderr.on('data', (data) => { stderrASS += data.toString(); });
         procesoASS.on('close', (code) => {
@@ -558,13 +579,20 @@ appExpress.post('/api/generar-ass', async (req, res) => {
 
     if (srtPath) {
         const srtLimpio = sanitizarRutaAudio(srtPath);
-        if (srtLimpio) {
+        if (srtLimpio && /\.srt$/i.test(srtLimpio)) {
             rutaSRTAbsoluta = path.join(PUBLIC_FOLDER, srtLimpio);
             nombreSRTFinal = srtLimpio.split('/').pop();
             ejecutarASS(rutaSRTAbsoluta);
         } else {
+            if (!features.transcription) return res.status(400).json({ error: 'El archivo SRT existente no es válido; no se inició transcripción' });
             ejecutarASS(null);
         }
+    } else if (metodo === 'plantilla') {
+        if (typeof textoOriginal !== 'string' || !textoOriginal.trim()) return res.status(400).json({ error: 'Falta texto para la plantilla ASS' });
+        nombreSRTFinal = `subtitulos-plantilla-${Date.now()}-${randomUUID()}.srt`;
+        rutaSRTAbsoluta = path.join(audioFolder, nombreSRTFinal);
+        if (!audioService.generarSRTMatematico(textoOriginal, audioAbsoluto, rutaSRTAbsoluta)) return res.status(400).json({ error: 'No se pudo generar la plantilla SRT para ASS' });
+        ejecutarASS(rutaSRTAbsoluta);
     } else {
         const nombreSRTTemp = `subtitulos-temp-${Date.now()}.srt`;
         rutaSRTAbsoluta = path.join(audioFolder, nombreSRTTemp);

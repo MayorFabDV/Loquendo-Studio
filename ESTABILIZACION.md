@@ -1,6 +1,6 @@
 # Loquendo Studio 1.2.0 — Seguimiento de estabilización
 
-Última actualización: 2026-11-18.
+Última actualización: 2026-11-22.
 
 Este es el índice de las etapas operativas del trabajo. La misión original agrupaba auditoría, implementación, pruebas y entrega en fases generales; aquí se registra la secuencia incremental usada en las sesiones. Las pruebas y la documentación forman parte de cada etapa, no se posponen hasta el final.
 
@@ -97,11 +97,11 @@ Se verificaron píxeles de sprites transparentes en MP4 y WebM con alfa, incluid
 
 ## Reglas vigentes
 
-- La estabilización base está en `feature/estabilizacion-1.2.0`; la recuperación explícita está en `feature/recuperacion-sesiones-alpha`. Las mejoras posteriores aprobadas de audio externo y biblioteca se trabajan en `feature/audio-externo-biblioteca-1.2.0`, preservando cambios ajenos.
+- Rama activa de la nueva fase: `feature/optimizacion-1.2.0`, desde `d1c02ea`. La recuperación explícita y las mejoras de audio/biblioteca se conservan en sus ramas y commits anteriores.
 - Pruebas y commits locales pequeños después de cada bloque verificable.
 - Resumir cada fase antes de continuar con la siguiente.
 - No tocar respaldos, datos del usuario o ramas remotas.
-- No instalar dependencias, ejecutar builds de distribución ni introducir incompatibilidades sin autorización específica.
+- No instalar dependencias ni introducir incompatibilidades sin autorización específica. Está autorizada una carpeta desempaquetada de prueba para medir tamaño y comprobar el paquete; no un instalador de publicación.
 - No confundir verificación histórica o sintáctica con una prueba funcional actual.
 
 ## Mejora posterior — Recuperación explícita y etiqueta Alpha
@@ -115,3 +115,33 @@ Resultado actualizado: **51 pruebas Node aprobadas**, smoke de UX con siete proc
 Implementadas y verificadas en desarrollo. PNGTuber admite WAV/MP3 con preview sincronizada; ducking incorpora Recientes/Mi biblioteca mediante referencias persistentes, selector nativo y localización de originales ausentes. Informe: [MEJORAS_AUDIO_1_2.md](MEJORAS_AUDIO_1_2.md).
 
 Resultado actualizado: **54 pruebas Node aprobadas**, exportaciones PNGTuber MP4/WebM reales con audio y silencio, biblioteca comprobada entre dos arranques de Electron con ducking real y regresiones de proyectos/sesiones/mezclador aprobadas. Distribución pendiente.
+
+## Nueva estabilización y optimización 1.2.0 — Plan aprobado
+
+Estado de Git verificado antes de modificar archivos: árbol limpio, rama `feature/optimizacion-1.2.0`, HEAD `d1c02ea` (`feat: add music library and finalize audio workflow improvements`). La etiqueta `respaldo-pre-optimizacion-1.2.0` apunta a ese commit y la rama `feature/audio-externo-biblioteca-1.2.0` permanece conservada. `videoProcessor.js` no tiene cambios pendientes. No repetir el commit de la biblioteca, crear otra rama ni restaurar archivos según información histórica.
+
+| Fase | Alcance aprobado | Estado |
+|---|---|---|
+| 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
+| 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Pendiente |
+| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Pendiente |
+| 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
+| 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
+
+### Orden, dependencias y aceptación
+
+1. **Subtítulos:** política compartida frontend/backend, bloqueo de pestaña/paso de flujo/navegación programática y pestaña inicial guardada; no activar IA desde ajustes antiguos o peticiones directas. Revisar el traslado de la onda a Subtítulos. Conservar archivos, marcadores y utilidades SRT/ASS sin Whisper.
+2. **Leonor:** distinguir enumeración/selección/asignación de token, apertura y formato del stream, `Speak`, cierre y liberación COM. Informar IDs de token, arquitectura x86, HRESULT/excepinfo y traceback por etapa. Comparar texto plano, etiquetas y cambios de voz, script y exe. Que aparezca `generar_audio_multivoz` en una traza no demuestra que multivoz sea la causa. No modificar registro, reinstalar voces ni aplicar arreglos especulativos; documentar lo que deba ejecutar el tester.
+3. **PNGTuber:** probar en una misma ventana cambios WAV/MP3 repetidos, silencio, fuentes Studio/externas y respuestas tardías. Revisar revisiones de fuente, listeners/temporizadores, rutas y análisis de silencio. Mantener prioridad exclusiva blink > talking > idle y comprobar MP4/WebM, incluido alfa.
+4. **Optimización por grupos:** primero desactivar limpiamente arranque/controles de LanguageTool; después excluir Java/JRE/LanguageTool y Whisper/modelo/dependencias exclusivas, impidiendo también fallback Whisper Python. Preservar puntuación y diccionarios propios, SAPI, FFmpeg, FFprobe y runtime x86. Auditar DLL y dependencias antes de excluir herramientas Python, cachés, `.git` y residuos. No borrar código fuente. Medir bytes/archivos/ahorro por grupo frente al artefacto anterior disponible; usar una salida desempaquetada separada, sin limpiar el respaldo anterior, y verificar ASAR/preload y ejecución empaquetada.
+5. **Expresiones:** definir catálogo extensible, compatibilidad con idle/talking/blink, activación manual o por intervalos, prioridades y fallback de imágenes ausentes. Presentar la propuesta antes de implementar un conjunto inicial pequeño. Sin detección automática de emociones.
+
+Pruebas automatizadas y Electron reales por fase; commits independientes y actualización de continuidad después de cada una. Mantener recuperación de sesiones, audio externo y biblioteca musical. Editor de audio y ampliaciones multipista fuera de alcance salvo correcciones necesarias para evitar regresiones. No se autoriza un instalador de publicación.
+
+### Continuidad tras Fase 1
+
+- Política central de mantenimiento implementada en frontend/backend; no inicia transcripción desde la UI, la API ni el servicio de audio aunque se solicite IA.
+- El editor existente de marcadores SRT permanece accesible desde Audio. Plantillas explícitas y conversión SRT a ASS funcionan sin Whisper; archivos originales conservados en las pruebas.
+- **55 pruebas Node aprobadas, ninguna omitida**. Smokes Electron de mantenimiento, SAPI real (incluida petición API con `usarIA:true`), audio externo, biblioteca musical entre reinicios, recuperación, sesiones base y mezclador aprobados.
+- No se modificó `generar_voz.py`, no se recompiló el exe ni se retiraron componentes del paquete en esta fase. No se generó distribución.
+- Siguiente fase: diagnóstico reproducible Leonor/COM, sin atribuir aún la causa a multivoz. Informe técnico de esta fase: [OPTIMIZACION_FASE1.md](OPTIMIZACION_FASE1.md).

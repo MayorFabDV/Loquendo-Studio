@@ -2,7 +2,15 @@
 (function () {
     'use strict';
 
+    function disponible(tabId) {
+        return tabId !== 'tab-subtitulos' || window.appFeatures?.subtitlesUI === true;
+    }
+
     function activar(tabId) {
+        if (!disponible(tabId)) {
+            window.notifications?.warning(window.appFeatures?.subtitlesMaintenanceMessage || 'Subtítulos está temporalmente en mantenimiento.');
+            return false;
+        }
         var paneles = document.querySelectorAll('.tab-panel');
         for (var i = 0; i < paneles.length; i++) {
             paneles[i].classList.toggle('tab-panel-activo', paneles[i].id === tabId);
@@ -29,15 +37,33 @@
         try {
             document.dispatchEvent(new CustomEvent('loquendo:tab-activada', { detail: { tabId: tabId } }));
         } catch (e) { /* noop */ }
+        return true;
     }
 
     function irA(nombre) {
-        activar('tab-' + nombre);
+        return activar('tab-' + nombre);
     }
 
-    window.tabs = { activar: activar, irA: irA };
+    window.tabs = { activar: activar, irA: irA, disponible: disponible };
 
     document.addEventListener('DOMContentLoaded', function () {
+        var habilitada = disponible('tab-subtitulos');
+        document.querySelectorAll('[data-tab="tab-subtitulos"]').forEach(function (control) {
+            control.setAttribute('aria-disabled', String(!habilitada));
+            if (control.tagName === 'BUTTON') control.disabled = !habilitada;
+            control.textContent = habilitada ? 'Subtítulos' : 'Subtítulos · Mantenimiento';
+        });
+        var aviso = document.getElementById('subtitlesMaintenanceNotice');
+        if (aviso) {
+            aviso.hidden = habilitada;
+            if (window.appFeatures?.subtitlesMaintenanceMessage) aviso.textContent = window.appFeatures.subtitlesMaintenanceMessage;
+        }
+        var opcion = document.querySelector('#setTabInicial option[value="tab-subtitulos"]');
+        if (opcion) { opcion.disabled = !habilitada; opcion.textContent = habilitada ? 'Subtítulos' : 'Subtítulos (mantenimiento)'; }
+        ['btnGenerarSRT', 'btnGenerarASS'].forEach(function (id) {
+            var control = document.getElementById(id);
+            if (control) control.disabled = !habilitada;
+        });
         var botones = document.querySelectorAll('.tab-btn[data-tab]');
         for (var i = 0; i < botones.length; i++) {
             botones[i].addEventListener('click', function () {
@@ -56,7 +82,7 @@
         try {
             if (window.settings && typeof window.settings.get === 'function') {
                 var guardada = window.settings.get('startTab');
-                if (guardada && document.getElementById(guardada)) tabInicial = guardada;
+                if (guardada && document.getElementById(guardada) && disponible(guardada)) tabInicial = guardada;
             }
         } catch (e) { /* usar Guion */ }
         activar(tabInicial);

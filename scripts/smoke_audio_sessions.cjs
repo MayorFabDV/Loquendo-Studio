@@ -26,6 +26,13 @@ async function ejecutarCoordinador() {
     const server = http.createServer(async (req,res) => {
         try {
             const url=new URL(req.url,'http://localhost');
+            if(url.pathname==='/api/features.js') {
+                // El smoke base conserva cobertura de los handlers legacy con un backend simulado habilitado.
+                // La variante recovery-ux usa la política real de mantenimiento.
+                const flags={...require('../backend/services/featurePolicy')};
+                if(!process.argv.includes('--recovery-ux')){flags.subtitlesUI=true;flags.transcription=true;}
+                res.setHeader('Content-Type','application/javascript');return res.end(`window.appFeatures=Object.freeze(${JSON.stringify(flags)});`);
+            }
             if(req.method==='POST' || req.method==='PUT') {
                 const chunks=[];for await(const chunk of req)chunks.push(chunk);
                 const body=Buffer.concat(chunks);

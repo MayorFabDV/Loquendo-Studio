@@ -202,6 +202,7 @@ class AudioService {
     // ✅ WHISPER.CPP (PRIORIDAD)
     // ==========================================
     async generarSRTWhisperCpp(audioAbsoluto, rutaSRT, maxPalabras = 7) {
+        if (!require('./featurePolicy').transcription) throw new Error('Transcripción temporalmente deshabilitada por mantenimiento');
         return new Promise((resolve, reject) => {
             console.log('\n  [Whisper.cpp] Iniciando transcripción...');
             
@@ -276,6 +277,7 @@ class AudioService {
     // ✅ PROCESAR AUDIO
     // ==========================================
     procesar(texto, voz, usarIA, dictionaryService, modo = 'normal', opciones = {}) {
+        if (!require('./featurePolicy').transcription) usarIA = false;
         return new Promise((resolve, reject) => {
             console.log('\n════════════════════════════════════════');
             console.log('🎬 [AudioService] INICIANDO PROCESAMIENTO');
