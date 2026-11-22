@@ -52,6 +52,7 @@ No hay lint/typecheck configurado. Existe suite Node (`npm test`) y smokes Elect
 - El usuario autorizó una carpeta desempaquetada de prueba para medir tamaño en la Fase 4, con salida separada. No generar instalador de publicación. Plan completo y estados en `ESTABILIZACION.md`.
 - Diagnóstico Leonor preparado en `tools/diagnostico_sapi/` (lanzador `.cmd`, Python embebido x86). Referencia en `OPTIMIZACION_FASE2.md`: las pruebas locales pasan, pero la causa del fallo del tester sigue pendiente de evidencia externa. No presentar multivoz/formato/registro como causa confirmada ni modificar la síntesis sin reproducirla.
 - Fase 3 PNGTuber verificada en `OPTIMIZACION_FASE3.md`: preservar refresco al cambiar de fuente, snapshots antes de `await`, descarte de respuestas obsoletas y rutas únicas de previews. Prioridad exclusiva blink > talking > idle.
+- Al elegir audio externo sin archivo, la preview solicita `soloReposo`; no simular talking/blink ni reutilizar la voz de Studio en ese estado. Con audio, conservar sincronización y las imágenes del personaje.
 - Diagnóstico general del sistema: propuesta pendiente de aprobación de alcance, dentro de Configuración/Ajustes existente, sin pestaña principal nueva. Conservar CMD independiente; no implementarlo automáticamente al continuar con optimización.
 
 ## Compilar generar_voz.py con Nuitka (proceso establecido)

@@ -555,6 +555,7 @@ function capturarEstadoPNGTuber() {
             idleImagePath: pngtuberIdlePath || null,
             talkingImagePath: pngtuberTalkingPath || null,
             blinkImagePath: pngtuberBlinkPath || null,
+            soloReposo: window.videoAudioInput?.sinAudioExterno?.() === true,
             fondo: document.getElementById('fondoPNGTuber')?.value || 'green',
             ...obtenerOpcionesPNGTuber()
         }

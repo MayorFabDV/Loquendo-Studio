@@ -46,19 +46,23 @@ module.exports=async function({run,action,wait,root}){
     assert.notEqual(secondChosen,chosen);
     assert.equal(await run(`videoAudioInput.importar(new File(['broken'],'invalido.mp3',{type:'audio/mpeg'}))`),false);
     assert.equal(await run(`videoAudioInput.ruta()`),secondChosen,'Fallos conservan selección anterior');
+    const frames=new Map();
     const pixel=(file,time,x,alpha)=>{
-        const bytes=native(['-ss',String(time),...(alpha?['-c:v','libvpx-vp9']:[]),'-i',file,'-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']);
+        const key=JSON.stringify([file,time,alpha]);
+        if(!frames.has(key))frames.set(key,native(['-ss',String(time),...(alpha?['-c:v','libvpx-vp9']:[]),'-i',file,'-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']));
+        const bytes=frames.get(key);
         assert.equal(bytes.length,64*64*4);return [...bytes.subarray((32*64+x)*4,(32*64+x)*4+4)];
     };
     const verifyFrames=(url,silent,alpha)=>{
         const file=path.join(root,'backend/public',new URL(url).pathname.replace(/^\//,''));
-        const idle=pixel(file,0.25,14,alpha);assert.ok(idle[0]>150,'Idle visible al comienzo de cada audio: '+idle);
-        if(!silent){
-            const talk=pixel(file,1.05,46,alpha);assert.ok(talk[2]>150,'Habla sincronizada con la nueva fuente');
-            const hiddenIdle=pixel(file,1.05,14,alpha);assert.ok(alpha?hiddenIdle[3]<20:hiddenIdle[0]<30,'Habla oculta completamente idle');
-        }else{
-            const hiddenTalk=pixel(file,0.75,46,alpha);assert.ok(alpha?hiddenTalk[3]<20:hiddenTalk[2]<30,'Silencio no activa hablando ni conserva el habla de la fuente anterior');
-            assert.ok(pixel(file,0.75,14,alpha)[0]>150,'Silencio conserva idle durante el audio');
+        const timeline=silent?[[0,'idle'],[0.75,'idle'],[0.95,'idle']]
+            :[[0,'idle'],[1.05,'talking'],[1.25,'blink'],[1.75,'idle'],[2.25,'blink'],[2.96,'idle']];
+        for(const [time,expected] of timeline){
+            for(const [expression,x,color] of [['idle',14,0],['talking',46,2],['blink',32,1]]){
+                const p=pixel(file,time,x,alpha);
+                assert.ok(expression===expected?p[color]>150:alpha?p[3]<20:p[color]<30,
+                    `${expected} exclusivo en ${time}s; ${expression}: ${p}`);
+            }
         }
     };
     const sources=['segmented.wav','segmented.mp3','silent.wav','silent.mp3'];
@@ -111,5 +115,33 @@ module.exports=async function({run,action,wait,root}){
     await action(`await cargarYReproducir('/audios/silent.mp3');tabs.irA('video');`);
     await wait(`!previewEnCurso&&!pendingPreview&&!document.getElementById('previewPngtuberVideo').hidden`);
     verifyFrames(await run(`document.getElementById('previewPngtuberVideo').src`),true,false);
-    console.log('EXTERNAL_AUDIO_ELECTRON_PASS: cambios repetidos WAV/MP3 y Studio, idle/habla por píxeles, silencio, MP4/WebM reales');
+    // Tras usar Studio, elegir externo sin archivo no debe reproducir una demostración hablando.
+    const character=await run(`JSON.stringify([pngtuberIdlePath,pngtuberTalkingPath,pngtuberBlinkPath])`);
+    await action(`document.getElementById('videoAudioSource').value='external';document.getElementById('videoAudioSource').dispatchEvent(new Event('change'));`);
+    await wait(`!previewEnCurso&&!pendingPreview&&!document.getElementById('previewPngtuberVideo').hidden`);
+    const emptyPreview=path.join(root,'backend/public',new URL(await run(`document.getElementById('previewPngtuberVideo').src`)).pathname.replace(/^\//,''));
+    for(const time of [0,1.05,2.65,3.96]){
+        assert.ok(pixel(emptyPreview,time,14,false)[0]>150,'Sin archivo externo, idle debe seguir visible en vez de simular habla');
+        assert.ok(pixel(emptyPreview,time,46,false)[2]<30&&pixel(emptyPreview,time,32,false)[1]<30,'Sin audio no se simulan otras expresiones');
+    }
+    await wait(`document.getElementById('previewPngtuberVideo').readyState>=2`);
+    const browserIdle=await run(`(async()=>{const v=document.getElementById('previewPngtuberVideo');v.pause();
+        await new Promise(resolve=>{v.addEventListener('seeked',resolve,{once:true});v.currentTime=1.05;});
+        const c=document.createElement('canvas');c.width=64;c.height=64;const ctx=c.getContext('2d');ctx.drawImage(v,0,0,64,64);
+        return Array.from(ctx.getImageData(14,32,1,1).data);})()`);
+    assert.ok(browserIdle[0]>150,'El reproductor Electron también muestra idle, no solo el archivo renderizado');
+    assert.match(await run(`document.getElementById('previewPngtuberNota').textContent`),/reposo/);
+    assert.equal(await run(`JSON.stringify([pngtuberIdlePath,pngtuberTalkingPath,pngtuberBlinkPath])`),character,'Cambiar fuente no pierde imágenes');
+    // Completar otra transición externo -> Studio -> externo, conservando el personaje.
+    for(const input of ['segmented.wav','segmented.mp3']){
+        const previous=await run(`document.getElementById('previewPngtuberVideo').src`);
+        await action(`const blob=await (await fetch('/audios/${input}')).blob();await videoAudioInput.importar(new File([blob],'${input}',{type:'audio/${input.endsWith('mp3')?'mpeg':'wav'}'}));`);
+        await wait(`!previewEnCurso&&!pendingPreview&&!document.getElementById('previewPngtuberVideo').hidden&&document.getElementById('previewPngtuberVideo').src!==${JSON.stringify(previous)}`);
+        verifyFrames(await run(`document.getElementById('previewPngtuberVideo').src`),false,false);
+        assert.equal(await run(`JSON.stringify([pngtuberIdlePath,pngtuberTalkingPath,pngtuberBlinkPath])`),character);
+        await action(`document.getElementById('videoAudioSource').value='studio';document.getElementById('videoAudioSource').dispatchEvent(new Event('change'));`);
+        await wait(`!previewEnCurso&&!pendingPreview&&!document.getElementById('previewPngtuberVideo').hidden`);
+        verifyFrames(await run(`document.getElementById('previewPngtuberVideo').src`),true,false);
+    }
+    console.log('EXTERNAL_AUDIO_ELECTRON_PASS: reposo sin archivo, inicio/pausas/final, prioridad exclusiva, WAV/MP3, Studio y MP4/WebM reales');
 };

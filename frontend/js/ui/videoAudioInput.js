@@ -4,6 +4,7 @@
     let externo = null, revision = 0, cargando = false;
     const el = id => document.getElementById(id);
     const modo = () => el('videoAudioSource')?.value || 'studio';
+    const sinAudioExterno = () => modo() === 'external' && !externo;
     const firmaStudio = () => `${global.audioEditor?._loadToken}:${global.audioEditor?._revisionAudio}`;
     let ultimaFuenteStudio = firmaStudio();
     function invalidarPreview() {
@@ -38,6 +39,10 @@
         const player = el('videoAudioPlayer');
         if (!external || !externo) { player.pause(); player.removeAttribute('src'); player.hidden = true; }
         else { player.src = `${global.CONFIG.API_BASE}${externo.url}`; player.hidden = false; }
+        const nota = el('previewPngtuberNota');
+        if (nota) nota.textContent = sinAudioExterno()
+            ? 'Sin audio externo: vista previa en reposo. Importa un WAV o MP3 para sincronizar las expresiones.'
+            : 'Con audio: primeros 4 segundos sincronizados (activa el sonido en el reproductor). Sin audio: animación de demostración.';
     }
     async function importar(file) {
         if (!file) return false;
@@ -70,7 +75,7 @@
         }
         return global.rutaVozPersistida ? global.rutaVozPersistida() : null;
     }
-    global.videoAudioInput = { importar, ruta, notificarFuenteStudio, version: () => `${revision}:${modo()}:${modo() === 'studio' ? firmaStudio() : ''}` };
+    global.videoAudioInput = { importar, ruta, notificarFuenteStudio, sinAudioExterno, version: () => `${revision}:${modo()}:${modo() === 'studio' ? firmaStudio() : ''}` };
     document.addEventListener('DOMContentLoaded', () => {
         el('videoAudioSource').onchange = () => { revision++; cargando = false; invalidarPreview(); invalidarResultado(); actualizar(); refrescarPreview(); };
         el('videoAudioFile').onchange = async event => { await importar(event.target.files[0]); event.target.value = ''; };

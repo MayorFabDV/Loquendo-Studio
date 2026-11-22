@@ -60,7 +60,10 @@ async function coordinator(){
                 if((args||[]).some(a=>/generar_ass\\.py$/i.test(a))&&options?.env?.LOQUENDO_TRANSCRIPTION_ENABLED!=='0')throw Error('ASS debe ejecutarse sin transcripción');
                 return original(file,args,options);
             };require('./server.js');`;
-        server=spawn(process.execPath,process.argv.includes('--maintenance')?['-e',guarded]:['server.js'],{cwd:root,env,windowsHide:true});
+        const pngtuberClock = `const VideoService=require('./backend/services/videoService');
+            VideoService.prototype._fechasParpadeo=duration=>[1.2,2.2].filter(t=>t+0.13<duration);require('./server.js');`;
+        server=spawn(process.execPath,process.argv.includes('--maintenance')?['-e',guarded]
+            :process.argv.includes('--external-audio')?['-e',pngtuberClock]:['server.js'],{cwd:root,env,windowsHide:true});
         let output='';server.stdout.on('data',d=>output+=d);server.stderr.on('data',d=>output+=d);
         const bound=await new Promise((resolve,reject)=>{
             const start=Date.now();const poll=()=>{const m=output.match(/Servidor escuchando en: http:\/\/localhost:(\d+)/);

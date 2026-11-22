@@ -35,7 +35,7 @@ El análisis de silencio mantiene sus datos locales por llamada y las pruebas re
 
 Archivos de aplicación modificados: `frontend/js/main.js`, `frontend/js/ui/videoAudioInput.js`, dos avisos de integración en `frontend/js/services/audioPlayer.js` y nombres de salida en `backend/services/videoService.js`.
 
-## Verificación
+## Verificación inicial (commit `ac7f75c`)
 
 | Comando | Resultado |
 |---|---|
@@ -66,3 +66,41 @@ El mock de documento de una prueba legacy se completó con `querySelector`, que 
 - La excepción Leonor del tester sigue pendiente de su informe; no se presenta como resuelta por estas regresiones locales.
 - Fase 4 permanece pendiente: exclusiones y medición de paquete desempaquetado, sin instalador de publicación.
 - Diagnóstico general y nuevas expresiones continúan sujetos a sus aprobaciones específicas; no se implementaron aquí.
+
+## Seguimiento: reposo al seleccionar audio externo sin archivo
+
+Fecha: 2026-11-22. Base de este seguimiento: `ac7f75c`. Se reabrió la comprobación de Fase 3 antes de avanzar a Fase 4.
+
+### Reproducción y comparación
+
+Se utilizó un personaje de prueba con imágenes separadas y transparentes: idle rojo, talking azul y blink verde. Después de usar audio de Studio, seleccionar **audio externo sin un archivo importado** devolvía `audioPath:null`; el backend ejecutaba entonces la demostración habitual, que alterna hablando y parpadeo en momentos fijos. A 1,05 s aparecía talking y no idle, aunque las tres rutas de imagen seguían intactas.
+
+La prueba Electron falló antes de la corrección en la comprobación «Sin archivo externo, idle debe seguir visible en vez de simular habla». Una prueba del controlador confirmó también que no se solicitaba un modo de reposo explícito. Por tanto, el caso reproducido es de **comportamiento visual de la preview sin archivo seleccionado**, no de pérdida/carga del PNG idle.
+
+Con WAV/MP3 ya importados, se compararon preview y MP4/WebM: idle aparece en el primer fotograma, los silencios intermedios y el silencio final. La exportación con audio no reprodujo este defecto visual de la selección vacía. La matriz conserva además la comprobación de audio totalmente silencioso en WAV/MP3.
+
+### Corrección mínima
+
+- El selector informa si se ha elegido externo sin archivo; esa condición forma parte del snapshot previo al `await`.
+- La petición de preview solicita `soloReposo:true` únicamente para ese estado. El backend lo utiliza solo cuando no hay audio y compone una preview de idle sin simular habla ni parpadeo.
+- Al importar un archivo, se vuelve automáticamente al análisis/sincronización de audio existentes; al quitarlo se vuelve a reposo. Las imágenes talking/blink se conservan y vuelven a utilizarse con audio.
+- La nota visible aclara **«Sin audio externo: vista previa en reposo»**. No se recurre a la voz de Studio como fallback al elegir externo vacío.
+- Se conservan la demostración anterior para los clientes/modos que no soliciten reposo y las exportaciones con audio. No se cambia ningún documento de proyecto, configuración persistente, archivo de audio ni imagen original.
+- Permanecen los snapshots de fuente/opciones, la cola de preview, las URLs únicas y el descarte de respuestas obsoletas de Fase 3. Con audio sigue vigente la prioridad exclusiva **blink > talking > idle**.
+
+### Pruebas de este seguimiento
+
+| Comando | Resultado |
+|---|---|
+| `npm test` | **67 aprobadas, ninguna omitida** |
+| `node --test tests/pngtuberSource.test.js tests/pngtuber.test.js` | 13 casos focalizados aprobados |
+| `node scripts/smoke_projects.cjs --external-audio` | Electron/Express/FFmpeg reales: reposo sin archivo, WAV/MP3, Studio/externo, MP4/WebM, alfa, cambios consecutivos y respuestas tardías; aprobado |
+| `node scripts/smoke_projects.cjs --sapi --voice=Leonor` | Flujo real de voz/edición/persistencia/mezclador y PNGTuber aprobado |
+| `node scripts/smoke_projects.cjs --maintenance` | Mantenimiento de Subtítulos y operaciones SRT/ASS independientes aprobados |
+| `node scripts/smoke_projects.cjs` | Proyectos, portable, medios y render reales aprobados |
+
+Para comprobar expresiones exactas, solo el servidor del smoke externo fija parpadeos en 1,20 y 2,20 s; el calendario aleatorio de producción no cambia. En preview y exportación se verifican por píxeles: **0 s idle; 1,05 s talking; 1,25 s blink; 1,75 s idle; 2,25 s blink; 2,96 s idle**, sin superposiciones. Se verifican también los primeros/últimos fotogramas de la preview sin audio y se captura un fotograma directamente del reproductor de Electron mediante canvas, confirmando idle en pantalla.
+
+Los ciclos adicionales externo → Studio → externo conservan exactamente las tres rutas de imágenes. La suite retiene las pruebas de importación retirada, rutas tardías y respuestas de preview/exportación obsoletas. Sintaxis de ocho JS/CJS y `git diff --check` correctos.
+
+**Estado:** seguimiento corregido y verificado en desarrollo. La preview con audio sigue mostrando los primeros cuatro segundos; no se agregan silencios artificiales al video. No se inició Fase 4 ni se generó distribución. El diagnóstico general sigue pendiente de aprobación de alcance.

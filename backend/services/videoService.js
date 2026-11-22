@@ -361,8 +361,8 @@ class VideoService {
         const fondoColor = this._colorDeFondo(opciones.fondo);
         const transparente = fondoColor === null;
         const duracion = 4;
-        const usarTalking = talkingImage && fs.existsSync(talkingImage) && talkingImage !== idleImage;
-        const usarBlink = blinkImage && fs.existsSync(blinkImage);
+        const usarTalking = !opciones.soloReposo && talkingImage && fs.existsSync(talkingImage) && talkingImage !== idleImage;
+        const usarBlink = !opciones.soloReposo && blinkImage && fs.existsSync(blinkImage);
 
         const ext = transparente ? 'webm' : 'mp4';
         const nombrePreview = `preview-${Date.now()}-${randomUUID()}.${ext}`;

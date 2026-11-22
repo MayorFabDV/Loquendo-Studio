@@ -84,3 +84,24 @@ test('previews de demostración tienen rutas únicas y cambiar MP4/WebM conserva
     await service.generarPreviewPNGTuber({idleImagePath:'idle.png',fondo:'transparent'});
     for(const preview of [first,second])assert.ok(fs.existsSync(path.join(root,path.basename(preview.url))),'Cambiar formato no debe borrar una salida que otro reproductor puede seguir usando');
 });
+
+test('preview soloReposo muestra idle durante todo el clip aunque talking y blink estén cargados',{
+    skip:!fs.existsSync(ffmpeg)||!fs.existsSync(ffprobe),timeout:120000
+},async t=>{
+    const root=fs.mkdtempSync(path.join(os.tmpdir(),'loquendo-preview-idle-'));
+    t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+    for(const [name,color,x] of [['idle','red',8],['talking','blue',40],['blink','lime',24]]){
+        run(['-f','lavfi','-i',`color=c=black@0.0:s=64x64,format=rgba,drawbox=x=${x}:y=16:w=16:h=32:color=${color}@1:t=fill:replace=1`,
+            '-frames:v','1',path.join(root,name+'.png')]);
+    }
+    const service=new VideoService(ffmpeg,root,root,ffprobe);
+    for(const fondo of ['black','transparent']){
+        const preview=await service.generarPreviewPNGTuber({idleImagePath:'idle.png',talkingImagePath:'talking.png',blinkImagePath:'blink.png',fondo,soloReposo:true});
+        const file=path.join(root,path.basename(preview.url)),alpha=fondo==='transparent';
+        for(const time of [0,1.05,2.65,3.96]){
+            assert.ok(pixel(file,time,14,32,alpha)[0]>150,'Idle no debe sustituirse por la demostración de habla/parpadeo');
+            const talk=pixel(file,time,46,32,alpha),blink=pixel(file,time,32,32,alpha);
+            assert.ok(alpha?talk[3]<20:talk[2]<30);assert.ok(alpha?blink[3]<20:blink[1]<30);
+        }
+    }
+});

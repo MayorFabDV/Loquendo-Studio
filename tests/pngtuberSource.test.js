@@ -107,3 +107,25 @@ test('quitar archivo durante una importación no permite que la respuesta tardí
     assert.equal(await h.ctx.window.videoAudioInput.ruta({preview:true}),null);
     assert.equal(h.node('videoAudioPlayer').hidden,true);
 });
+
+test('seleccionar audio externo sin archivo solicita reposo, sin reutilizar voz de Studio ni simular habla',async()=>{
+    const h=setup();h.ctx.window.rutaVozPersistida=async()=>'/audios/voz-studio.wav';
+    h.node('videoAudioSource').onchange();await settle();
+    const request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
+    assert.equal(request.body.audioPath,null);
+    assert.equal(request.body.soloReposo,true);
+    assert.equal(request.body.idleImagePath,'/pngtuber/idle.png');
+    assert.equal(request.body.talkingImagePath,'/pngtuber/talking.png','Se conserva la imagen, aunque no se active sin audio');
+});
+
+test('cargar y quitar audio externo alterna soloReposo sin borrar las imágenes del personaje',async()=>{
+    const h=setup();h.node('videoAudioSource').onchange();await settle();
+    await h.ctx.window.videoAudioInput.importar(h.file());await settle();
+    let request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
+    assert.equal(request.body.soloReposo,false);assert.equal(request.body.audioPath,'/audios/1.wav');
+    h.node('videoAudioRemove').onclick();await settle();
+    request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
+    assert.equal(request.body.soloReposo,true);assert.equal(request.body.audioPath,null);
+    assert.equal(request.body.idleImagePath,'/pngtuber/idle.png');
+    assert.equal(request.body.talkingImagePath,'/pngtuber/talking.png');
+});

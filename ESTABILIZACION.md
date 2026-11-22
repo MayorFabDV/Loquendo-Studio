@@ -124,7 +124,7 @@ Estado de Git verificado antes de modificar archivos: árbol limpio, rama `featu
 |---|---|---|
 | 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
 | 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Diagnóstico implementado y verificado; causa bloqueada por falta del informe del tester (`OPTIMIZACION_FASE2.md`) |
-| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Completada en desarrollo; informe `OPTIMIZACION_FASE3.md` |
+| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Verificada en desarrollo, incluido seguimiento de reposo al elegir externo sin archivo; informe `OPTIMIZACION_FASE3.md` |
 | 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
 | 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
 
@@ -192,3 +192,10 @@ Dependencias/riesgos a resolver al aprobar: compatibilidad del esquema de inform
 - Informe completo: [OPTIMIZACION_FASE3.md](OPTIMIZACION_FASE3.md). No se generó distribución ni se avanzó en exclusiones de Fase 4.
 - La mejora general de diagnóstico quedó registrada en el commit `ad83bf0`, **sin implementar**: dentro de Configuración, sin pestaña principal nueva, reutilizando el núcleo y conservando el CMD. Aunque Fase 3 esté verificada, sigue requiriendo aprobación específica de alcance antes de implementarla.
 - Leonor sigue pendiente de evidencia externa según Fase 2; esta corrección PNGTuber no cambia la síntesis ni la política de mantenimiento.
+
+### Seguimiento de Fase 3 — Idle en selección externa
+
+- Reproducido el detalle adicional: externo sin archivo enviaba audio vacío y activaba la demostración de talking/blink. El PNG idle no se perdía; la preview simulada lo sustituía. Con audio importado, preview/exportaciones mostraban correctamente los silencios.
+- Corregido mediante `soloReposo` explícito en preview sin audio externo, con nota visible aclaratoria. Importar/quitar archivo cambia entre reposo y sincronización sin borrar ninguna imagen ni cambiar proyectos. Se mantienen prioridad exclusiva y guardas asíncronas.
+- **67 pruebas Node aprobadas, ninguna omitida**. Electron y exportaciones reales MP4/WebM con WAV/MP3: primer fotograma, silencio intermedio, parpadeos durante habla y último fotograma; verificación de píxeles/alfa y captura directa del reproductor. Ciclos externos/Studio y respuestas obsoletas aprobados; regresiones SAPI Leonor, mantenimiento y proyectos aprobadas.
+- Evidencia y alcance en la sección de seguimiento de [OPTIMIZACION_FASE3.md](OPTIMIZACION_FASE3.md). No se avanzó a Fase 4 ni se generó distribución.
