@@ -4,10 +4,31 @@
     let externo = null, revision = 0, cargando = false;
     const el = id => document.getElementById(id);
     const modo = () => el('videoAudioSource')?.value || 'studio';
+    const firmaStudio = () => `${global.audioEditor?._loadToken}:${global.audioEditor?._revisionAudio}`;
+    let ultimaFuenteStudio = firmaStudio();
     function invalidarPreview() {
         const player = el('previewPngtuberVideo');
         player.pause(); player.removeAttribute('src'); player.load(); player.hidden = true;
         el('previewPngtuberPlaceholder').hidden = false;
+        el('previewPngtuberPlaceholder').textContent = 'La vista previa se actualizará con el audio seleccionado.';
+    }
+    function invalidarResultado() {
+        const player = el('videoPngtuberResultado');
+        player.pause(); player.removeAttribute('src'); player.load(); player.hidden = true;
+        el('placeholderVideoPngtuber').hidden = false;
+        const link = el('descargarVideoPngtuber');
+        link.removeAttribute('href'); link.hidden = true;
+    }
+    function refrescarPreview() {
+        if (!cargando && el('tab-video')?.classList.contains('tab-panel-activo')) {
+            global.actualizarPreviewPNGTuber?.();
+        }
+    }
+    function notificarFuenteStudio({ refrescar = true } = {}) {
+        ultimaFuenteStudio = firmaStudio();
+        if (modo() !== 'studio') return;
+        revision++; invalidarPreview(); invalidarResultado();
+        if (refrescar) refrescarPreview();
     }
     function actualizar() {
         const external = modo() === 'external';
@@ -32,12 +53,13 @@
             if (token !== revision) return false;
             externo = data;
             el('videoAudioSource').value = 'external';
+            invalidarResultado();
             return true;
         } catch (error) {
             if (token === revision) global.notifications?.error(error.message);
             return false;
         } finally {
-            if (token === revision) { cargando = false; actualizar(); }
+            if (token === revision) { cargando = false; actualizar(); refrescarPreview(); }
         }
     }
     async function ruta({ preview = false } = {}) {
@@ -48,11 +70,16 @@
         }
         return global.rutaVozPersistida ? global.rutaVozPersistida() : null;
     }
-    global.videoAudioInput = { importar, ruta, version: () => `${revision}:${modo()}:${modo() === 'studio' ? `${global.audioEditor?._loadToken}:${global.audioEditor?._revisionAudio}` : ''}` };
+    global.videoAudioInput = { importar, ruta, notificarFuenteStudio, version: () => `${revision}:${modo()}:${modo() === 'studio' ? firmaStudio() : ''}` };
     document.addEventListener('DOMContentLoaded', () => {
-        el('videoAudioSource').onchange = () => { revision++; cargando = false; invalidarPreview(); actualizar(); };
+        el('videoAudioSource').onchange = () => { revision++; cargando = false; invalidarPreview(); invalidarResultado(); actualizar(); refrescarPreview(); };
         el('videoAudioFile').onchange = async event => { await importar(event.target.files[0]); event.target.value = ''; };
-        el('videoAudioRemove').onclick = () => { revision++; cargando = false; externo = null; invalidarPreview(); actualizar(); };
+        el('videoAudioRemove').onclick = () => { revision++; cargando = false; externo = null; invalidarPreview(); invalidarResultado(); actualizar(); refrescarPreview(); };
+        document.addEventListener('loquendo:tab-activada', event => {
+            if (event.detail?.tabId !== 'tab-video') return;
+            if (modo() === 'studio' && ultimaFuenteStudio !== firmaStudio()) notificarFuenteStudio();
+            else if (el('previewPngtuberVideo').hidden) refrescarPreview();
+        });
         actualizar();
     });
 })(window);

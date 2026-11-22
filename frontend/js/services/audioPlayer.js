@@ -134,6 +134,7 @@ function asegurarEditorInicializado() {
 // ==========================================
 async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
     if (!urlAudio) return;
+    window.videoAudioInput?.notificarFuenteStudio?.({ refrescar: false });
     const secuencia = ++secuenciaCargaAudio;
     const conservarMarcadores = !!(opciones && opciones.conservarMarcadores);
     try {
@@ -216,6 +217,7 @@ async function cargarYReproducir(urlAudio, urlSRT, urlASS, opciones) {
                 await window.audioMarkers.cargarDesdeApp({ silencioso: true, forzar: true });
             }
         }
+        window.videoAudioInput?.notificarFuenteStudio?.();
         return true;
     } catch (error) {
         console.error("Error al cargar el audio:", error);

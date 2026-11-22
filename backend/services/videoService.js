@@ -365,11 +365,8 @@ class VideoService {
         const usarBlink = blinkImage && fs.existsSync(blinkImage);
 
         const ext = transparente ? 'webm' : 'mp4';
-        const rutaVideo = path.join(this.pngtuberFolder, `preview.${ext}`);
-        const rutaOpuesta = path.join(this.pngtuberFolder, `preview.${transparente ? 'mp4' : 'webm'}`);
-        if (fs.existsSync(rutaOpuesta)) {
-            try { fs.unlinkSync(rutaOpuesta); } catch (e) { /* ignore */ }
-        }
+        const nombrePreview = `preview-${Date.now()}-${randomUUID()}.${ext}`;
+        const rutaVideo = path.join(this.pngtuberFolder, nombrePreview);
 
         const [dimIdle, dimTalking, dimBlink] = await Promise.all([
             this._dimensionesImagen(idleImage),
@@ -433,8 +430,8 @@ class VideoService {
             rutaVideo
         );
 
-        await this._ejecutarFFmpeg(ffmpegArgs, filterScript, rutaVideo, `preview.${ext}`);
-        return { url: `/pngtuber/preview.${ext}` };
+        await this._ejecutarFFmpeg(ffmpegArgs, filterScript, rutaVideo, nombrePreview);
+        return { url: `/pngtuber/${nombrePreview}` };
     }
 }
 

@@ -70,3 +70,17 @@ test('PNGTuber distingue silencio total de habla y rechaza audio inválido',{
     const broken=path.join(root,'broken.wav');fs.writeFileSync(broken,'no es audio');
     await assert.rejects(service.detectarSegmentosVoz(broken),/No se pudo analizar/);
 });
+
+test('previews de demostración tienen rutas únicas y cambiar MP4/WebM conserva las anteriores',{
+    skip:!fs.existsSync(ffmpeg)||!fs.existsSync(ffprobe),timeout:60000
+},async t=>{
+    const root=fs.mkdtempSync(path.join(os.tmpdir(),'loquendo-preview-identity-'));
+    t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+    run(['-f','lavfi','-i','color=red:s=64x64','-frames:v','1',path.join(root,'idle.png')]);
+    const service=new VideoService(ffmpeg,root,root,ffprobe);
+    const first=await service.generarPreviewPNGTuber({idleImagePath:'idle.png',fondo:'black'});
+    const second=await service.generarPreviewPNGTuber({idleImagePath:'idle.png',fondo:'black'});
+    assert.notEqual(first.url,second.url,'Una petición posterior no debe reescribir la preview anterior');
+    await service.generarPreviewPNGTuber({idleImagePath:'idle.png',fondo:'transparent'});
+    for(const preview of [first,second])assert.ok(fs.existsSync(path.join(root,path.basename(preview.url))),'Cambiar formato no debe borrar una salida que otro reproductor puede seguir usando');
+});

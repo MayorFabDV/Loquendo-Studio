@@ -16,6 +16,8 @@ let pngtuberTalkingPath = null;
 let pngtuberBlinkPath = null;
 let previewEnCurso = false;
 let pendingPreview = false;
+let revisionPreviewPNGTuber = 0;
+let renderPNGTuberEnCurso = false;
 
 // ✅ Función auxiliar para notificaciones
 function notificar(tipo, mensaje, duracion) {
@@ -546,6 +548,23 @@ function obtenerOpcionesPNGTuber() {
     };
 }
 
+function capturarEstadoPNGTuber() {
+    return {
+        fuente: window.videoAudioInput?.version() ?? JSON.stringify(versionAudioActual()),
+        opciones: {
+            idleImagePath: pngtuberIdlePath || null,
+            talkingImagePath: pngtuberTalkingPath || null,
+            blinkImagePath: pngtuberBlinkPath || null,
+            fondo: document.getElementById('fondoPNGTuber')?.value || 'green',
+            ...obtenerOpcionesPNGTuber()
+        }
+    };
+}
+
+function estadoPNGTuberActual(estado) {
+    return JSON.stringify(estado) === JSON.stringify(capturarEstadoPNGTuber());
+}
+
 async function subirImagenPNGTuber(tipo = 'idle') {
     const ids = { idle: 'pngtuberIdleInput', talking: 'pngtuberTalkingInput', blink: 'pngtuberBlinkInput' };
     const inputId = ids[tipo] || 'pngtuberIdleInput';
@@ -592,6 +611,7 @@ async function subirImagenPNGTuber(tipo = 'idle') {
 }
 
 async function actualizarPreviewPNGTuber() {
+    const solicitud = ++revisionPreviewPNGTuber;
     const video = document.getElementById('previewPngtuberVideo');
     const placeholder = document.getElementById('previewPngtuberPlaceholder');
     const btn = document.getElementById('btnActualizarPreview');
@@ -602,6 +622,7 @@ async function actualizarPreviewPNGTuber() {
         video.hidden = true;
         video.removeAttribute('src');
         placeholder.hidden = false;
+        placeholder.textContent = 'Sube una imagen en reposo para ver la vista previa.';
         return;
     }
 
@@ -610,28 +631,23 @@ async function actualizarPreviewPNGTuber() {
     const textoBtn = btn ? btn.innerText : '';
     if (btn) { btn.innerText = 'Generando...'; btn.disabled = true; }
 
-    const fondo = document.getElementById('fondoPNGTuber')?.value || 'green';
-    const { resolucion, escala } = obtenerOpcionesPNGTuber();
+    const estado = capturarEstadoPNGTuber();
+    const vigente = () => solicitud === revisionPreviewPNGTuber && estadoPNGTuberActual(estado);
 
     try {
         const audioPath = window.videoAudioInput ? await window.videoAudioInput.ruta({ preview: true }) : null;
-        const versionFuente = window.videoAudioInput?.version();
+        if (!vigente()) return;
         const res = await fetch(`${API_BASE}/api/pngtuber/preview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 audioPath,
-                idleImagePath: pngtuberIdlePath,
-                talkingImagePath: pngtuberTalkingPath || null,
-                blinkImagePath: pngtuberBlinkPath || null,
-                fondo,
-                resolucion,
-                escala
+                ...estado.opciones
             })
         });
         const data = await res.json();
+        if (!vigente()) return;
         if (!res.ok) throw new Error(data.error || 'Error al generar la vista previa');
-        if (versionFuente !== window.videoAudioInput?.version()) return;
 
         video.src = `${API_BASE}${data.url}?t=${Date.now()}`;
         video.hidden = false;
@@ -639,6 +655,7 @@ async function actualizarPreviewPNGTuber() {
         video.load();
         video.play().catch(() => {});
     } catch (error) {
+        if (!vigente()) return;
         console.error('Error generando vista previa:', error);
         notificar('error', error.message || 'Error al generar la vista previa.');
         video.hidden = true;
@@ -651,16 +668,9 @@ async function actualizarPreviewPNGTuber() {
 }
 
 async function generarVideoPNGTuber() {
-    let audioPath;
-    try { audioPath = window.videoAudioInput ? await window.videoAudioInput.ruta() : await rutaVozPersistida(); }
-    catch (error) { notificar('warning', error.message); return; }
-    const versionFuente = window.videoAudioInput?.version();
-    if (!audioPath || audioPath.startsWith('blob:')) {
-        notificar('warning', 'Primero genera un audio válido (no ediciones temporales).');
-        return;
-    }
-    
-    let rutaLimpia = String(audioPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
+    if (renderPNGTuberEnCurso) return false;
+    renderPNGTuberEnCurso = true;
+    const estado = capturarEstadoPNGTuber();
     const btnVideo = document.querySelector('.btn-video');
     const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Generar Video PNGTuber';
     
@@ -670,23 +680,29 @@ async function generarVideoPNGTuber() {
     }
     
     try {
+        let audioPath;
+        try { audioPath = window.videoAudioInput ? await window.videoAudioInput.ruta() : await rutaVozPersistida(); }
+        catch (error) {
+            if (estadoPNGTuberActual(estado)) notificar('warning', error.message);
+            return false;
+        }
+        if (!estadoPNGTuberActual(estado)) return false;
+        if (!audioPath || audioPath.startsWith('blob:')) {
+            notificar('warning', 'Selecciona un audio válido para generar el video.');
+            return false;
+        }
+        const rutaLimpia = String(audioPath).replace(API_BASE, '').replace(/^\/+/, '').split('?')[0];
         notificar('info', 'Procesando video...');
-        const { resolucion, escala } = obtenerOpcionesPNGTuber();
         const res = await fetch(`${API_BASE}/api/generar-video-pngtuber`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 audioPath: rutaLimpia,
-                idleImagePath: pngtuberIdlePath || null,
-                talkingImagePath: pngtuberTalkingPath || null,
-                blinkImagePath: pngtuberBlinkPath || null,
-                fondo: document.getElementById('fondoPNGTuber')?.value || 'green',
-                resolucion,
-                escala
+                ...estado.opciones
             })
         });
         const data = await res.json();
-        if (versionFuente !== window.videoAudioInput?.version()) return;
+        if (!estadoPNGTuberActual(estado)) return false;
         if (res.ok) {
             notificar('success', '¡Video PNGTuber generado con éxito!');
             const ext = (data.video || '').toLowerCase().endsWith('.webm') ? 'webm' : 'mp4';
@@ -710,9 +726,11 @@ async function generarVideoPNGTuber() {
             notificar('error', 'Error: ' + (data.error || 'Desconocido'));
         }
     } catch (error) {
+        if (!estadoPNGTuberActual(estado)) return false;
         console.error('Error generando video:', error);
         notificar('error', 'Error de conexión al generar video.');
     } finally {
+        renderPNGTuberEnCurso = false;
         if (btnVideo) {
             btnVideo.innerText = textoOriginalBtn;
             btnVideo.disabled = false;

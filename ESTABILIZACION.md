@@ -124,7 +124,7 @@ Estado de Git verificado antes de modificar archivos: árbol limpio, rama `featu
 |---|---|---|
 | 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
 | 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Diagnóstico implementado y verificado; causa bloqueada por falta del informe del tester (`OPTIMIZACION_FASE2.md`) |
-| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | En curso, prioridad actual |
+| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Completada en desarrollo; informe `OPTIMIZACION_FASE3.md` |
 | 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
 | 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
 
@@ -182,3 +182,13 @@ Pruebas automatizadas y Electron reales por fase; commits independientes y actua
 6. **Informe de soporte:** ZIP con datos estructurados y resumen legible, sin voces/DLL redistribuidas, textos personales, WAV/audios, guiones, biblioteca, proyectos ni rutas sensibles. Reutilizar y probar la redacción existente; representar directorios con identificadores lógicos.
 
 Dependencias/riesgos a resolver al aprobar: compatibilidad del esquema de informe del diagnóstico Leonor, diferencias dev/instalado/portable, ubicación escribible del informe, evitar congelar la UI con comprobaciones profundas y respetar los componentes excluidos en Fase 4. La sección no debe ampliar el editor de audio ni el mezclador.
+
+### Continuidad tras Fase 3 — PNGTuber
+
+- Reproducido en Electron: importar el segundo audio ocultaba/vaciaba la preview sin solicitar otra, aunque idle seguía cargado. Se corrigió el refresco automático y la invalidación de resultados anteriores, incluidas las fuentes de Studio.
+- Reproducidas carreras al resolver la ruta: la revisión se capturaba después del `await`. Ahora se captura antes junto con imágenes/opciones y se verifica antes de enviar y al recibir resultados. Respuestas/errores obsoletos no publican previews, videos ni descargas del audio anterior.
+- Las previews de demostración ahora tienen UUID; no sobrescriben `preview.mp4/webm` ni borran la salida del formato contrario. Se mantiene la prioridad exclusiva blink > talking > idle.
+- **64 pruebas Node aprobadas, ninguna omitida**. Electron/Express/FFmpeg reales: cambios repetidos WAV/MP3, silencio en ambos formatos, Studio/externo, píxeles idle/habla y alfa, respuestas reales retenidas deliberadamente y exportaciones MP4/WebM. Regresiones de sesiones, biblioteca/ducking, proyectos, mezclador, mantenimiento de Subtítulos y voz SAPI Leonor aprobadas.
+- Informe completo: [OPTIMIZACION_FASE3.md](OPTIMIZACION_FASE3.md). No se generó distribución ni se avanzó en exclusiones de Fase 4.
+- La mejora general de diagnóstico quedó registrada en el commit `ad83bf0`, **sin implementar**: dentro de Configuración, sin pestaña principal nueva, reutilizando el núcleo y conservando el CMD. Aunque Fase 3 esté verificada, sigue requiriendo aprobación específica de alcance antes de implementarla.
+- Leonor sigue pendiente de evidencia externa según Fase 2; esta corrección PNGTuber no cambia la síntesis ni la política de mantenimiento.

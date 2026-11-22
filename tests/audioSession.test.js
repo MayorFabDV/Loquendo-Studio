@@ -20,7 +20,7 @@ function preparar() {
         warning:m=>avisos.push(m),error:m=>avisos.push(m),success(){}},audioMarkers:{
         getMarkers:()=>structuredClone(markers),setMarkers:m=>{markers=structuredClone(m);}}},
         console:{log(){},warn(){},error(){}},URL,Blob,FormData,setTimeout,clearTimeout,
-        document:{getElementById:()=>null,addEventListener(){},readyState:'loading'} });
+        document:{getElementById:()=>null,querySelector:()=>null,addEventListener(){},readyState:'loading'} });
     ctx.window.AudioContext=class {
         async decodeAudioData(bytes) {const n=new Uint8Array(bytes)[0];if(n===0)throw new Error('audio inválido');return buffer(n/255);}
         createBuffer(){return buffer();} close(){return Promise.resolve();}
