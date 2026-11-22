@@ -123,7 +123,7 @@ Estado de Git verificado antes de modificar archivos: árbol limpio, rama `featu
 | Fase | Alcance aprobado | Estado |
 |---|---|---|
 | 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
-| 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Pendiente |
+| 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Diagnóstico implementado y verificado; causa bloqueada por falta del informe del tester (`OPTIMIZACION_FASE2.md`) |
 | 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Pendiente |
 | 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
 | 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
@@ -145,3 +145,12 @@ Pruebas automatizadas y Electron reales por fase; commits independientes y actua
 - **55 pruebas Node aprobadas, ninguna omitida**. Smokes Electron de mantenimiento, SAPI real (incluida petición API con `usarIA:true`), audio externo, biblioteca musical entre reinicios, recuperación, sesiones base y mezclador aprobados.
 - No se modificó `generar_voz.py`, no se recompiló el exe ni se retiraron componentes del paquete en esta fase. No se generó distribución.
 - Siguiente fase: diagnóstico reproducible Leonor/COM, sin atribuir aún la causa a multivoz. Informe técnico de esta fase: [OPTIMIZACION_FASE1.md](OPTIMIZACION_FASE1.md).
+
+### Continuidad tras investigación local de Fase 2
+
+- Herramienta independiente en `tools/diagnostico_sapi/`, lanzador `Diagnosticar_Leonor.cmd`: usa el Python embebido x86, sin instalar nada ni modificar registro/archivos de Studio. Produce `para_compartir.zip` con Markdown/JSON depurados, sin WAV ni rutas personales.
+- Se comparan COM mínimo, script original y exe original, texto plano/XML, etiquetas de voz, formato/reasignación y cambios Jorge/Leonor en procesos separados. Se registra llamada/línea original, token, arquitectura, HRESULT externo e interno (`excepinfo`), timeouts y fallos nativos.
+- Leonor está instalada localmente y **26 comprobaciones reales pasaron**, incluido el listado usado por Studio. También pasó la generación real de Leonor desde Electron. **No se reprodujo el error del tester**; no se atribuyó a multivoz ni se aplicó un cambio especulativo de síntesis.
+- **56 pruebas en `npm test` aprobadas**, incluida una prueba que ejecuta siete verificaciones Python del diagnóstico. Smoke de mantenimiento de Fase 1 y smoke SAPI/Electron con Leonor aprobados.
+- Commit de herramienta/pruebas: `d7b7a1f`. Se preservan `generar_voz.py`, exe y política de Fase 1 sin modificaciones. No se inició Fase 3 ni se generó distribución.
+- **Bloqueo externo:** falta ejecutar la herramienta sobre la instalación que falla y recibir su `para_compartir.zip`, versión/arquitectura de Loquendo TTS, captura/traza original depurada y, si los casos fijos pasan, una frase mínima sin datos personales que reproduzca el error. Procedimiento y referencia local: [OPTIMIZACION_FASE2.md](OPTIMIZACION_FASE2.md).

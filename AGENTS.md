@@ -50,6 +50,7 @@ No hay lint/typecheck configurado. Existe suite Node (`npm test`) y smokes Elect
 - Conservar el código y las operaciones independientes: marcadores SRT existentes desde Audio, plantillas matemáticas explícitas (`metodo: 'plantilla'`) y conversión de SRT existente a ASS.
 - Los procesos Python de conversión reciben `LOQUENDO_TRANSCRIPTION_ENABLED=0`: no importar ni iniciar Whisper desde ese camino. No hacer fallback a transcripción si falta el SRT.
 - El usuario autorizó una carpeta desempaquetada de prueba para medir tamaño en la Fase 4, con salida separada. No generar instalador de publicación. Plan completo y estados en `ESTABILIZACION.md`.
+- Diagnóstico Leonor preparado en `tools/diagnostico_sapi/` (lanzador `.cmd`, Python embebido x86). Referencia en `OPTIMIZACION_FASE2.md`: las pruebas locales pasan, pero la causa del fallo del tester sigue pendiente de evidencia externa. No presentar multivoz/formato/registro como causa confirmada ni modificar la síntesis sin reproducirla.
 
 ## Compilar generar_voz.py con Nuitka (proceso establecido)
 
