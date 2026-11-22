@@ -1,6 +1,7 @@
 // node scripts/smoke_projects.cjs
 // --desktop: main/preload reales, puerto ocupado, IPC y cierre de Electron.
 // --sapi: voces instaladas + Python/binario x86 reales, UI de voz y PNGTuber.
+// --sapi --voice=Leonor: mismo flujo con Leonor (debe estar instalada).
 // --maintenance: bloqueo de transcripción y operaciones SRT/ASS independientes reales.
 // Express/server.js y Electron reales en un sandbox; ningún dato del usuario se modifica.
 'use strict';
@@ -67,7 +68,7 @@ async function coordinator(){
                 if(Date.now()-start>30000)return reject(new Error('Timeout de Express: '+output));setTimeout(poll,50);};poll();
         });
         await new Promise((resolve,reject)=>{
-            const childEnv={...process.env,PROJECT_TEST_URL:'http://localhost:'+bound,PROJECT_TEST_ROOT:root,PROJECT_TEST_SAPI:nativeVoice?'1':'0',PROJECT_TEST_EXTERNAL:process.argv.includes('--external-audio')?'1':'0',PROJECT_TEST_MAINTENANCE:process.argv.includes('--maintenance')?'1':'0'};delete childEnv.ELECTRON_RUN_AS_NODE;
+            const childEnv={...process.env,PROJECT_TEST_URL:'http://localhost:'+bound,PROJECT_TEST_ROOT:root,PROJECT_TEST_SAPI:nativeVoice?'1':'0',PROJECT_TEST_VOICE:process.argv.find(arg=>arg.startsWith('--voice='))?.slice('--voice='.length)||'Jorge',PROJECT_TEST_EXTERNAL:process.argv.includes('--external-audio')?'1':'0',PROJECT_TEST_MAINTENANCE:process.argv.includes('--maintenance')?'1':'0'};delete childEnv.ELECTRON_RUN_AS_NODE;
             const child=spawn(require('electron'),[__filename],{env:childEnv,stdio:'inherit',windowsHide:true});
             const timeout=setTimeout(()=>{child.kill();reject(new Error('Timeout de Electron'));},120000);
             child.on('error',error=>{clearTimeout(timeout);reject(error);});
@@ -188,11 +189,12 @@ async function renderer(){
             win.destroy();app.exit(0);return;
         }
         if(process.env.PROJECT_TEST_SAPI==='1'){
-            await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.value==='Jorge')`);
-            await action(`document.getElementById('vozSeleccionada').value='Jorge';document.getElementById('resultado').value='Prueba de voz generada desde Electron.';
+            const voice=process.env.PROJECT_TEST_VOICE||'Jorge';
+            await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.value===${JSON.stringify(voice)})`);
+            await action(`document.getElementById('vozSeleccionada').value=${JSON.stringify(voice)};document.getElementById('resultado').value='Prueba de voz generada desde Electron.';
                 document.getElementById('calidadSeleccionada').value='16k';document.getElementById('chkSRT_IA').checked=true;await generarAudio();`);
             await wait(`audioEditor.audioBuffer && !audioEditor._cargandoEdicion`);
-            const soloVoz=await run(`(async()=>{const r=await fetch('/api/generar-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'Prueba de voz sin transcripción durante mantenimiento.',voz:'Jorge',usarIA:true})});if(!r.ok)throw Error(await r.text());return r.json();})()`);
+            const soloVoz=await run(`(async()=>{const r=await fetch('/api/generar-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'Prueba de voz sin transcripción durante mantenimiento.',voz:${JSON.stringify(voice)},usarIA:true})});if(!r.ok)throw Error(await r.text());return r.json();})()`);
             assert.equal(soloVoz.srt,null);assert.equal(soloVoz.ass,null,'La API ignora usarIA:true durante mantenimiento');
             const url=await run('voiceAudioRealPath');
             const file=path.join(root,'backend/public',url.replace(/^\//,''));
@@ -221,7 +223,7 @@ async function renderer(){
             assert.equal(videoInfo.status,0,videoInfo.stderr);
             assert.deepEqual(JSON.parse(videoInfo.stdout).streams.map(s=>s.codec_type).sort(),['audio','video']);
             assert.deepEqual(await run('projectErrors'),[]);
-            console.log('SAPI_RENDERER_PASS: Jorge desde UI, WAV 16k, fade, mezclador y PNGTuber con preview/video reales');
+            console.log(`SAPI_RENDERER_PASS: ${voice} desde UI, WAV 16k, fade, mezclador y PNGTuber con preview/video reales`);
             win.destroy();app.exit(0);return;
         }
         await action(`document.getElementById('contenedorReproductor').style.display='block';tabs.irA('audio');audioEditorUI.setMode('avanzado');audioEditorUI.setSubtab('mezclador');
