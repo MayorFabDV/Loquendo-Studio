@@ -124,7 +124,7 @@ Estado de Git verificado antes de modificar archivos: árbol limpio, rama `featu
 |---|---|---|
 | 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
 | 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Diagnóstico implementado y verificado; causa bloqueada por falta del informe del tester (`OPTIMIZACION_FASE2.md`) |
-| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Pendiente |
+| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | En curso, prioridad actual |
 | 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
 | 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
 
@@ -155,3 +155,30 @@ Pruebas automatizadas y Electron reales por fase; commits independientes y actua
 - Commit de herramienta/pruebas: `d7b7a1f`. Se preservan `generar_voz.py`, exe y política de Fase 1 sin modificaciones. No se inició Fase 3 ni se generó distribución.
 - **Bloqueo externo:** falta ejecutar la herramienta sobre la instalación que falla y recibir su `para_compartir.zip`, versión/arquitectura de Loquendo TTS, confirmación textual de la traza y, si los casos fijos pasan, una frase mínima sin datos personales que reproduzca el error. Las capturas ya recibidas se describen abajo. Procedimiento y referencia local: [OPTIMIZACION_FASE2.md](OPTIMIZACION_FASE2.md).
 - **Evidencia posterior recibida:** revisadas las dos capturas de `loquendo studio errores/`. La fotografía sitúa el COM en `speaker.Speak(texto_ssml, flags)` (línea 268), con lectura `DISP_E_EXCEPTION` externo / `E_FAIL` interno y mensajes IUnknown posteriores. La otra captura es un `WinError 3` al crear una carpeta, un fallo distinto. Se actualizó el informe de Fase 2; sigue faltando el ZIP del diagnóstico para confirmar token/flags/segmento/versiones y reproducir la causa. Las imágenes del usuario se conservan sin confirmar en Git.
+
+## Mejora pendiente — Diagnóstico del sistema en Configuración
+
+**Decisión del usuario:** integrar una sección **Diagnóstico del sistema dentro de la Configuración/Ajustes existente**, sin añadir una pestaña principal. Tendrá acciones de **Análisis rápido**, **Análisis profundo opcional** y **Exportar informe ZIP depurado**. Mantener el diagnóstico independiente mediante CMD para cuando Studio no pueda arrancar.
+
+**Estado: propuesta registrada y arquitectura evaluada; no implementada.** No interrumpe la Fase 3 de PNGTuber. Su implementación requiere terminar esa fase y una aprobación posterior del alcance.
+
+### Alcance propuesto
+
+- Voces SAPI5/Loquendo: tokens, arquitectura y disponibilidad; síntesis real solo en análisis profundo opcional, con texto fijo.
+- Python embebido x86 y dependencias de ejecución necesarias.
+- FFmpeg/FFprobe y dependencias de exportación/PNGTuber.
+- Directorios de trabajo/temporales, accesibilidad y permisos.
+- Versiones y hashes de componentes relevantes.
+- Estados comprensibles por comprobación: **correcto, advertencia, error y no comprobado**, con explicación breve.
+- No modificar registro, reinstalar componentes ni cambiar configuraciones automáticamente.
+
+### Arquitectura propuesta, sujeta a aprobación
+
+1. **Núcleo reutilizable:** extraer/adaptar las piezas de `tools/diagnostico_sapi/` (redacción, arquitectura PE, hashes, procesos aislados, límites de tiempo, resultados e informes) para reutilizarlas desde los dos puntos de entrada. No crear otra matriz SAPI ni otro depurador de datos en paralelo. Esta extracción todavía no se realiza.
+2. **Comprobaciones por componente:** identificador estable, estado, motivo, capacidad asociada, versión/hash y duración. Separar existencia física, compatibilidad y disponibilidad funcional: un componente presente no implica que su función esté habilitada.
+3. **Política de capacidades:** consultar `backend/services/featurePolicy.js` y el manifiesto del paquete. Una función intencionalmente deshabilitada o un componente retirado durante optimización debe aparecer como **no comprobado — deshabilitado/no incluido por diseño**, no como roto. No lanzar transcripción ni LanguageTool para comprobar una función deshabilitada.
+4. **Rápido frente a profundo:** el rápido revisa inventario, arquitecturas y disponibilidad sin sintetizar ni renderizar. El profundo ejecuta casos sintéticos aislados de voz, audio/exportación/PNGTuber y, si se aprueba, pruebas de escritura únicamente sobre archivos temporales propios que luego retira; nunca sobre archivos existentes del usuario. Definir tiempos, cancelación y casos exactos antes de implementar.
+5. **Integración UI:** bloque dentro de la Configuración actual, con invocación acotada al backend/IPC y progreso/resultados compartidos. No exponer ejecución arbitraria ni rutas completas a la UI de soporte. El CMD independiente consume el mismo núcleo aun si Electron/API no arrancan.
+6. **Informe de soporte:** ZIP con datos estructurados y resumen legible, sin voces/DLL redistribuidas, textos personales, WAV/audios, guiones, biblioteca, proyectos ni rutas sensibles. Reutilizar y probar la redacción existente; representar directorios con identificadores lógicos.
+
+Dependencias/riesgos a resolver al aprobar: compatibilidad del esquema de informe del diagnóstico Leonor, diferencias dev/instalado/portable, ubicación escribible del informe, evitar congelar la UI con comprobaciones profundas y respetar los componentes excluidos en Fase 4. La sección no debe ampliar el editor de audio ni el mezclador.
