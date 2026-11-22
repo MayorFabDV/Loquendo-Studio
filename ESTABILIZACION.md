@@ -125,7 +125,7 @@ Estado de Git verificado antes de modificar archivos: árbol limpio, rama `featu
 | 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
 | 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Diagnóstico implementado y verificado; causa bloqueada por falta del informe del tester (`OPTIMIZACION_FASE2.md`) |
 | 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Verificada en desarrollo con contrato aclarado: demo muda de 4 s independiente del audio y exportación sincronizada; informe `OPTIMIZACION_FASE3.md` |
-| 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
+| 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Completada; informe en OPTIMIZACION_FASE4.md |
 | 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
 
 ### Orden, dependencias y aceptación
@@ -209,3 +209,14 @@ La aclaración posterior del usuario sustituye el seguimiento anterior de `soloR
 - Etiquetas y ayuda distinguen «Vista previa de expresiones» y «Exportar video final».
 - **67 pruebas Node aprobadas, ninguna omitida**, y 13 casos focalizados. Electron/FFprobe verifican duración de 4 s, stream exclusivamente de video, tres expresiones con alfa y bucle efectivo en ambas fuentes. Las exportaciones MP4/WebM mantienen pista de audio, duración completa y expresión según silencios; pruebas con WAV/MP3 y respuestas tardías aprobadas. Smokes de Leonor, mantenimiento y recuperación aprobados.
 - Informe y evidencia actualizados en [OPTIMIZACION_FASE3.md](OPTIMIZACION_FASE3.md). No se avanzó a Fase 4 ni se generó distribución.
+
+### Continuidad tras Fase 4 — Optimización de tamaño
+
+- Respaldo físico completo e independiente organizado en `Actualizaciones_Futuras_Loquendo_Studio_1.2.0/` fuera del repositorio. 0 discrepancias de hash SHA-256 en los 979,44 MB resguardados (LanguageTool, JRE, Whisper.cpp y ggml-small.bin), con documentación e instrucciones de restauración en `INVENTARIO.md`.
+- Desactivación limpia y controlada de LanguageTool (`languageTool: false` en `featurePolicy.js`, guard en `server.js` respondiendo 503 `LANGUAGETOOL_DISABLED`, guard en frontend `corregirTexto` y botón deshabilitado con aviso). Los diccionarios locales y optimización de texto se conservan al 100%.
+- Bloqueo explícito de fallback de transcripción Whisper en `audioService.js`.
+- Filtros de empaquetado configurados en `package.json` para excluir del paquete JRE, LanguageTool, binarios Whisper, modelos y residuos temporales.
+- Reducción de la distribución Windows de prueba (`dist/win-unpacked`): de 1.778,33 MB a 798,42 MB (**-979,91 MB, reducción del 55,1%**). `resources/backend/bin` redujo de 1.203,69 MB a 223,53 MB (-81,4%).
+- Conservados obligatoriamente: Python x86 embebido de 32 bits, FFmpeg, FFprobe, SAPI5 Loquendo (`generar_voz.exe`), PNGTuber con sus 3 expresiones, mezclador, proyectos, biblioteca musical y recuperación de sesiones.
+- **70 pruebas Node aprobadas, ninguna omitida** (`npm test`). Smokes de Electron reales aprobados (`--maintenance`, `--sapi`, `--desktop --music-library`, `--recovery-ux`). Binarios del paquete (`generar_voz.exe`, ffmpeg, ffprobe, python 32-bit) validados directamente en `dist/win-unpacked`. Preload presente en `app.asar`.
+- Informe técnico detallado en [OPTIMIZACION_FASE4.md](OPTIMIZACION_FASE4.md). No se generó instalador definitivo ni se avanzó a la Fase 5.
