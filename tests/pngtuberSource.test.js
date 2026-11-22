@@ -34,22 +34,22 @@ function setup(){
     load('main.js');load('ui/videoAudioInput.js');
     // Solo el binding del selector; la inicialización general de la app se prueba con Electron.
     events.get('DOMContentLoaded').at(-1)();
-    vm.runInContext(`pngtuberIdlePath='/pngtuber/idle.png';pngtuberTalkingPath='/pngtuber/talking.png';`,ctx);
+    vm.runInContext(`pngtuberIdlePath='/pngtuber/idle.png';pngtuberTalkingPath='/pngtuber/talking.png';pngtuberBlinkPath='/pngtuber/blink.png';`,ctx);
     const file=()=>new File(['audio'],'prueba.wav',{type:'audio/wav'});
     return {ctx,node,requests,warnings,file,fetch,emit:(name,detail)=>events.get(name)?.forEach(fn=>fn({detail}))};
 }
 
-test('cambiar al segundo audio repone automáticamente la preview, sin volver a subir idle',async()=>{
+test('cambiar al segundo audio conserva la demostración visible sin volver a subir imágenes',async()=>{
     const h=setup();await h.ctx.window.videoAudioInput.importar(h.file());
     await h.ctx.window.actualizarPreviewPNGTuber();await settle();
     const previous=h.node('previewPngtuberVideo').src;
     await h.ctx.window.videoAudioInput.importar(h.file());await settle();
     assert.equal(h.node('previewPngtuberVideo').hidden,false);
-    assert.notEqual(h.node('previewPngtuberVideo').src,previous);
-    assert.equal(h.requests.filter(r=>r.url.endsWith('/preview')).at(-1).body.audioPath,'/audios/2.wav');
+    assert.equal(h.node('previewPngtuberVideo').src,previous);
+    assert.ok(h.requests.filter(r=>r.url.endsWith('/preview')).every(r=>!('audioPath' in r.body)));
 });
 
-for(const method of ['actualizarPreviewPNGTuber','generarVideoPNGTuber']){
+for(const method of ['generarVideoPNGTuber']){
     test(`${method}: una ruta que termina después de cambiar fuente no se etiqueta como la fuente nueva`,async()=>{
         const h=setup(),pending=deferred();let version=1;
         h.ctx.window.videoAudioInput={version:()=>version,ruta:()=>pending.promise};
@@ -60,18 +60,19 @@ for(const method of ['actualizarPreviewPNGTuber','generarVideoPNGTuber']){
     });
 }
 
-test('un error de preview antigua no se muestra ni impide procesar la fuente nueva encolada',async()=>{
+test('un error de preview con imágenes antiguas no se muestra ni impide procesar la configuración nueva',async()=>{
     const h=setup(),old=deferred();let first=true;
     h.ctx.fetch=(url,opts)=>{
         if(url.endsWith('/preview')&&first){first=false;return old.promise;}
         return h.fetch(url,opts);
     };
     await h.ctx.window.videoAudioInput.importar(h.file());await settle();
-    await h.ctx.window.videoAudioInput.importar(h.file());
+    vm.runInContext(`pngtuberIdlePath='/pngtuber/idle-nuevo.png';`,h.ctx);
+    await h.ctx.window.actualizarPreviewPNGTuber();
     old.reject(new Error('fallo de una fuente que ya no está seleccionada'));await settle();
     assert.deepEqual(h.warnings,[]);
     assert.equal(h.node('previewPngtuberVideo').hidden,false);
-    assert.equal(h.requests.filter(r=>r.url.endsWith('/preview')).at(-1).body.audioPath,'/audios/2.wav');
+    assert.equal(h.requests.filter(r=>r.url.endsWith('/preview')).at(-1).body.idleImagePath,'/pngtuber/idle-nuevo.png');
 });
 
 test('un render tardío no vuelve a publicar el resultado ni la descarga del audio anterior',async()=>{
@@ -86,15 +87,17 @@ test('un render tardío no vuelve a publicar el resultado ni la descarga del aud
     assert.equal(h.node('render').disabled,false);
 });
 
-test('volver a Video después de cambiar la voz de Studio invalida el resultado y usa la fuente actual',async()=>{
+test('volver a Video tras cambiar voz Studio invalida el resultado final y conserva la demo independiente',async()=>{
     const h=setup();let route='/audios/voz-1.wav';
     h.ctx.window.rutaVozPersistida=async()=>route;
     h.node('videoAudioSource').value='studio';h.node('videoAudioSource').onchange();await settle();
+    const preview=h.node('previewPngtuberVideo').src;
     h.node('videoPngtuberResultado').hidden=false;
     route='/audios/voz-2.wav';h.ctx.window.audioEditor._loadToken++;
     h.emit('loquendo:tab-activada',{tabId:'tab-video'});await settle();
     assert.equal(h.node('videoPngtuberResultado').hidden,true);
-    assert.equal(h.requests.filter(r=>r.url.endsWith('/preview')).at(-1).body.audioPath,route);
+    assert.equal(h.node('previewPngtuberVideo').src,preview);
+    assert.ok(h.requests.filter(r=>r.url.endsWith('/preview')).every(r=>!('audioPath' in r.body)));
 });
 
 test('quitar archivo durante una importación no permite que la respuesta tardía lo reactive',async()=>{
@@ -104,28 +107,49 @@ test('quitar archivo durante una importación no permite que la respuesta tardí
     h.node('videoAudioRemove').onclick();
     upload.resolve({ok:true,json:async()=>({url:'/audios/tardio.wav',name:'tardio.wav',duration:2})});
     assert.equal(await job,false);await settle();
-    assert.equal(await h.ctx.window.videoAudioInput.ruta({preview:true}),null);
+    await assert.rejects(h.ctx.window.videoAudioInput.ruta(),/Importa un archivo/);
     assert.equal(h.node('videoAudioPlayer').hidden,true);
 });
 
-test('seleccionar audio externo sin archivo solicita reposo, sin reutilizar voz de Studio ni simular habla',async()=>{
-    const h=setup();h.ctx.window.rutaVozPersistida=async()=>'/audios/voz-studio.wav';
-    h.node('videoAudioSource').onchange();await settle();
-    const request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
-    assert.equal(request.body.audioPath,null);
-    assert.equal(request.body.soloReposo,true);
-    assert.equal(request.body.idleImagePath,'/pngtuber/idle.png');
-    assert.equal(request.body.talkingImagePath,'/pngtuber/talking.png','Se conserva la imagen, aunque no se active sin audio');
+test('ambas fuentes solicitan demo sin consultar ni persistir audio y activan bucle mudo',async()=>{
+    const h=setup();
+    h.ctx.window.videoAudioInput.ruta=()=>{throw Error('La demo no debe consultar audio');};
+    for(const mode of ['studio','external']){
+        h.node('videoAudioSource').value=mode;
+        await h.ctx.window.actualizarPreviewPNGTuber();await settle();
+        const request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
+        assert.equal('audioPath' in request.body,false);
+        assert.equal('soloReposo' in request.body,false);
+        assert.equal(request.body.idleImagePath,'/pngtuber/idle.png');
+        assert.equal(request.body.talkingImagePath,'/pngtuber/talking.png');
+        assert.equal(request.body.blinkImagePath,'/pngtuber/blink.png');
+        assert.equal(h.node('previewPngtuberVideo').loop,true);
+        assert.equal(h.node('previewPngtuberVideo').muted,true);
+        assert.equal(h.node('previewPngtuberVideo').autoplay,true);
+    }
 });
 
-test('cargar y quitar audio externo alterna soloReposo sin borrar las imágenes del personaje',async()=>{
+test('cargar y quitar audio externo mantiene las tres imágenes y no transforma la demo en render con audio',async()=>{
     const h=setup();h.node('videoAudioSource').onchange();await settle();
     await h.ctx.window.videoAudioInput.importar(h.file());await settle();
     let request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
-    assert.equal(request.body.soloReposo,false);assert.equal(request.body.audioPath,'/audios/1.wav');
+    assert.equal('audioPath' in request.body,false);
     h.node('videoAudioRemove').onclick();await settle();
     request=h.requests.filter(r=>r.url.endsWith('/preview')).at(-1);
-    assert.equal(request.body.soloReposo,true);assert.equal(request.body.audioPath,null);
+    assert.equal('audioPath' in request.body,false);assert.equal('soloReposo' in request.body,false);
     assert.equal(request.body.idleImagePath,'/pngtuber/idle.png');
     assert.equal(request.body.talkingImagePath,'/pngtuber/talking.png');
+    assert.equal(request.body.blinkImagePath,'/pngtuber/blink.png');
+});
+
+test('una validación de audio pendiente o fallida no bloquea ni vacía la demostración',async()=>{
+    const h=setup(),upload=deferred();
+    h.ctx.fetch=(url,opts)=>url.endsWith('/pngtuber/audio')?upload.promise:h.fetch(url,opts);
+    const job=h.ctx.window.videoAudioInput.importar(h.file());await settle();
+    assert.equal(h.node('previewPngtuberVideo').hidden,false);
+    const preview=h.node('previewPngtuberVideo').src;
+    upload.reject(new Error('Archivo de prueba inválido'));assert.equal(await job,false);await settle();
+    assert.equal(h.node('previewPngtuberVideo').src,preview);
+    assert.equal(h.node('previewPngtuberVideo').hidden,false);
+    assert.ok(h.requests.filter(r=>r.url.endsWith('/preview')).every(r=>!('audioPath' in r.body)));
 });

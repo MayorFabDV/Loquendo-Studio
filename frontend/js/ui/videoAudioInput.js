@@ -4,15 +4,8 @@
     let externo = null, revision = 0, cargando = false;
     const el = id => document.getElementById(id);
     const modo = () => el('videoAudioSource')?.value || 'studio';
-    const sinAudioExterno = () => modo() === 'external' && !externo;
     const firmaStudio = () => `${global.audioEditor?._loadToken}:${global.audioEditor?._revisionAudio}`;
     let ultimaFuenteStudio = firmaStudio();
-    function invalidarPreview() {
-        const player = el('previewPngtuberVideo');
-        player.pause(); player.removeAttribute('src'); player.load(); player.hidden = true;
-        el('previewPngtuberPlaceholder').hidden = false;
-        el('previewPngtuberPlaceholder').textContent = 'La vista previa se actualizará con el audio seleccionado.';
-    }
     function invalidarResultado() {
         const player = el('videoPngtuberResultado');
         player.pause(); player.removeAttribute('src'); player.load(); player.hidden = true;
@@ -21,14 +14,14 @@
         link.removeAttribute('href'); link.hidden = true;
     }
     function refrescarPreview() {
-        if (!cargando && el('tab-video')?.classList.contains('tab-panel-activo')) {
+        if (el('tab-video')?.classList.contains('tab-panel-activo') && el('previewPngtuberVideo').hidden) {
             global.actualizarPreviewPNGTuber?.();
         }
     }
     function notificarFuenteStudio({ refrescar = true } = {}) {
         ultimaFuenteStudio = firmaStudio();
         if (modo() !== 'studio') return;
-        revision++; invalidarPreview(); invalidarResultado();
+        revision++; invalidarResultado();
         if (refrescar) refrescarPreview();
     }
     function actualizar() {
@@ -39,16 +32,12 @@
         const player = el('videoAudioPlayer');
         if (!external || !externo) { player.pause(); player.removeAttribute('src'); player.hidden = true; }
         else { player.src = `${global.CONFIG.API_BASE}${externo.url}`; player.hidden = false; }
-        const nota = el('previewPngtuberNota');
-        if (nota) nota.textContent = sinAudioExterno()
-            ? 'Sin audio externo: vista previa en reposo. Importa un WAV o MP3 para sincronizar las expresiones.'
-            : 'Con audio: primeros 4 segundos sincronizados (activa el sonido en el reproductor). Sin audio: animación de demostración.';
     }
     async function importar(file) {
         if (!file) return false;
         const token = ++revision;
-        invalidarPreview();
         cargando = true; actualizar();
+        refrescarPreview();
         try {
             if (!/\.(wav|mp3)$/i.test(file.name)) throw new Error('Selecciona un archivo WAV o MP3');
             const body = new FormData(); body.append('audio', file);
@@ -67,19 +56,19 @@
             if (token === revision) { cargando = false; actualizar(); refrescarPreview(); }
         }
     }
-    async function ruta({ preview = false } = {}) {
+    async function ruta() {
         if (cargando) throw new Error('Espera a que termine la validación del audio');
         if (modo() === 'external') {
-            if (!externo && !preview) throw new Error('Importa un archivo WAV o MP3 para el video');
+            if (!externo) throw new Error('Importa un archivo WAV o MP3 para el video');
             return externo?.url || null;
         }
         return global.rutaVozPersistida ? global.rutaVozPersistida() : null;
     }
-    global.videoAudioInput = { importar, ruta, notificarFuenteStudio, sinAudioExterno, version: () => `${revision}:${modo()}:${modo() === 'studio' ? firmaStudio() : ''}` };
+    global.videoAudioInput = { importar, ruta, notificarFuenteStudio, version: () => `${revision}:${modo()}:${modo() === 'studio' ? firmaStudio() : ''}` };
     document.addEventListener('DOMContentLoaded', () => {
-        el('videoAudioSource').onchange = () => { revision++; cargando = false; invalidarPreview(); invalidarResultado(); actualizar(); refrescarPreview(); };
+        el('videoAudioSource').onchange = () => { revision++; cargando = false; invalidarResultado(); actualizar(); refrescarPreview(); };
         el('videoAudioFile').onchange = async event => { await importar(event.target.files[0]); event.target.value = ''; };
-        el('videoAudioRemove').onclick = () => { revision++; cargando = false; externo = null; invalidarPreview(); invalidarResultado(); actualizar(); refrescarPreview(); };
+        el('videoAudioRemove').onclick = () => { revision++; cargando = false; externo = null; invalidarResultado(); actualizar(); refrescarPreview(); };
         document.addEventListener('loquendo:tab-activada', event => {
             if (event.detail?.tabId !== 'tab-video') return;
             if (modo() === 'studio' && ultimaFuenteStudio !== firmaStudio()) notificarFuenteStudio();

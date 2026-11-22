@@ -85,7 +85,7 @@ test('previews de demostración tienen rutas únicas y cambiar MP4/WebM conserva
     for(const preview of [first,second])assert.ok(fs.existsSync(path.join(root,path.basename(preview.url))),'Cambiar formato no debe borrar una salida que otro reproductor puede seguir usando');
 });
 
-test('preview soloReposo muestra idle durante todo el clip aunque talking y blink estén cargados',{
+test('la demostración siempre dura 4 segundos, sin pista de audio, y muestra las tres expresiones',{
     skip:!fs.existsSync(ffmpeg)||!fs.existsSync(ffprobe),timeout:120000
 },async t=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),'loquendo-preview-idle-'));
@@ -96,12 +96,18 @@ test('preview soloReposo muestra idle durante todo el clip aunque talking y blin
     }
     const service=new VideoService(ffmpeg,root,root,ffprobe);
     for(const fondo of ['black','transparent']){
-        const preview=await service.generarPreviewPNGTuber({idleImagePath:'idle.png',talkingImagePath:'talking.png',blinkImagePath:'blink.png',fondo,soloReposo:true});
+        service.detectarSegmentosVoz=()=>{throw Error('La demostración no debe analizar audio');};
+        const preview=await service.generarPreviewPNGTuber({idleImagePath:'idle.png',talkingImagePath:'talking.png',blinkImagePath:'blink.png',fondo,
+            audioPath:'audio-ignorado.wav',soloReposo:true}); // Opciones antiguas no deben crear otra ruta de preview.
         const file=path.join(root,path.basename(preview.url)),alpha=fondo==='transparent';
-        for(const time of [0,1.05,2.65,3.96]){
-            assert.ok(pixel(file,time,14,32,alpha)[0]>150,'Idle no debe sustituirse por la demostración de habla/parpadeo');
-            const talk=pixel(file,time,46,32,alpha),blink=pixel(file,time,32,32,alpha);
-            assert.ok(alpha?talk[3]<20:talk[2]<30);assert.ok(alpha?blink[3]<20:blink[1]<30);
+        const probe=spawnSync(ffprobe,['-v','error','-show_streams','-show_format','-of','json',file],{encoding:'utf8',windowsHide:true});
+        assert.equal(probe.status,0,probe.stderr);const info=JSON.parse(probe.stdout);
+        assert.deepEqual(info.streams.map(s=>s.codec_type),['video']);assert.ok(Math.abs(Number(info.format.duration)-4)<0.08);
+        for(const [time,expected] of [[0,'idle'],[1.05,'talking'],[2.65,'blink'],[3.96,'talking']]){
+            for(const [name,x,color] of [['idle',14,0],['talking',46,2],['blink',32,1]]){
+                const p=pixel(file,time,x,32,alpha);
+                assert.ok(name===expected?p[color]>150:alpha?p[3]<20:p[color]<30,`${expected} exclusivo a ${time}s; ${name}: ${p}`);
+            }
         }
     }
 });

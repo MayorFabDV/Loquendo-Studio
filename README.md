@@ -86,6 +86,8 @@
 
 ### 🎬 Video PNGTuber
 - **Imágenes de reposo/habla/parpadeo** con visibilidad exclusiva por expresión
+- **Vista previa de expresiones**: demostración de 4 segundos, sin audio y en bucle, igual para audio de Studio o externo
+- **Video final**: exportación con audio real y expresiones sincronizadas con su actividad
 - **Fondos**: verde (chroma key), negro, transparente
 - **Renderizado MP4 o WebM con alfa** mediante FFmpeg
 - **Listo para OBS/Streamlabs**

@@ -32,7 +32,7 @@ window.HELP_TEXTS = {
         pngtuberTalkingInput: "Sube la imagen PNG del personaje hablando.",
         pngtuberBlinkInput: "Imagen opcional del personaje con los ojos cerrados. Si la subes, el video intercala parpadeos automáticos.",
         btnRenderVideo: "Genera el video con el audio y las imágenes del personaje (en reposo y hablando). Con fondo transparente se exporta en WebM.",
-        previewPngtuber: "Vista previa animada del personaje: alterna entre reposo y habla para que veas cómo quedará. Se genera con FFmpeg.",
+        previewPngtuber: "Demostración de expresiones de 4 segundos, sin audio y en bucle: reposo, hablando y parpadeo. Es independiente del audio de Studio o externo. El video final sí se sincroniza con el audio real.",
         btnActualizarPreview: "Vuelve a generar la vista previa con las imágenes y el fondo actuales.",
         videoPngtuberResultado: "Reproductor del video final. Revísalo aquí; si te gusta, descárgalo y edítalo a tu manera. Si no, cambia las opciones y genera otro.",
         btnDescargarVideoPngtuber: "Descarga el video final con audio para editarlo o compartirlo.",

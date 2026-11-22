@@ -2,6 +2,8 @@
 
 Fecha: 2026-11-22. Rama `feature/optimizacion-1.2.0`. Inicio en `8648913`, con la carpeta de capturas aportada por el usuario como único cambio sin confirmar; se conservó intacta y fuera de los commits.
 
+**Contrato vigente tras la aclaración final del usuario:** la **Vista previa de expresiones** es siempre una demostración de ~4 segundos, sin pista de audio y en bucle, mostrando idle/talking/blink. Es independiente de la fuente. Solo **Exportar video final** usa el audio real completo y su actividad. Los apartados de preview sincronizada y `soloReposo` que aparecen más abajo son historial de desarrollo y quedan sustituidos por la sección final «Unificación de la vista previa de expresiones».
+
 ## Propuesta registrada antes de la corrección
 
 Commit `ad83bf0`: arquitectura pendiente de **Diagnóstico del sistema dentro de Configuración/Ajustes**, sin nueva pestaña principal. Incluye análisis rápido/profundo, ZIP depurado, reutilización del diagnóstico Leonor y respaldo CMD, respetando capacidades deshabilitadas/retiradas. Solo se documentó en `ESTABILIZACION.md`; no se implementó la función. Requiere aprobación específica de alcance aunque esta fase quede completada.
@@ -67,7 +69,7 @@ El mock de documento de una prueba legacy se completó con `querySelector`, que 
 - Fase 4 permanece pendiente: exclusiones y medición de paquete desempaquetado, sin instalador de publicación.
 - Diagnóstico general y nuevas expresiones continúan sujetos a sus aprobaciones específicas; no se implementaron aquí.
 
-## Seguimiento: reposo al seleccionar audio externo sin archivo
+## Seguimiento histórico: reposo al seleccionar audio externo sin archivo
 
 Fecha: 2026-11-22. Base de este seguimiento: `ac7f75c`. Se reabrió la comprobación de Fase 3 antes de avanzar a Fase 4.
 
@@ -104,3 +106,43 @@ Para comprobar expresiones exactas, solo el servidor del smoke externo fija parp
 Los ciclos adicionales externo → Studio → externo conservan exactamente las tres rutas de imágenes. La suite retiene las pruebas de importación retirada, rutas tardías y respuestas de preview/exportación obsoletas. Sintaxis de ocho JS/CJS y `git diff --check` correctos.
 
 **Estado:** seguimiento corregido y verificado en desarrollo. La preview con audio sigue mostrando los primeros cuatro segundos; no se agregan silencios artificiales al video. No se inició Fase 4 ni se generó distribución. El diagnóstico general sigue pendiente de aprobación de alcance.
+
+## Unificación de la vista previa de expresiones — Contrato vigente
+
+Base de esta corrección independiente: `cbc2951`. El usuario aclaró que la preview corta debe ser una **demostración similar a un GIF**, no una muestra de la sincronización del video final. Esa aclaración sustituye los contratos previos de preview con audio y reposo sin archivo.
+
+### Rutas revisadas y unificación
+
+Antes, `/api/pngtuber/preview` tenía dos caminos: con `audioPath` invocaba el generador final limitado a cuatro segundos e incluía audio; sin él generaba una demo, que podía quedar reducida a reposo mediante `soloReposo`.
+
+Ahora hay una única ruta de demostración: `generarPreviewPNGTuber()` compone cuatro segundos con expresiones de ejemplo y `-an`. Solo admite imágenes, fondo, resolución y escala como entradas útiles. Aunque un cliente envíe los antiguos `audioPath`/`soloReposo`, no se analiza ese audio ni cambia el contrato de la demo. Se verifica también con una ruta de audio inexistente: no se intenta leerla.
+
+La exportación final continúa por `/api/generar-video-pngtuber` → `generarPNGTuber()` con el audio seleccionado completo. Se retiró la opción interna de truncamiento para preview; **no se modificaron el detector de silencios, sus umbrales ni las reglas de expresión del video final**.
+
+### Renderer y conservación de estado
+
+- La demo no llama a `videoAudioInput.ruta()` ni a la persistencia de voz. Funciona sin archivo, durante la validación de un externo y aunque esa validación falle.
+- Una demo visible sigue reproduciéndose al cambiar Studio/externo o cargar/quitar un archivo. Las tres imágenes se conservan. Los cambios de audio invalidan únicamente el resultado final correspondiente.
+- La demo mantiene snapshot de imágenes/opciones, revisión de petición y cola; descarta respuestas/errores de configuraciones visuales antiguas. Su firma excluye el audio porque ya no forma parte de su contenido. La exportación sí conserva su firma de fuente y su validación antes/después de resolver la ruta y recibir el resultado.
+- El reproductor de demostración es `loop`, `muted` y `autoplay`, y el archivo no contiene pista de audio: no se trata solo de silenciar una pista existente.
+- La interfaz separa **Vista previa de expresiones**, con nota explícita «Demostración de 4 segundos, sin audio y en bucle», y **Exportar video final / Video final con audio**. La ayuda y el resumen de uso se actualizaron.
+- Prioridad exclusiva **blink > talking > idle**, proyectos/sesiones, música e imágenes originales conservados. No hay migraciones de datos ni cambios de formato de proyecto.
+
+### Pruebas de la unificación
+
+| Comando | Resultado |
+|---|---|
+| `npm test` | **67 aprobadas, ninguna omitida**, adaptadas al contrato vigente |
+| `node --test tests/pngtuberSource.test.js tests/pngtuber.test.js` | 13 casos focalizados aprobados |
+| `node scripts/smoke_projects.cjs --external-audio` | Electron/Express/FFmpeg reales, ambas fuentes y ausencia de archivo, WAV/MP3, silencio y MP4/WebM: aprobado |
+| `node scripts/smoke_projects.cjs --sapi --voice=Leonor` | Flujo SAPI real y demo/exportación desde Electron aprobados |
+| `node scripts/smoke_projects.cjs --maintenance` | Mantenimiento y SRT/ASS independientes aprobados |
+| `node scripts/smoke_audio_sessions.cjs --recovery-ux` | Recuperaciones separadas y protección de sesiones aprobadas |
+
+FFprobe comprueba demos de ~4,00 s y **único stream de video**, tanto MP4 como WebM. Las fixtures tienen audio de uno, tres y seis segundos, también completamente silencioso: la demo sigue mostrando las mismas tres expresiones a tiempos de demostración, mientras el final conserva audio, duración completa y expresiones sincronizadas. El caso de seis segundos comprueba habla y reposo también después del límite de cuatro segundos de la demo.
+
+Se comprueban por píxeles las expresiones exclusivas y alfa de los archivos de demostración, y se capturan las tres directamente del reproductor Electron por canvas. Además de comprobar los atributos de bucle, se reproduce desde cerca del final y se observa el retorno efectivo al comienzo. Se retienen deliberadamente respuestas reales para verificar que una configuración visual nueva descarta la preview antigua y que un audio nuevo descarta una exportación anterior.
+
+Las pruebas anteriores de preview sincronizada/solo reposo se sustituyeron por independencia del audio, demostración durante validación pendiente/fallida y ausencia de pistas de audio. La regresión de rutas tardías se mantiene para la exportación; la demo ya no resuelve rutas de audio. Sintaxis de los ocho JS/CJS afectados y `git diff --check` correctos.
+
+**Estado:** contrato unificado verificado en desarrollo; Fase 4 no iniciada y ninguna distribución generada. El diagnóstico general continúa pendiente de aprobación específica.

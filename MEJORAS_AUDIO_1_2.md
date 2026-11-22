@@ -8,7 +8,7 @@ En Generar video se puede elegir audio de Studio o importar WAV/MP3. El audio ex
 
 `POST /api/pngtuber/audio` recibe una copia temporal con UUID, verifica stream/duración con FFprobe y decodifica con FFmpeg sin modificar el original. El máximo es 1 GB; una validación fallida elimina solo esa copia temporal. La selección externa no se restaura entre reinicios; sus copias temporales siguen la limpieza existente.
 
-La vista previa usa hasta cuatro segundos del audio elegido y el mismo análisis de silencio/expresiones de la exportación; sus controles permiten activar sonido. Sin audio conserva la demostración. La prioridad exclusiva sigue siendo parpadeo > hablando > reposo, también con alfa. Fondo transparente exporta WebM/VP9/Opus; los fondos opacos exportan MP4/H.264/AAC.
+Contrato actualizado de Fase 3: **Vista previa de expresiones** es una demostración muda de cuatro segundos en bucle, mostrando reposo/habla/parpadeo con independencia del audio elegido. **Exportar video final** utiliza el audio real completo y su análisis de silencios para sincronizar las expresiones. La prioridad exclusiva sigue siendo parpadeo > hablando > reposo, también con alfa. Fondo transparente exporta WebM/VP9/Opus; los fondos opacos exportan MP4/H.264/AAC. La aclaración y las pruebas vigentes están en `OPTIMIZACION_FASE3.md`.
 
 Verificado con `node scripts/smoke_projects.cjs --external-audio`: Electron/Express/FFmpeg reales, WAV/MP3, reproducción, inválido conservando anterior, exportaciones MP4/WebM con audio y silencio, original sin modificar y selección Studio compatible. `node --test tests/pngtuber.test.js tests/audioSession.test.js`: 12 aprobadas, incluidos píxeles de expresiones y transparencia.
 

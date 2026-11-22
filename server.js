@@ -779,16 +779,10 @@ appExpress.post('/api/generar-video-pngtuber', async (req, res) => {
 });
 
 appExpress.post('/api/pngtuber/preview', async (req, res) => {
-    const { audioPath, idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala, soloReposo } = req.body;
+    const { idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala } = req.body;
     try {
         const opciones = { idleImagePath, talkingImagePath, blinkImagePath, fondo, resolucion, escala };
-        let resultado;
-        if (audioPath) {
-            const limpia = sanitizarRutaAudio(audioPath);
-            if (!limpia) return res.status(403).json({ error: 'Ruta no permitida' });
-            const video = await videoService.generarPNGTuber(path.join(PUBLIC_FOLDER, limpia), { ...opciones, preview: true });
-            resultado = { url: video.video };
-        } else resultado = await videoService.generarPreviewPNGTuber({ ...opciones, soloReposo: soloReposo === true });
+        const resultado = await videoService.generarPreviewPNGTuber(opciones);
         res.json({ ...resultado, mensaje: 'Vista previa generada' });
     } catch (error) {
         console.error('âŒ Error vista previa PNGTuber:', error.message);

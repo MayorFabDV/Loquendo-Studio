@@ -124,7 +124,7 @@ Estado de Git verificado antes de modificar archivos: árbol limpio, rama `featu
 |---|---|---|
 | 1 | Bloquear temporalmente la pestaña Subtítulos y los procesos de transcripción; conservar código y operaciones SRT/ASS independientes | Completada en desarrollo; informe en `OPTIMIZACION_FASE1.md` |
 | 2 | Investigar Leonor/COM y generación simple/multivoz; preparar diagnóstico comparable para el tester | Diagnóstico implementado y verificado; causa bloqueada por falta del informe del tester (`OPTIMIZACION_FASE2.md`) |
-| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Verificada en desarrollo, incluido seguimiento de reposo al elegir externo sin archivo; informe `OPTIMIZACION_FASE3.md` |
+| 3 | Reproducir y corregir idle al cambiar de audio; verificar preview y exportaciones | Verificada en desarrollo con contrato aclarado: demo muda de 4 s independiente del audio y exportación sincronizada; informe `OPTIMIZACION_FASE3.md` |
 | 4 | Excluir JRE/Java, LanguageTool y Whisper/modelo de la distribución; optimizar residuos por grupos y medir paquete desempaquetado | Pendiente |
 | 5 | Presentar propuesta concreta de expresiones y compatibilidad; tras aprobación implementar un primer conjunto pequeño | Pendiente de propuesta y aprobación específica |
 
@@ -193,9 +193,19 @@ Dependencias/riesgos a resolver al aprobar: compatibilidad del esquema de inform
 - La mejora general de diagnóstico quedó registrada en el commit `ad83bf0`, **sin implementar**: dentro de Configuración, sin pestaña principal nueva, reutilizando el núcleo y conservando el CMD. Aunque Fase 3 esté verificada, sigue requiriendo aprobación específica de alcance antes de implementarla.
 - Leonor sigue pendiente de evidencia externa según Fase 2; esta corrección PNGTuber no cambia la síntesis ni la política de mantenimiento.
 
-### Seguimiento de Fase 3 — Idle en selección externa
+### Seguimiento histórico de Fase 3 — Idle en selección externa
 
 - Reproducido el detalle adicional: externo sin archivo enviaba audio vacío y activaba la demostración de talking/blink. El PNG idle no se perdía; la preview simulada lo sustituía. Con audio importado, preview/exportaciones mostraban correctamente los silencios.
 - Corregido mediante `soloReposo` explícito en preview sin audio externo, con nota visible aclaratoria. Importar/quitar archivo cambia entre reposo y sincronización sin borrar ninguna imagen ni cambiar proyectos. Se mantienen prioridad exclusiva y guardas asíncronas.
 - **67 pruebas Node aprobadas, ninguna omitida**. Electron y exportaciones reales MP4/WebM con WAV/MP3: primer fotograma, silencio intermedio, parpadeos durante habla y último fotograma; verificación de píxeles/alfa y captura directa del reproductor. Ciclos externos/Studio y respuestas obsoletas aprobados; regresiones SAPI Leonor, mantenimiento y proyectos aprobadas.
 - Evidencia y alcance en la sección de seguimiento de [OPTIMIZACION_FASE3.md](OPTIMIZACION_FASE3.md). No se avanzó a Fase 4 ni se generó distribución.
+
+### Contrato vigente de Fase 3 — Demo de expresiones y video final separados
+
+La aclaración posterior del usuario sustituye el seguimiento anterior de `soloReposo` y la preview sincronizada de los primeros segundos. **Vista previa de expresiones:** aproximadamente 4 s, sin ninguna pista de audio, en bucle, mostrando idle/talking/blink con cualquier fuente, sin depender del audio ni sus silencios. **Exportar video final:** audio real completo y sincronización con su actividad.
+
+- `/api/pngtuber/preview` usa un único camino de demostración. El renderer no solicita/persiste audio para ella. Se retiraron el modo `soloReposo` y la variante de render final recortado para preview; el detector y los umbrales del video final se conservan.
+- Cambiar, cargar o quitar audio no vacía/reinicia una demo visible ni pierde las imágenes. Los snapshots visuales/cola de peticiones descartan previews obsoletas por cambios de imágenes/opciones; la exportación conserva su guarda de revisión de audio antes de `await`.
+- Etiquetas y ayuda distinguen «Vista previa de expresiones» y «Exportar video final».
+- **67 pruebas Node aprobadas, ninguna omitida**, y 13 casos focalizados. Electron/FFprobe verifican duración de 4 s, stream exclusivamente de video, tres expresiones con alfa y bucle efectivo en ambas fuentes. Las exportaciones MP4/WebM mantienen pista de audio, duración completa y expresión según silencios; pruebas con WAV/MP3 y respuestas tardías aprobadas. Smokes de Leonor, mantenimiento y recuperación aprobados.
+- Informe y evidencia actualizados en [OPTIMIZACION_FASE3.md](OPTIMIZACION_FASE3.md). No se avanzó a Fase 4 ni se generó distribución.

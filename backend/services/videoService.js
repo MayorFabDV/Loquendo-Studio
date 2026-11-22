@@ -284,7 +284,7 @@ class VideoService {
 
         // Duración y expresión de habla
         const info = await this.detectarSegmentosVoz(audioPathAbsoluto);
-        let duracionTotal = opciones.preview ? Math.min(4, info.duracionTotal) : info.duracionTotal;
+        const duracionTotal = info.duracionTotal;
         let enableExprTalking = null;
         if (usarTalking || usarBlinkImg) {
             if (usarTalking) enableExprTalking = this._construirEnableExpression(info.segmentosVoz);
@@ -361,8 +361,8 @@ class VideoService {
         const fondoColor = this._colorDeFondo(opciones.fondo);
         const transparente = fondoColor === null;
         const duracion = 4;
-        const usarTalking = !opciones.soloReposo && talkingImage && fs.existsSync(talkingImage) && talkingImage !== idleImage;
-        const usarBlink = !opciones.soloReposo && blinkImage && fs.existsSync(blinkImage);
+        const usarTalking = talkingImage && fs.existsSync(talkingImage) && talkingImage !== idleImage;
+        const usarBlink = blinkImage && fs.existsSync(blinkImage);
 
         const ext = transparente ? 'webm' : 'mp4';
         const nombrePreview = `preview-${Date.now()}-${randomUUID()}.${ext}`;

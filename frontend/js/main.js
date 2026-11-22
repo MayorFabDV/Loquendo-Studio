@@ -548,14 +548,13 @@ function obtenerOpcionesPNGTuber() {
     };
 }
 
-function capturarEstadoPNGTuber() {
+function capturarEstadoPNGTuber({ demo = false } = {}) {
     return {
-        fuente: window.videoAudioInput?.version() ?? JSON.stringify(versionAudioActual()),
+        fuente: demo ? null : window.videoAudioInput?.version() ?? JSON.stringify(versionAudioActual()),
         opciones: {
             idleImagePath: pngtuberIdlePath || null,
             talkingImagePath: pngtuberTalkingPath || null,
             blinkImagePath: pngtuberBlinkPath || null,
-            soloReposo: window.videoAudioInput?.sinAudioExterno?.() === true,
             fondo: document.getElementById('fondoPNGTuber')?.value || 'green',
             ...obtenerOpcionesPNGTuber()
         }
@@ -563,7 +562,7 @@ function capturarEstadoPNGTuber() {
 }
 
 function estadoPNGTuberActual(estado) {
-    return JSON.stringify(estado) === JSON.stringify(capturarEstadoPNGTuber());
+    return JSON.stringify(estado) === JSON.stringify(capturarEstadoPNGTuber({ demo: estado.fuente === null }));
 }
 
 async function subirImagenPNGTuber(tipo = 'idle') {
@@ -632,25 +631,23 @@ async function actualizarPreviewPNGTuber() {
     const textoBtn = btn ? btn.innerText : '';
     if (btn) { btn.innerText = 'Generando...'; btn.disabled = true; }
 
-    const estado = capturarEstadoPNGTuber();
+    const estado = capturarEstadoPNGTuber({ demo: true });
     const vigente = () => solicitud === revisionPreviewPNGTuber && estadoPNGTuberActual(estado);
 
     try {
-        const audioPath = window.videoAudioInput ? await window.videoAudioInput.ruta({ preview: true }) : null;
-        if (!vigente()) return;
         const res = await fetch(`${API_BASE}/api/pngtuber/preview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                audioPath,
-                ...estado.opciones
-            })
+            body: JSON.stringify(estado.opciones)
         });
         const data = await res.json();
         if (!vigente()) return;
         if (!res.ok) throw new Error(data.error || 'Error al generar la vista previa');
 
         video.src = `${API_BASE}${data.url}?t=${Date.now()}`;
+        video.loop = true;
+        video.muted = true;
+        video.autoplay = true;
         video.hidden = false;
         placeholder.hidden = true;
         video.load();
@@ -673,7 +670,7 @@ async function generarVideoPNGTuber() {
     renderPNGTuberEnCurso = true;
     const estado = capturarEstadoPNGTuber();
     const btnVideo = document.querySelector('.btn-video');
-    const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Generar Video PNGTuber';
+    const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Exportar video final';
     
     if (btnVideo) {
         btnVideo.innerText = 'Procesando video...';
