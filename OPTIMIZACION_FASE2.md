@@ -83,11 +83,21 @@ Solo cambió el smoke para permitir elegir la voz mediante `--voice=...`; no cam
 
 ## Bloqueo externo y próximo paso
 
+### Capturas recibidas después de preparar el diagnóstico
+
+El usuario aportó dos imágenes en `loquendo studio errores/`. Se revisaron como evidencia; no se modificaron ni se añadieron al commit porque contienen rutas de la computadora del tester.
+
+- **Fotografía del aviso rojo** (`rn_image_picker_lib_temp_1684c957-f1ff-4bb3-bbac-d302e9bf0aa3.webp`): la traza llega a `_procesar_audio_voz`, línea 268, `speaker.Speak(texto_ssml, flags)`. Esta línea coincide con la llamada del código actual. La excepción aparece durante `Speak`, no al entrar simplemente en `generar_audio_multivoz`. La lectura de la fotografía muestra HRESULT externo `-2147352567` (`0x80020009`, `DISP_E_EXCEPTION`) y código interno `-2147467259` (`0x80004005`, `E_FAIL`). Son errores genéricos: no identifican por sí solos formato, XML, token o motor como causa.
+- Después de esa excepción se ven mensajes `Win32 exception occurred releasing IUnknown`. Son evidencia adicional del camino de liberación tras el fallo. No prueban que la liberación sea la causa inicial de que falle `Speak`; hay que distinguir el error de síntesis de los mensajes posteriores de limpieza.
+- **Captura de diálogo** (`image.webp`): muestra `FileNotFoundError [WinError 3]` en `os.makedirs(directorio)`, línea 91 de otra representación del generador, con una ruta temporal y segmentos relativos a `resources`. Es un fallo de creación/resolución de ruta distinto del COM de la fotografía. No se usa como prueba de que el `Speak` actual falla por esa misma ruta ni de que ambos binarios sean la misma versión.
+
+La fotografía acota la llamada que falla, pero no muestra el token realmente seleccionado, los flags, el texto/XML del segmento ni las versiones/hashes del motor y los binarios. Tampoco demuestra si el guion tenía varias voces. El diagnóstico ya registra esos datos para los casos fuente equivalentes y permite compararlos con el exe.
+
 Falta recibir del tester:
 
 1. El `para_compartir.zip` de **la instalación exacta que falla**, usando la misma herramienta; ejecutar también en la otra computadora para comparar hashes y casos.
 2. Versión visible de Studio y versión/arquitectura de Loquendo TTS si se conoce.
-3. Captura/traza completa del error original, depurada de identidades/rutas personales, y voz seleccionada.
+3. La voz seleccionada y, si es posible, el traceback en texto para confirmar la lectura de los códigos de la fotografía; las dos capturas anteriores ya se recibieron.
 4. Si los casos fijos pasan: una frase mínima sin datos personales con las etiquetas necesarias para reproducirlo, y las condiciones de aparición (primer intento/cambio de voz, elevación u otros programas de voz abiertos).
 
 Comparar primero si difieren script/exe/motor o tokens; después, el primer fallo COM de casos equivalentes y su código interno. Solo tras reproducir una causa se aplicará una corrección mínima y su regresión. Esta fase **no declara resuelto el bug**: la investigación queda explícitamente bloqueada por esa evidencia. La Fase 3 no se inició en esta sesión.
