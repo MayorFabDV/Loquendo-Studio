@@ -392,8 +392,8 @@ class AudioService {
                 const rutaSRT = path.join(this.audioFolder, nombreSRT);
                 let srtUrl = null;
 
-                const usarWhisperCpp = fs.existsSync(this.whisperExe) && fs.existsSync(this.whisperModel);
-                const usarPythonSRT = !usarWhisperCpp && this.pythonScript && fs.existsSync(this.pythonScript)
+                const usarWhisperCpp = require('./featurePolicy').transcription && fs.existsSync(this.whisperExe) && fs.existsSync(this.whisperModel);
+                const usarPythonSRT = require('./featurePolicy').transcription && !usarWhisperCpp && this.pythonScript && fs.existsSync(this.pythonScript)
                     && this.pythonBin && fs.existsSync(this.pythonBin);
 
                 const generarASS = () => {

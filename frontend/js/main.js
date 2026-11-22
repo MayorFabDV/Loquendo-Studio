@@ -216,6 +216,10 @@ async function cargarVoces() {
 // 1.6 CORREGIR TEXTO CON LANGUAGETOOL
 // ==========================================
 async function corregirTexto() {
+    if (window.appFeatures && window.appFeatures.languageTool === false) {
+        notificar('info', window.appFeatures.languageToolMaintenanceMessage || 'LanguageTool está temporalmente desactivado.');
+        return;
+    }
     const textarea = document.getElementById('resultado');
     const textoOriginal = textarea?.value || '';
     
@@ -670,7 +674,7 @@ async function generarVideoPNGTuber() {
     renderPNGTuberEnCurso = true;
     const estado = capturarEstadoPNGTuber();
     const btnVideo = document.querySelector('.btn-video');
-    const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Exportar video final';
+    const textoOriginalBtn = btnVideo ? btnVideo.innerText : 'Crear Video del Personaje';
     
     if (btnVideo) {
         btnVideo.innerText = 'Procesando video...';
@@ -1125,6 +1129,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     actualizarEtiquetaEscalaPNGTuber();
+
+    if (window.appFeatures?.languageTool === false) {
+        const btnLT = document.getElementById('btnCorregirTexto');
+        if (btnLT) {
+            btnLT.disabled = true;
+            btnLT.title = 'LanguageTool desactivado por optimización';
+            btnLT.style.opacity = '0.6';
+            btnLT.style.cursor = 'not-allowed';
+        }
+        const panelLT = document.querySelector('[data-help-section="correccion-ortografica"] p');
+        if (panelLT) {
+            panelLT.textContent = 'Corrección con LanguageTool desactivada por optimización. Los diccionarios locales y optimización siguen activos.';
+        }
+    }
 
     console.log('✅ Loquendo Studio cargado y listo');
     notificar('success', 'Loquendo Studio listo para usar');

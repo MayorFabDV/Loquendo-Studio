@@ -1197,13 +1197,13 @@
 
                 <button type="button" data-help="btnRenderVideo" onclick="generarVideoPNGTuber()" class="btn-video">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
-                    Exportar video final
+                    Crear Video del Personaje
                 </button>
             </section>
 
             <section class="pngtuber-visual">
                 <section class="preview-pngtuber" data-help="previewPngtuber">
-                    <h4>Vista previa de expresiones</h4>
+                  
                     <div class="preview-frame">
                         <video id="previewPngtuberVideo" loop muted autoplay controls playsinline hidden></video>
                         <div id="previewPngtuberPlaceholder" class="preview-placeholder">
@@ -1211,24 +1211,23 @@
                         </div>
                     </div>
                     <div class="preview-acciones">
-                        <span id="previewPngtuberNota" class="preview-nota">Demostración de 4 segundos, sin audio y en bucle: reposo, hablando y parpadeo. No representa la sincronización del video final.</span>
+                        <span id="previewPngtuberNota" class="preview-nota">Demostración de 4 segundos, sin audio y en bucle: reposo, hablando y parpadeo.</span>
                         <button type="button" data-help="btnActualizarPreview" id="btnActualizarPreview" class="btn-preview" onclick="actualizarPreviewPNGTuber()">
-                            Actualizar vista previa
+                            Actualizar
                         </button>
                     </div>
                 </section>
 
                 <section class="player-pngtuber" data-help="videoPngtuberResultado">
-                    <h4>Video final con audio</h4>
                     <div class="preview-frame">
                         <video id="videoPngtuberResultado" controls playsinline hidden></video>
                         <div id="placeholderVideoPngtuber" class="preview-placeholder">
-                            Exporta el video final para revisarlo aquí con su audio.
+                            Genera el video para verlo aquí.
                         </div>
                     </div>
                     <div class="preview-acciones">
-                        <span class="preview-nota">Resultado final con audio. Revísalo aquí antes de descargarlo.</span>
-                        <a id="descargarVideoPngtuber" data-help="btnDescargarVideoPngtuber" class="btn-preview" hidden download>Descargar video final</a>
+                        <span class="preview-nota">Resultado con audio. Revísalo aquí antes de descargarlo.</span>
+                        <a id="descargarVideoPngtuber" data-help="btnDescargarVideoPngtuber" class="btn-preview" hidden download>Descargar video</a>
                     </div>
                 </section>
             </section>

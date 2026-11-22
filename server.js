@@ -1,4 +1,4 @@
-﻿// server.js - API REST con GeneraciÃ³n de SubtÃ­tulos Bajo Demanda (VersiÃ³n Final Blindada)
+// server.js - API REST con GeneraciÃ³n de SubtÃ­tulos Bajo Demanda (VersiÃ³n Final Blindada)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -123,6 +123,10 @@ if (componentesFaltantes.length > 0) {
 let languageToolProcess = null;
 
 function iniciarLanguageTool() {
+    if (!features.languageTool) {
+        console.log('[LanguageTool] Desactivado por política de capacidades de la versión.');
+        return;
+    }
     if (!fs.existsSync(javaPath) || !fs.existsSync(ltJar)) {
         console.warn('[LanguageTool] No disponible. CorrecciÃ³n ortogrÃ¡fica desactivada.');
         return;
@@ -437,6 +441,12 @@ appExpress.get('/api/voces', async (req, res) => {
 });
 
 appExpress.post('/api/corregir-texto', async (req, res) => {
+    if (!features.languageTool) {
+        return res.status(503).json({
+            code: 'LANGUAGETOOL_DISABLED',
+            error: features.languageToolMaintenanceMessage || 'LanguageTool está desactivado'
+        });
+    }
     const { texto } = req.body;
     if (!texto || texto.trim() === '') return res.status(400).json({ error: 'Texto vacÃ­o' });
     
@@ -1074,7 +1084,9 @@ function startServer(port = PORT) {
         console.log(`ðŸ“Š Health check: http://localhost:${boundPort}/api/health`);
         console.log('');
 
-        setTimeout(() => { iniciarLanguageTool(); }, 1500);
+        if (features.languageTool) {
+            setTimeout(() => { iniciarLanguageTool(); }, 1500);
+        }
     }).catch((err) => {
         console.error('Error del servidor:', err);
         process.exit(1);

@@ -6,6 +6,7 @@ module.exports = Object.freeze({
     subtitlesUI: false,
     transcription: false,
     subtitleFiles: true,
-    languageTool: true,
-    subtitlesMaintenanceMessage: 'Subtítulos está temporalmente en mantenimiento. Puedes seguir trabajando con archivos SRT existentes desde Audio.'
+    languageTool: false,
+    subtitlesMaintenanceMessage: 'Subtítulos está temporalmente en mantenimiento. Puedes seguir trabajando con archivos SRT existentes desde Audio.',
+    languageToolMaintenanceMessage: 'La corrección con LanguageTool está temporalmente desactivada por optimización. Los diccionarios locales y la optimización de texto siguen activos.'
 });
