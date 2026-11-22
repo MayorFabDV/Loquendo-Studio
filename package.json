@@ -65,11 +65,29 @@
     "extraResources": [
       {
         "from": "backend/bin/",
-        "to": "backend/bin/"
+        "to": "backend/bin/",
+        "filter": [
+          "**/*",
+          "!jre/**",
+          "!languageTool/**",
+          "!languagetool/**",
+          "!ggml-small.bin",
+          "!whisper-cli.exe",
+          "!whisper.dll",
+          "!ggml-base.dll",
+          "!ggml-cpu-x64.dll",
+          "!ggml.dll",
+          "!handle.exe",
+          "!test_salida.srt"
+        ]
       },
       {
         "from": "backend/modules/",
-        "to": "backend/modules/"
+        "to": "backend/modules/",
+        "filter": [
+          "**/*",
+          "!generar_voz.spec"
+        ]
       },
       {
         "from": "backend/public/",
