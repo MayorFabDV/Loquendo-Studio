@@ -1,33 +1,33 @@
-
 # 🎙️ Loquendo Studio
 
-> **Estabilización 1.2.0:** las fases de desarrollo y regresión están documentadas en [ESTABILIZACION.md](ESTABILIZACION.md). La nueva distribución y la validación de su asar siguen pendientes; los artefactos existentes no se regeneraron durante estas fases.
+> **Versión 1.2.0 (Pre-release de prueba y optimización):** Las fases de desarrollo, estabilización y optimización de tamaño están documentadas en [ESTABILIZACION.md](ESTABILIZACION.md) y [OPTIMIZACION_FASE4.md](OPTIMIZACION_FASE4.md). La transcripción automática y LanguageTool se encuentran temporalmente en mantenimiento.
 
-### Suite profesional de automatización de voz y edición multimedia
+### Suite de automatización de voz, edición multimedia y video PNGTuber
 
-[![Versión](https://img.shields.io/badge/versión-1.2.0-e41a1a?style=for-the-badge)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
+[![Versión](https://img.shields.io/badge/versión-1.2.0--preview-e41a1a?style=for-the-badge)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%2F11-0078D6?style=for-the-badge&logo=windows)](https://github.com/MayorFabDV/Loquendo-Studio/releases)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-green?style=for-the-badge)](LICENSE)
-[![Estado](https://img.shields.io/badge/estado-activo-brightgreen?style=for-the-badge)]()
+[![Estado](https://img.shields.io/badge/estado-pre--release-orange?style=for-the-badge)]()
 
-**Convierte texto en audio profesional, genera subtítulos con IA, aplica efectos visuales y crea videos PNGTuber — todo en una sola aplicación offline.**
+**Convierte texto en audio con voces Loquendo y Microsoft SAPI5, organiza mezclas multipista, aplica ducking musical y genera videos PNGTuber animados — en una suite de escritorio offline para Windows.**
 
-[Características](#-características) •
+[Características](#-características-principales) •
 [Descarga](#-descarga) •
-[Desarrollo](#️-para-desarrolladores) •
+[Historial de Versiones](#-historial-de-versiones) •
+[Para Desarrolladores](#️-para-desarrolladores) •
 [Roadmap](#-roadmap) •
 [Licencia](#-licencia)
-
-
 
 ---
 
 ## 📖 Tabla de Contenidos
 
 - [Características Principales](#-características-principales)
+- [Limitaciones Conocidas y Avisos](#-limitaciones-conocidas-y-avisos)
 - [Stack Tecnológico](#-stack-tecnológico)
 - [Vista Previa](#-vista-previa)
 - [Descarga](#-descarga)
+- [Historial de Versiones](#-historial-de-versiones)
 - [Para Desarrolladores](#️-para-desarrolladores)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Cómo Funciona](#-cómo-funciona)
@@ -40,96 +40,75 @@
 
 ## ✨ Características Principales
 
-### 🎙️ Síntesis de Voz
-- **Voces Loquendo**: Jorge, Carlos, Carmen, Diego, Ludoviko, Esperanza, Francisca, Leonor, Soledad, Ximena
-- **Voces Microsoft**: Helena, Sabina, David, Zira
-- **Voces Acapella**: Diego, Carmen, Jorge
-- **Detección automática** de voces instaladas en el sistema
-- **SSML completo**: pausas, velocidad, tono, volumen, énfasis, deletreo
-- **Multi-voz**: cambia de voz dentro del mismo texto con `[voz:nombre]`
-- **Expresiones**: risa, suspiro, grito, llanto, susurro, enojo, felicidad, tristeza, sorpresa, miedo
+### 🎙️ Síntesis de Voz (SAPI5 Loquendo y Microsoft)
+- **Voces Loquendo**: Jorge, Carlos, Carmen, Diego, Ludoviko, Esperanza, Francisca, Leonor, Soledad, Ximena.
+- **Voces Microsoft**: Helena, Sabina, David, Zira.
+- **Voces Acapella**: Diego, Carmen, Jorge.
+- **Detección automática** de voces nativas instaladas en Windows mediante proceso x86 de 32 bits.
+- **Control SSML**: pausas (`[pause]`), velocidad (`[slow]`, `[fast]`), tono (`[pitch]`), volumen (`[vol]`), énfasis y deletreo.
+- **Multi-voz**: permite alternar voces dentro de un mismo guion con etiquetas `[voz:Nombre]`.
 
-### 📝 Procesamiento de Texto
-- **5 diccionarios personalizables**: jergas, sinónimos, fonética, ortografía, gramática
-- **Corrección con LanguageTool** (Java): ortografía, gramática y puntuación
-- **Comas inteligentes**: conectores de contraste, causa y enumeración, antes y después
-- **Puntos inteligentes**: corta oraciones largas (>30 palabras / >170 caracteres) en puntos de pausa
-- **Modos de narración**: Estándar, Creepypasta, Tutorial, Gameplay
+### 📝 Procesamiento y Optimización de Texto
+- **Diccionarios locales personalizables**: jergas, sinónimos, fonética, ortografía y gramática basados en SQLite/JSON local.
+- **Puntuación y comas inteligentes**: detección automática de conectores lógicos, causa, contraste y enumeración.
+- **Puntos inteligentes**: segmentación de oraciones excesivamente largas para una locución fluida.
+- **Modos de narración**: Estándar, Creepypasta, Tutorial, Gameplay.
+- *(Nota: La corrección externa mediante servidor LanguageTool se encuentra temporalmente deshabilitada en esta versión).*
 
-### 🎵 Editor de Audio
-- **WaveSurfer integrado**: visualización de ondas en tiempo real
-- **Recortar**: elimina secciones no deseadas
-- **Fade In/Out**: transiciones suaves
-- **Normalizar**: volumen consistente
-- **Eliminar silencios**: automáticamente
-- **Historial**: Deshacer/Rehacer (Ctrl+Z/Ctrl+Y)
-- **Atajos**: Espacio, Delete, Ctrl+Z, Ctrl+Y, M
-- **Mezclador multipista**: varios clips de voz, música y SFX; dividir, copiar/cortar/pegar, mover, recortar y deshacer/rehacer.
-- **Sesión de voz recuperable**: audio y marcadores actuales, original restaurable y ajustes de escucha guardados localmente (mismo perfil/origen).
-- **Proyectos**: guardar/abrir en el equipo, recuperar fuentes faltantes, exportar JSON y paquete `.loquendo.tar` con medios incluidos.
+### 🎵 Editor de Audio y Mezclador Multipista
+- **WaveSurfer integrado**: visualización de ondas de audio en tiempo real.
+- **Operaciones de edición**: recortar, split, transiciones Fade In / Fade Out, normalización y eliminación de silencios.
+- **Mezclador multipista**: soporte para múltiples clips en pistas independientes de voz, música y SFX; duplicar, mover, recortar, copiar/cortar/pegar y deshacer/rehacer.
+- **Proyectos de mezcla**: guardar/abrir proyectos locales en formato JSON y paquetes completos `.loquendo.tar` con medios incorporados y recuperación de fuentes faltantes.
+- **Recuperación de sesiones (Alpha)**: almacenamiento en IndexedDB local para restaurar sesiones de voz y mezcla tras reinicios accidentales.
 
-### 🎚️ Ducking Inteligente
-- **Sidechain compression** con FFmpeg
-- **Volumen configurable** de la música
-- **Fade In/Out** de la música
-- **Loop** para música de fondo
-- **Umbral y ratio** ajustables
-- **Ocultar automáticamente** la música después de aplicar
-
-### 📄 Subtítulos con IA
-- **Whisper.cpp** (C++): transcripción offline sin Python
-- **Modelo ggml-small** incluido
-- **Subtítulos dinámicos**: 2-15 palabras por línea
-- **Formato SRT**: para YouTube, VLC, etc.
-- **Formato ASS**: con efectos visuales
-- **Sin internet**: 100% offline
+### 🎚️ Ducking Inteligente y Biblioteca Musical
+- **Atenuación automática (sidechain)** mediante FFmpeg para modular la música de fondo mientras habla la voz.
+- **Biblioteca musical**: persistencia de canciones recientes y favoritas para ducking sin duplicar archivos.
+- **Parámetros configurables**: volumen de música, fade in/out, bucle (loop) y umbrales de compresión.
 
 ### 🎬 Video PNGTuber
-- **Imágenes de reposo/habla/parpadeo** con visibilidad exclusiva por expresión
-- **Vista previa de expresiones**: demostración de 4 segundos, sin audio y en bucle, igual para audio de Studio o externo
-- **Video final**: exportación con audio real y expresiones sincronizadas con su actividad
-- **Fondos**: verde (chroma key), negro, transparente
-- **Renderizado MP4 o WebM con alfa** mediante FFmpeg
-- **Listo para OBS/Streamlabs**
+- **Gestión de expresiones**: reposo (idle), habla (talking) y parpadeo (blink) con visibilidad mutuamente exclusiva.
+- **Vista previa de expresiones**: demostración cíclica de aproximadamente 4 segundos, sin pista de audio y en bucle continuo, permitiendo evaluar el personaje con cualquier fuente.
+- **Exportación de video final**: generación del video sincronizado con el audio real (Studio o archivo externo WAV/MP3), respetando silencios y habla.
+- **Fondos soportados**: verde (chroma key), negro o transparente (alfa).
+- **Formatos de exportación**: MP4 (H.264) o WebM con canal alfa para OBS Studio / Streamlabs.
+- **Ajustes de personaje**: posición, tamaño del lienzo y escala configurable.
 
-### 💾 Exportación
-- **WAV** (sin pérdida)
-- **MP3** (comprimido)
-- **FLAC / Opus / WAV 24-bit** mediante el render avanzado
-- **SRT** (subtítulos)
-- **ASS** (subtítulos con efectos)
-- **MP4** (video PNGTuber)
-- **WebM** (PNGTuber con transparencia)
-- **JSON / `.loquendo.tar`** (proyecto de mezcla; el TAR incluye los audios referenciados, sin compresión, hasta 2 GiB)
+### 📄 Herramientas de Subtítulos (Archivos existentes)
+- Importación, edición manual y descarga de archivos de subtítulos **SRT** y **ASS** existentes desde el editor de Audio.
+- Generación de plantillas aproximadas matemáticas sin requerir modelos de IA.
+- *(Nota: La transcripción automática mediante Whisper se encuentra temporalmente deshabilitada por mantenimiento).*
 
-### 🎨 Interfaz
-- **Diseño moderno** con iconos SVG
-- **Interfaz por pestañas**: Guión → Audio → Video, con barra de flujo y salto automático a Audio al generar
-- **Ayudas contextuales**: tooltips en todos los controles (activables/desactivables)
-- **Menú Ajustes**: tema oscuro/claro/sistema, ayudas y sonidos de notificación (persistente en localStorage)
-- **Tema oscuro/claro**
-- **Notificaciones elegantes** (sin alertas)
-- **Modales de ayuda y testers**
-- **Selector de etiquetas interactivo**
-- **Expresiones rápidas**
-- **Enlaces externos** en navegador
+---
+
+## ⚠️ Limitaciones Conocidas y Avisos
+
+1. **Efectos del editor de audio en la exportación final:**
+   Los efectos aplicados en el editor de audio (filtros de ecualización, ciertos fades y procesamientos de escucha) todavía no se reflejan correctamente en todos los archivos finales exportados. Se recomienda utilizar el render avanzado y revisar el resultado antes de publicar.
+2. **Recuperación de sesiones en estado ALPHA:**
+   La recuperación automática de sesiones de voz y mezclador se encuentra en fase **Alpha**. Aunque previene pérdidas accidentales ante recargas, **el usuario debe guardar manualmente sus proyectos y realizar copias de seguridad de sus archivos de audio y guiones**.
+3. **Transcripción automática (Whisper) deshabilitada:**
+   La generación automática de subtítulos con IA (Whisper.cpp y modelos `ggml`) fue temporalmente deshabilitada por mantenimiento y excluida del instalador para reducir el tamaño del paquete.
+4. **LanguageTool deshabilitado:**
+   El corrector externo LanguageTool y su runtime Java fueron temporalmente retirados de la distribución. La corrección ortográfica y gramatical opera exclusivamente con los diccionarios locales y el procesador de texto integrado.
+5. **Investigación abierta con la voz Leonor:**
+   Existe un reporte de fallo COM (`Speak`) con la voz Leonor en la computadora de un tester. El fallo no se reproduce en entornos estándar y permanece bajo investigación mediante la herramienta de diagnóstico disponible en `tools/diagnostico_sapi/`.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-| Tecnología | Uso | Lenguaje |
-|------------|-----|----------|
-| **Electron** | Framework de escritorio | JavaScript |
-| **Node.js + Express** | Backend API REST | JavaScript |
-| **Python 32 bits** | Síntesis de voz con SAPI | Python |
-| **Java + LanguageTool** | Corrección ortográfica | Java |
-| **Whisper.cpp** | Transcripción de audio con IA | C++ |
-| **FFmpeg** | Procesamiento de audio/video | C |
-| **WaveSurfer.js** | Editor de audio | JavaScript |
-| **HTML/CSS** | Interfaz | HTML/CSS |
+| Tecnología | Rol | Arquitectura / Detalle |
+|---|---|---|
+| **Electron (v37)** | Framework de escritorio | x64 |
+| **Node.js + Express** | Servidor API local y orquestación | Localhost restringido |
+| **Python embebido** | Síntesis SAPI5 y automatización | **32 bits (x86)** (requerido por SAPI) |
+| **FFmpeg & FFprobe** | Procesamiento multimedia y renderizado | x64 |
+| **WaveSurfer.js** | Visualización interactiva de ondas | Frontend |
+| **sql.js (SQLite)** | Almacenamiento local de diccionarios | WebAssembly |
 
-**4 lenguajes integrados**: JavaScript + Python + Java + C++
+*(Los componentes Java/LanguageTool y Whisper.cpp están temporalmente desactivados en v1.2.0 y resguardados en respaldo externo).*
 
 ---
 
@@ -141,117 +120,80 @@
 
 ## 📥 Descarga
 
-### Windows 10/11 (64 bits)
+> ℹ️ **Las descargas de prueba de la versión 1.2.0 estarán disponibles en la sección [Releases](https://github.com/MayorFabDV/Loquendo-Studio/releases) de GitHub una vez aprobada su publicación.**
 
-1. Ve a la sección **[Releases](https://github.com/MayorFabDV/Loquendo-Studio/releases)**
-2. Descarga el ZIP `LoquendoStudio-v1.2.0-win64.zip`
-3. Descomprime el ZIP en una carpeta local (no ejecutes la app desde dentro del ZIP)
-4. Ejecuta `Loquendo Studio.exe`
+Formatos previstos para Windows 10 / 11 (64 bits):
+- **Instalador estándar (NSIS):** `Loquendo Studio Setup 1.2.0.exe` (~225 MB).
+- **Distribución portable (ZIP):** `LoquendoStudio-v1.2.0-win64-portable.zip` (~302 MB). No requiere instalación; basta con descomprimir en una carpeta local y ejecutar `Loquendo Studio.exe`.
 
-La distribución oficial es la carpeta `win-unpacked` empaquetada en ZIP. No requiere instalador ni Node.js.
+**Requisitos mínimos:**
+- Windows 10 o Windows 11 de 64 bits.
+- Voces SAPI5 instaladas en Windows si se desea síntesis Loquendo.
+- No requiere instalar Python, Java ni herramientas externas.
 
-**Requisitos:**
-- Windows 10/11 (64 bits)
-- Loquendo instalado (opcional, para voces Loquendo)
-- No requiere Node.js
-- No requiere Python
-- No requiere Java
-- No requiere internet
+---
 
-> Si Windows SmartScreen muestra una advertencia, usa "Más información" → "Ejecutar de todas formas". El ejecutable no está firmado.
+## 📜 Historial de Versiones
+
+### 📦 v1.2.0 — Optimización y Mezclador Multipista (Pre-release)
+- **Mezclador multipista:** Incorporación de editor multipista con clips independientes de voz, música y efectos, soporte de split, trim, mover, duplicar y proyectos en formato JSON y `.loquendo.tar`.
+- **Mejoras PNGTuber:** Soporte para audio externo (WAV/MP3), unificación de la vista previa de expresiones como demo cíclica de 4 s sin audio y exportación final sincronizada en MP4 y WebM con alfa.
+- **Biblioteca musical:** Persistencia de canciones recientes y favoritas para ducking sin duplicar archivos.
+- **Recuperación de sesiones (Alpha):** Recuperación de voz y mezcla ante reinicios. *(Nota: Estado Alpha; se requiere guardar proyectos manualmente).*
+- **Optimización de distribución:** Reducción del tamaño de la carpeta desempaquetada de 1.778,33 MB a 798,42 MB (~55,1% de reducción).
+- **Mantenimiento y resguardo:** Exclusión temporal del paquete de Whisper.cpp, modelos IA y Java/LanguageTool, preservándolos en respaldo externo documentado para reactivación futura.
+- **Diccionarios locales y subtítulos:** Conservación de diccionarios locales y herramientas independientes para archivos SRT/ASS.
+- **Limitación pendiente:** Los efectos aplicados en el editor de audio todavía no se reflejan correctamente en todas las exportaciones finales.
+
+### 📦 v1.1.2v — Mejoras PNGTuber y Editor de Audio
+- Ya incluía el editor de audio con WaveSurfer.
+- **NO** incluía mezclador multipista.
+- Introdujo mejoras en el proceso de generación de video PNGTuber.
+- Incorporó el parpadeo del personaje (blink) con temporización intercalada.
+- Incorporó el control de ajuste de escala del personaje PNGTuber.
+- *Limitación conocida:* Los efectos del editor de audio todavía no se reflejaban correctamente en el archivo final exportado.
+
+### 🎨 v1.1 — Nueva Interfaz y Pestañas
+- Interfaz modular por pestañas: Guión → Audio → Video, con barra de flujo.
+- Sistema de ayudas contextuales y tooltips interactivos en todos los controles.
+- Menú de Ajustes con personalización de tema (oscuro/claro/sistema) y preferencias persistentes.
+- Puntuación inteligente con corte automático de oraciones largas.
+
+### 🔧 v1.0.1 — Parche de Estabilidad
+- Corrección del historial Undo/Redo en el editor de audio.
+- Corrección de la exportación del servidor REST con puerto dinámico.
+- Soporte para parámetros de calidad y rutas seguras de archivos temporales.
+
+### ✅ v1.0 — Lanzamiento Inicial
+- Síntesis de voz con Loquendo SAPI5 y Microsoft Speech API.
+- Procesamiento de texto con 5 diccionarios locales.
+- Generación inicial de videos PNGTuber y ducking musical con FFmpeg.
 
 ---
 
 ## 🛠️ Para Desarrolladores
 
-### Requisitos
-
+### Requisitos de Desarrollo
 - [Node.js](https://nodejs.org/) 18+
-- [Python](https://python.org/) 3.10+ (32 bits, solo para desarrollo)
-- [Java](https://adoptium.net/) 17+ (para LanguageTool)
-- Windows 10/11
+- Python 3.10+ (32 bits, requerido para compilar y probar llamadas SAPI COM)
+- Windows 10/11 x64
 
-### Instalación
-
+### Comandos Principales
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/MayorFabDV/Loquendo-Studio.git
-cd Loquendo-Studio
-
-# 2. Instalar dependencias
+# 1. Instalar dependencias
 npm install
 
-# 3. Ejecutar en desarrollo
+# 2. Ejecutar en desarrollo
 npm start
-```
 
-### Compilación
-
-Antes de empaquetar, revisar el informe de regresión [ESTABILIZACION_FASE5.md](ESTABILIZACION_FASE5.md). Las pruebas disponibles no sustituyen probar la distribución generada.
-
-```bash
-# 1. Verificar binarios y módulos requeridos
-node scripts/check_build_prereqs.js
-
-# 2. Generar la carpeta win-unpacked
-npx electron-builder --win dir
-
-# 3. Crear el ZIP de release
-empaquetar_portable.bat
-```
-
-Formatos opcionales (no son la distribución oficial):
-
-```bash
-npm run build:portable
-npm run build:nsis
-```
-
-### Pruebas de desarrollo
-
-```powershell
+# 3. Ejecutar suite de pruebas
 npm test
-node scripts/smoke_projects.cjs
-node scripts/smoke_projects.cjs --desktop
-node scripts/smoke_projects.cjs --sapi
-node scripts/smoke_audio_sessions.cjs
-node node_modules/electron/cli.js scripts/smoke_mixer.cjs --full-page
-node scripts/smoke_native.cjs
-```
 
-Los smokes usan perfiles y salidas temporales aislados. `--sapi` requiere la voz Jorge instalada, el ejecutable SAPI y el Python embebido de 32 bits. El smoke nativo usa también Whisper/modelo local y JRE/LanguageTool; no descarga componentes. Consultar el informe para resultados, límites y qué casos usan APIs simuladas.
+# 4. Generar distribución desempaquetada de prueba (win-unpacked)
+npm run build:dir
 
----
-
-## 📁 Estructura del Proyecto
-
-```text
-Loquendo-Studio/
-├── backend/
-│   ├── bin/                    # Binarios nativos
-│   │   ├── ffmpeg.exe          # Procesamiento audio/video
-│   │   ├── generar_voz.exe     # Síntesis de voz (32 bits)
-│   │   ├── whisper-cli.exe     # Whisper.cpp (IA)
-│   │   ├── ggml-small.bin      # Modelo Whisper
-│   │   ├── jre/                # Java Runtime Environment
-│   │   └── languagetool/       # LanguageTool
-│   ├── db/                     # Diccionarios (JSON)
-│   ├── modules/                # Scripts Python
-│   ├── python/                 # Python 32 bits embebido
-│   ├── services/               # Servicios Node.js
-│   └── public/                 # Archivos generados
-├── frontend/
-│   ├── css/                    # Estilos
-│   ├── js/                     # Scripts
-│   │   ├── core/               # Configuración
-│   │   ├── ui/                 # Interfaz
-│   │   ├── services/           # Servicios
-│   │   └── libs/               # Librerías locales
-│   ├── img/                    # Assets
-│   └── index.html              # Interfaz principal
-├── main-electron.js            # Entry point de Electron
-├── server.js                   # API REST
-└── package.json
+# 5. Generar instalador NSIS
+npm run build:nsis
 ```
 
 ---
@@ -259,78 +201,49 @@ Loquendo-Studio/
 ## 🎯 Cómo Funciona
 
 ```text
-1. 📝 Escribe o pega tu texto
+1. 📝 Escribe o pega tu texto en el Guión
    ↓
-2. ⚙️ Activa opciones (ortografía, gramática, jergas, etc.)
+2. ⚙️ Aplica optimizaciones (puntuación inteligente, jergas, sinónimos, ortografía local)
    ↓
-3. ✨ Optimiza el texto (diccionarios + puntuación)
+3. 🎙️ Selecciona voz SAPI5 Loquendo o Microsoft
    ↓
-4. 🔍 Corrige con LanguageTool (opcional)
+4. 🔊 Genera el audio de voz (WAV / MP3)
    ↓
-5. 🎙️ Selecciona voz y modo de narración
+5. ✂️ Edita o mezcla el audio en el Mezclador Multipista
    ↓
-6. 🔊 Genera audio (WAV + SRT/ASS automáticamente)
+6. 🎵 Añade música de fondo con Ducking automático
    ↓
-7. ✂️ Edita el audio (cortar, fades, normalizar)
+7. 🎬 Configura tu personaje PNGTuber (idle, talking, blink)
    ↓
-8. 🎵 Sube música y aplica Ducking
-   ↓
-9. 📄 Exporta a MP3
-   ↓
-10. 🎬 Genera video PNGTuber
+8. 💾 Exporta tu audio final o video PNGTuber (MP4 / WebM con transparencia)
 ```
 
 ---
 
 ## 🚀 Roadmap
 
-### ✅ v1.0 (Completada)
-- ☑ Síntesis de voz con Loquendo
-- ☑ Editor de audio con WaveSurfer
-- ☑ Ducking con FFmpeg
-- ☑ Subtítulos con Whisper.cpp
-- ☑ LanguageTool
-- ☑ Diccionarios (5 tipos)
-- ☑ Video PNGTuber
-- ☑ Exportación MP3
+### 🔄 v1.2.x (Estabilización en curso)
+- [x] Optimización del peso de distribución (exclusión temporal de Whisper y JRE).
+- [x] Contrato unificado de preview PNGTuber (demo 4s) y exportación final sincronizada.
+- [x] Biblioteca musical y ducking persistente.
+- [ ] Reflejo fiel de efectos del editor de audio en todas las exportaciones finales.
+- [ ] Maduración de la recuperación de sesiones para salir de fase Alpha.
+- [ ] Diagnóstico del sistema integrado en el panel de Ajustes.
+- [ ] Conclusión de investigación sobre síntesis con voz Leonor.
 
-### 🔧 v1.0.1 — Parche de Bugs (2026-10-15)
-- ☑ [Bug #1] Fix historial Undo/Redo: `historyIndex` desincronizado al llegar a `MAX_HISTORY` causaba Ctrl+Z errático (`audioProcessor.js`)
-- ☑ [Bug #2] Fix server exportado como null: `module.exports` se evaluaba antes de que el servidor async arrancara; ahora se expone `getServer()` como getter lazy (`server.js`)
-- ☑ [Bug #4] Fix exportar MP3 / ducking con puerto dinámico: `btnDescargar.href` devolvía URL absoluta que fallaba si el puerto cambiaba a 3001/3002; ahora se usa `voiceAudioRealPath` directamente (`main.js`)
-- ☑ [Bug #5] Fix usarIA ignorado: el backend hardcodeaba `false` al llamar a `audioService.procesar()`, ignorando el checkbox de subtítulos automáticos; ahora se lee el valor del body (`server.js`)
-
-### 🎨 v1.1 — Nueva Interfaz (2026-10-16)
-- ☑ Interfaz por pestañas (Guión → Audio → Video) con barra de flujo y salto automático a Audio al generar el reproductor
-- ☑ Sistema de ayudas contextuales: tooltips en todos los controles (`helpSystem.js` + `helpTexts.js`)
-- ☑ Menú Ajustes: tema oscuro/claro/sistema, mostrar/ocultar ayudas y sonidos de notificación (persistente en localStorage)
-- ☑ Rediseño visual completo de la interfaz (HTML + CSS)
-- ☑ Puntuación inteligente mejorada: más conectores (antes y después), comas de énfasis y corte de oraciones largas en puntos de pausa (`TextProcessor.js`)
-- ☑ Limpieza de código: lógica de puntuación consolidada en `TextProcessor` (eliminada la duplicada en `main.js`)
-
-### 🔄 v2.0 (En desarrollo)
-- □ Migración a Tauri (Rust)
-- □ Editor de subtítulos avanzado
-- □ Editor de audio avanzado (Tone.js)
-- □ Editor de video multipista
-- □ Versión Android
-- □ Versión iOS
-
-### 🔮 v3.0 (Futuro)
-- □ IA generativa de guiones
-- □ Clonación de voz
-- □ Traducción automática
-- □ Publicación automática a YouTube
-- □ Colaboración en tiempo real
+### 🔮 v2.0 (Futuro)
+- □ Reactivación optimizada de transcripción de subtítulos y corrector gramatical.
+- □ Nuevas expresiones para personajes PNGTuber (enojo, sorpresa, tristeza).
+- □ Evaluaciones de migración a frameworks ligeros (Tauri/Rust).
 
 ---
 
 ## 🧪 Testers
 
-Gracias a los testers que hicieron posible esta versión:
+Agradecimiento especial a los testers por su colaboración activa:
 
 | Tester | Rol | Canal |
-|--------|-----|-------|
+|---|---|---|
 | LautyKT | Tester | YouTube |
 | Allstarz | Tester | YouTube |
 | DarkerGhost | Tester | YouTube |
@@ -353,7 +266,7 @@ Gracias a los testers que hicieron posible esta versión:
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia **MIT**. Ver el archivo [LICENSE](LICENSE) para más detalles.
+Este proyecto está bajo la licencia **MIT**. Consulta el archivo [LICENSE](LICENSE) para más información.
 
 ---
 
