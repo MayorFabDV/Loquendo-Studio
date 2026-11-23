@@ -252,12 +252,19 @@
         if (!select || select.disabled || !select.options.length) return;
         if (!state.defaultVoice) return;
         var opciones = Array.prototype.slice.call(select.options);
-        var exacta = opciones.filter(function (opt) { return opt.value === state.defaultVoice; });
-        if (exacta.length === 1) { select.value = exacta[0].value; return; }
         var antigua = String(state.defaultVoice).trim().toLowerCase();
+        var exacta = opciones.filter(function (opt) { return opt.value.trim().toLowerCase() === antigua; });
+        if (exacta.length === 1) { select.value = exacta[0].value; return; }
+        var nombre = function (opt) { return String(opt.dataset?.voiceName || opt.textContent).trim().toLowerCase(); };
         var matches = opciones.filter(function (opt) {
-            return String(opt.dataset.voiceName || opt.textContent).trim().toLowerCase() === antigua;
+            return nombre(opt) === antigua;
         });
+        if (!matches.length && !/^(hkey_|hklm\\|hkcu\\)/i.test(antigua)) {
+            matches = opciones.filter(function (opt) { return nombre(opt).includes(antigua); });
+            if (!matches.length && antigua.startsWith('loquendo ')) {
+                matches = opciones.filter(function (opt) { return nombre(opt) === antigua.slice('loquendo '.length).trim(); });
+            }
+        }
         if (matches.length === 1) { select.value = matches[0].value; return; }
         select.selectedIndex = -1;
         window.notifications?.warning('La voz guardada no está disponible o es ambigua. Selecciona una voz concreta.');

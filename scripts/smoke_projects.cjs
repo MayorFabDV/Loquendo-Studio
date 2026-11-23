@@ -196,9 +196,11 @@ async function renderer(){
             await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.dataset.voiceName===${JSON.stringify(voice)})`);
             const token=await run(`Array.from(document.getElementById('vozSeleccionada').options).find(o=>o.dataset.voiceName===${JSON.stringify(voice)}).value`);
             assert.ok(/^HKEY_LOCAL_MACHINE\\/i.test(token),'El selector debe transportar un token estable, no una descripción');
-            await action(`settings.set('defaultVoice',${JSON.stringify(voice)});settings.aplicarVozPorDefecto();`);
-            assert.ok(await run(`document.getElementById('vozSeleccionada').value===${JSON.stringify(token)}`),'La preferencia antigua debe resolver al ID estable');
-            assert.equal(await run(`localStorage.getItem('loquendo.default_voice')`),voice);
+            for(const legacy of [voice,'Loquendo '+voice]){
+                await action(`settings.set('defaultVoice',${JSON.stringify(legacy)});settings.aplicarVozPorDefecto();`);
+                assert.ok(await run(`document.getElementById('vozSeleccionada').value===${JSON.stringify(token)}`),'La preferencia antigua debe resolver al ID estable');
+                assert.equal(await run(`localStorage.getItem('loquendo.default_voice')`),legacy);
+            }
             await action(`document.getElementById('vozSeleccionada').value=${JSON.stringify(token)};document.getElementById('resultado').value='Prueba de voz generada desde Electron.';
                 document.getElementById('calidadSeleccionada').value='16k';document.getElementById('chkSRT_IA').checked=true;await generarAudio();`);
             await wait(`audioEditor.audioBuffer && !audioEditor._cargandoEdicion`);

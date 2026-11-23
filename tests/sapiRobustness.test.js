@@ -44,12 +44,15 @@ const option=(value,name)=>({value,textContent:name,dataset:{voiceName:name}});
 test('preferencia legacy por descripción se resuelve al token sin reescribir el valor guardado',()=>{
     const h=preferences('Leonor',[option('opaque-j','Jorge'),option('opaque-l','Leonor')]);
     assert.equal(h.select.value,'opaque-l');assert.equal(h.stored.get('loquendo.default_voice'),'Leonor');
+    assert.equal(preferences('Loquendo Jorge',[option('opaque-j','Jorge')]).select.value,'opaque-j');
+    assert.equal(preferences('Leonor',[option('opaque-l','Loquendo Leonor')]).select.value,'opaque-l');
 });
 
 test('preferencia por token exacto desambigua nombres iguales y la legacy ambigua queda sin seleccionar',()=>{
     const options=[option('opaque-a','Leonor'),option('opaque-b','Leonor')];
     assert.equal(preferences('opaque-b',options).select.value,'opaque-b');
     const h=preferences('Leonor',options);assert.equal(h.select.value,'');assert.equal(h.warnings.length,1);
+    assert.equal(preferences('Leonor',[option('opaque-a','Loquendo Leonor A'),option('opaque-b','Loquendo Leonor B')]).select.value,'');
 });
 
 test('una preferencia ambigua no termina generando Jorge como fallback silencioso',async()=>{
