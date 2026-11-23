@@ -23,7 +23,7 @@ Si encuentra un único token Leonor y una voz de control, realiza **26 comprobac
 - Script original y ejecutable original: texto plano, etiquetas XML/SSML y etiqueta de voz sobre sí misma.
 - Cambios control → Leonor → control y Leonor → control → Leonor, en script y ejecutable.
 
-Control predeterminado: Jorge, o una alternativa disponible si falta. El informe identifica el token concreto usado. Si Leonor no aparece o su nombre coincide con varios tokens, no se la sustituye silenciosamente por otra voz ni se declara que pasó la prueba.
+Control predeterminado: Jorge, o una alternativa disponible si falta. El informe identifica el token mediante una huella anonimizada. Si Leonor no aparece o su nombre coincide con varios tokens, no se la sustituye silenciosamente por otra voz ni se declara que pasó la prueba. Un ID exacto puede utilizarse como entrada privada para desambiguar; no se publica en el informe.
 
 El código fuente original se observa mediante trazado de Python, sin modificarlo ni envolver los objetos COM. Se registran función, línea y llamada, token, segmento y flags. Para un `com_error` se conservan HRESULT firmado/hexadecimal, descripción, `excepinfo` —incluido su `scode` interno— y argumento. El HRESULT externo puede ser solo `DISP_E_EXCEPTION`: también hay que mirar el interno.
 
@@ -33,9 +33,9 @@ El inventario de registro es de **solo lectura** en vistas 32/64 bits. Recoge to
 
 ## Informe y privacidad
 
-Se usa exclusivamente texto fijo de prueba. No se leen guiones, proyectos, biblioteca musical, diccionarios ni credenciales. El informe no recoge nombre de usuario/equipo ni rutas de instalación: los mensajes de error y logs se depuran para eliminar rutas absolutas, identidades del entorno, SID personales y correos. Sí conserva los IDs de token SAPI y CLSID necesarios para comparar las instalaciones.
+Se usa exclusivamente texto fijo de prueba. No se leen guiones, proyectos, biblioteca musical, diccionarios ni credenciales. El informe no recoge nombre de usuario/equipo ni rutas de instalación: los mensajes de error y logs se depuran para eliminar rutas absolutas, identidades del entorno, SID personales y correos. Desde la versión 2, `informe.json`, `informe.md` y el ZIP sustituyen los tokens completos por huellas SHA-256. Los archivos internos de trabajo sí pueden contener IDs necesarios para seleccionar voces: comparte solo `para_compartir.zip`, no toda la carpeta de resultados.
 
-Además de los errores, se guardan las versiones/arquitecturas y hashes del Python, script de voz, listado de voces, exe y herramienta. Así se detecta si se está comparando código o binarios distintos. Un WAV vacío, silencioso o un aviso de liberación IUnknown no se considera una síntesis correcta sin observaciones.
+Además de los errores, se guardan las versiones/arquitecturas y hashes del Python, script de voz, listado, módulo común SAPI si existe, exe y herramienta. Así se detecta si se está comparando código o binarios distintos. Un WAV vacío, silencioso o un aviso de liberación IUnknown no se considera una síntesis correcta sin observaciones. La herramienta puede comparar la beta publicada antigua y la rama de parche futura; no modifica sus ejecutables ni exige que ambos tengan el nuevo protocolo de selección.
 
 `not_reproduced_with_fixed_cases` significa que estos casos no reprodujeron el error; no demuestra que el fallo original no exista.
 

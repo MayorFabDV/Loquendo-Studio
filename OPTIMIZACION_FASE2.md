@@ -2,7 +2,7 @@
 
 Fecha: 2026-11-22. Rama `feature/optimizacion-1.2.0`, comienzo en `f2afd6c`, árbol limpio. Herramienta y pruebas: `d7b7a1f`.
 
-**Estado: diagnóstico reproducible entregado; causa del fallo del tester pendiente de evidencia externa. No hay corrección de síntesis aplicada.** No se inició la Fase 3.
+**Estado actual: parche mínimo de robustez aprobado e implementado en la rama separada `fix/sapi-token-com-robustness`; causa del E_FAIL del tester aún pendiente de validación externa. La beta publicada y sus binarios no se alteraron.** Informe del parche: [PARCHE_SAPI_ROBUSTEZ.md](PARCHE_SAPI_ROBUSTEZ.md). Las secciones de referencia inicial siguientes describen el estado anterior al parche.
 
 ## Investigación del código actual
 
@@ -52,8 +52,8 @@ Ejecución completa mediante el lanzador PowerShell, apuntando a la instalación
 | Python | 3.13.14, proceso de 32 bits |
 | pywin32 | 312 |
 | Exe de voz | PE x86 |
-| Leonor | `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\LTTS7Leonor` |
-| Control | Token `LTTS7Jorge` |
+| Leonor | Referencia anonimizada `token-sha256:d47c57eb65348f60` |
+| Control | Jorge, referencia `token-sha256:99d6a5f016c998f9` |
 | Leonor visible en listado de Studio | Sí |
 | Motor registrado x86 | `LTTS7SAPI5.dll`, versión 7.0.7.0 |
 | CLSID del motor | `{780fe1fc-1376-4ffb-8ebb-3477bfee873d}` |
@@ -101,3 +101,14 @@ Falta recibir del tester:
 4. Si los casos fijos pasan: una frase mínima sin datos personales con las etiquetas necesarias para reproducirlo, y las condiciones de aparición (primer intento/cambio de voz, elevación u otros programas de voz abiertos).
 
 Comparar primero si difieren script/exe/motor o tokens; después, el primer fallo COM de casos equivalentes y su código interno. Solo tras reproducir una causa se aplicará una corrección mínima y su regresión. Esta fase **no declara resuelto el bug**: la investigación queda explícitamente bloqueada por esa evidencia. La Fase 3 no se inició en esta sesión.
+
+## Seguimiento aprobado — Robustez sin declarar resuelto el E_FAIL
+
+Publicación confirmada con el nombre real `Loquendo_Studio1.2v(beta)`, no `v1.2.0-beta.1`. Por indicación del usuario, el parche se aisló desde `f0e29d4` en `fix/sapi-token-com-robustness`. Primer commit: `76b6c5f` (identidad de tokens, compatibilidad, limpieza y pruebas); seguimiento `c3a33a9` para alias de preferencias inequívocos. Tag y assets existentes conservados; no se generó otra build ni release.
+
+- Catálogo/identidad compartidos, IDs de token end-to-end y compatibilidad de nombres antiguos inequívocos. Se conserva el filtro y se rechazan ambigüedades/no disponibles sin cambiar de voz silenciosamente.
+- Stream en `try/finally`, errores primarios/secundarios separados y liberación de traceback/wrappers antes de `CoUninitialize`.
+- `stdout=None` protegido, claves de registro con context managers, etapa/flags/formato/HRESULT y referencias anonimizadas. Formato 39 se conserva y su comentario se corrige a 48 kHz, 16 bits, estéreo.
+- Exe legado sin protocolo 2 nunca recibe IDs nuevos; la rama fuente utiliza Python embebido x86 hasta que exista un ejecutable compatible en un trabajo futuro autorizado.
+- **75 pruebas Node aprobadas**, incluida suite de 12 verificaciones Python de robustez. Ocho síntesis nativas de Leonor/Jorge (ID/nombre × plano/XML), control COM negativo sin IUnknown, smokes de ambas voces, detector alternativo, preferencias antiguas, PNGTuber/externo, recuperación, mantenimiento y biblioteca aprobados. Diagnóstico independiente v2: 26/26 comprobaciones y ZIP con tokens anonimizados.
+- El error remoto de Leonor no se declara resuelto; WinError 3 sigue siendo una investigación separada. Detalle, archivos y limitaciones en `PARCHE_SAPI_ROBUSTEZ.md`.

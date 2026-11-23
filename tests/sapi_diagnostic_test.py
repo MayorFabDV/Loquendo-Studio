@@ -129,12 +129,14 @@ class DiagnosticTests(unittest.TestCase):
         self.assertTrue(all(c['id'].startswith('control_') for c in cases))
 
     def test_share_archive_contains_only_sanitized_reports(self):
-        report = diag.Redactor([self.root]).clean({'environment': {'file': str(self.root / 'privado')}, 'selection': {}, 'cases': []})
+        report = diag.Redactor([self.root]).clean({'environment': {'file': str(self.root / 'privado')}, 'selection': {'token': Token.Id}, 'cases': []})
         (self.root / 'audio.wav').write_bytes(b'no se comparte')
         diag.write_report(self.root, report)
         with zipfile.ZipFile(self.root / 'para_compartir.zip') as archive:
             self.assertEqual(sorted(archive.namelist()), ['informe.json', 'informe.md'])
             self.assertNotIn(str(self.root).encode(), archive.read('informe.json'))
+            self.assertNotIn(Token.Id, archive.read('informe.json').decode('utf-8'))
+            self.assertIn('token-sha256:', archive.read('informe.json').decode('utf-8'))
 
     def test_native_registry_view_avoids_x86_filesystem_redirection(self):
         with patch.dict(os.environ, {'PROCESSOR_ARCHITEW6432': 'AMD64', 'WINDIR': r'C:\Windows', 'ProgramW6432': r'C:\Program Files'}), patch.object(diag.struct, 'calcsize', return_value=4):

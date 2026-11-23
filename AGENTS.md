@@ -44,13 +44,14 @@ No hay lint/typecheck configurado. Existe suite Node (`npm test`) y smokes Elect
 
 ## Política temporal de funciones (optimización 1.2.0)
 
-- Rama activa: `feature/optimizacion-1.2.0`, base `d1c02ea`, etiqueta intocable `respaldo-pre-optimizacion-1.2.0`.
+- Fase 4 conservada en `feature/optimizacion-1.2.0`. Parche SAPI futuro en `fix/sapi-token-com-robustness`, desde `f0e29d4`. No alterar la beta publicada `Loquendo_Studio1.2v(beta)`, sus assets ni la etiqueta `respaldo-pre-optimizacion-1.2.0`.
 - `backend/services/featurePolicy.js` es la fuente de capacidades; `/api/features.js` la comparte con el renderer y `/api/health` informa `capabilities`.
 - La pestaña Subtítulos y la transcripción están temporalmente bloqueadas, incluso si hay binarios Whisper o ajustes IA antiguos. No reactivarlas como efecto lateral de un arreglo.
 - Conservar el código y las operaciones independientes: marcadores SRT existentes desde Audio, plantillas matemáticas explícitas (`metodo: 'plantilla'`) y conversión de SRT existente a ASS.
 - Los procesos Python de conversión reciben `LOQUENDO_TRANSCRIPTION_ENABLED=0`: no importar ni iniciar Whisper desde ese camino. No hacer fallback a transcripción si falta el SRT.
 - El usuario autorizó una carpeta desempaquetada de prueba para medir tamaño en la Fase 4, con salida separada. No generar instalador de publicación. Plan completo y estados en `ESTABILIZACION.md`.
 - Diagnóstico Leonor preparado en `tools/diagnostico_sapi/` (lanzador `.cmd`, Python embebido x86). Referencia en `OPTIMIZACION_FASE2.md`: las pruebas locales pasan, pero la causa del fallo del tester sigue pendiente de evidencia externa. No presentar multivoz/formato/registro como causa confirmada ni modificar la síntesis sin reproducirla.
+- Parche de robustez aprobado en `PARCHE_SAPI_ROBUSTEZ.md`: IDs exactos y nombres legacy inequívocos mediante `sapi_voice_common.py`, sin eliminar `voz_usable`. Solo ejecutar un exe que anuncie `--sapi-protocol` 2/x86; con el binario legado usar el Python embebido. No recompilar ni reemplazar artefactos publicados automáticamente. El ZIP del diagnóstico v2 anonimiza tokens; no compartir archivos privados de trabajo.
 - Fase 3 PNGTuber verificada en `OPTIMIZACION_FASE3.md`: preservar refresco al cambiar de fuente, snapshots antes de `await`, descarte de respuestas obsoletas y rutas únicas de previews. Prioridad exclusiva blink > talking > idle.
 - Contrato vigente PNGTuber: la **Vista previa de expresiones** es siempre una demostración de ~4 s, sin pista de audio y en bucle, con idle/talking/blink. Es independiente de Studio/externo, no consulta/persiste audio ni usa `soloReposo`. Solo la exportación final utiliza y analiza el audio real; conservar su detector/umbrales y las imágenes del personaje. El seguimiento anterior de reposo sin archivo quedó sustituido por esta aclaración del usuario.
 - Diagnóstico general del sistema: propuesta pendiente de aprobación de alcance, dentro de Configuración/Ajustes existente, sin pestaña principal nueva. Conservar CMD independiente; no implementarlo automáticamente al continuar con optimización.
@@ -76,13 +77,12 @@ No hay lint/typecheck configurado. Existe suite Node (`npm test`) y smokes Elect
 
 ### Detalles COM de generar_voz (¡no romper!)
 
-- El script usa SAPI vía COM (`win32com`/`pythoncom`). El ciclo de vida COM debe ser:
-  `CoInitialize()` → trabajo dentro de una única función local → `finally: gc.collect(); CoUninitialize()`.
-- El refactor correcto vive en `_procesar_audio_voz(win32com_client, pythoncom, ...)`, al que llama `generar_audio_multivoz()` con `try/finally` (`gc.collect()` + `pythoncom.CoUninitialize()`).
+- El script usa SAPI vía COM (`win32com`/`pythoncom`). Ciclo de vida: `CoInitialize()` → trabajo local con limpieza de stream en `finally` → diagnóstico puramente serializable/liberación de frames de traceback → `gc.collect(); CoUninitialize()`. Una excepción pendiente no debe retener wrappers al desinicializar COM.
+- `_sintetizar()` cierra/desconecta; `_procesar_audio_voz()` captura error primario y errores secundarios por separado; `generar_audio_multivoz()` desinicializa COM. No devolver ni guardar objetos COM en el informe.
 - **Síntoma de bug**: al cerrar, el exe imprime `Win32 exception occurred releasing IUnknown` (con exit 0). Ocurre cuando objetos COM (`speaker`, `stream`, `voces`) sobreviven como globales cuando termina el intérprete; la solución es el patrón de arriba.
 - Si el proceso se levanta con `Start-Process`, redirige stdout y stderr a archivos separados para depurar.
 - `parsear_segmentos_voz()` entiende `[voz:Nombre]` (multi-voz) y `[pause]/[emphasis]` → los convierte a SSML.
-- Formato de salida del stream: `stream.Format.Type = 39`. En la práctica SAPI/Loquendo emite **48 kHz estéreo 16-bit (~192 KB/s)** sin importar el `Type` (36→8-bit, 41→8 kHz, 40 crashea). La selección de calidad (`16k`/`22k`/`44k` mono) se aplica **después** con ffmpeg en `AudioService._aplicarCalidad()`,
+- Formato de salida del stream: `stream.Format.Type = 39`, que significa **48 kHz estéreo 16-bit (~192 KB/s)**. No cambiarlo por conjeturas sobre Leonor. La auditoría controlada también obtuvo los formatos PCM solicitados con 18/22/34/38; no afirmar que SAPI ignora todos los Type. La selección de calidad (`16k`/`22k`/`44k` mono) se aplica **después** con ffmpeg en `AudioService._aplicarCalidad()`,
   no en el script/exe.
 
 ## Enlaces externos y preload (Electron)

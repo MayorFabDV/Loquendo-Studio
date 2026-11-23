@@ -20,12 +20,13 @@ import uuid
 import wave
 import zipfile
 
-VERSION = 1
+VERSION = 2
 TEXT = 'Prueba de voz. Uno, dos, tres.'
 
 
 class Redactor:
-    def __init__(self, roots=()):
+    def __init__(self, roots=(), public=False):
+        self.public = public
         self.values = []
         for value in [*roots, os.environ.get('USERPROFILE'), os.environ.get('APPDATA'),
                       os.environ.get('LOCALAPPDATA'), os.environ.get('TEMP')]:
@@ -45,6 +46,11 @@ class Redactor:
             if len(name) >= 3:
                 value = re.sub(r'(?<!\w)' + re.escape(name) + r'(?!\w)', '[IDENTIDAD]', value, flags=re.I)
         value = re.sub(r'\b[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}\b', '[EMAIL]', value)
+        if self.public:
+            def token_ref(match):
+                token = match.group().lower().replace('hkey_local_machine', 'hklm').replace('hkey_current_user', 'hkcu')
+                return 'token-sha256:' + hashlib.sha256(token.encode('utf-8')).hexdigest()[:16]
+            value = re.sub(r'(?:HKEY_LOCAL_MACHINE|HKEY_CURRENT_USER|HKLM|HKCU)\\[^\r\n\'",)]+', token_ref, value, flags=re.I)
         return value
 
     def clean(self, value):
@@ -204,6 +210,9 @@ def inventory_com(client, rec):
 
 
 def select_match(voices, query):
+    token = [v for v in voices if v.get('id', '').lower() == query.strip().lower()]
+    if token:
+        return token
     exact = [v for v in voices if v.get('description', '').casefold() == query.casefold()]
     partial = exact or [v for v in voices if query.casefold() in v.get('description', '').casefold()]
     return partial
@@ -355,6 +364,12 @@ def run_case(backend, folder, case, timeout, redactor):
     result = {'case': case, 'status': status, 'exit_code': code, 'elapsed_seconds': round(time.monotonic()-started, 2),
               'stdout': stdout.decode('utf-8', errors='replace')[-12000:],
               'stderr': stderr.decode('utf-8', errors='replace')[-12000:]}
+    for line in result['stderr'].splitlines():
+        if line.startswith('SAPI_DIAGNOSTIC '):
+            try:
+                result['sapi_diagnostic'] = json.loads(line[len('SAPI_DIAGNOSTIC '):])
+            except ValueError:
+                pass
     if code:
         result['exit_code_hex'] = '0x%08X' % (code & 0xffffffff)
     if (folder / 'result.json').is_file():
@@ -416,6 +431,8 @@ def find_backend(studio):
 
 
 def write_report(folder, report):
+    # Los datos de trabajo privados conservan IDs para seleccionar; el ZIP público no.
+    report = Redactor([folder], public=True).clean(report)
     data = json.dumps(report, ensure_ascii=False, indent=2)
     (folder / 'informe.json').write_text(data, encoding='utf-8')
     lines = ['# Diagnóstico SAPI / Leonor', '', 'Versión del diagnóstico: %s' % VERSION,
@@ -430,7 +447,7 @@ def write_report(folder, report):
         location = '%s:%s %s' % (event.get('file', ''), event.get('line', ''), event.get('code', event.get('operation', '')))
         hr = event.get('error', {}).get('hresult_hex', '')
         lines.append('| %s | %s | %s | %s |' % (result['case']['id'], result['status'], location.replace('|', '/'), hr))
-    lines += ['', 'El JSON contiene eventos, HRESULT/excepinfo, tokens, inventario de registro de solo lectura y hashes.',
+    lines += ['', 'El JSON contiene eventos, HRESULT/excepinfo, referencias de token anonimizadas, inventario de solo lectura y hashes.',
               'Las pruebas usan únicamente texto fijo. El ZIP no contiene WAV ni carpetas de instalación.',
               'Que una voz funcione en Loquendo TTS no demuestra por sí solo que use el mismo token o motor SAPI x86.',
               'Un error del exe sin eventos debe compararse con el caso source equivalente; no se deduce una llamada COM solo por el código de salida.']
@@ -462,7 +479,7 @@ def main(args):
               'environment': {'python_bits': struct.calcsize('P') * 8, 'python_version': platform.python_version(),
                               'windows_version': platform.version(), 'os_arch': os.environ.get('PROCESSOR_ARCHITEW6432', os.environ.get('PROCESSOR_ARCHITECTURE')),
                               'exe_machine': pe_machine(backend / 'bin' / 'generar_voz.exe')},
-              'hashes': {name: sha256(backend / name) for name in ['python/python.exe', 'modules/generar_voz.py', 'modules/listar_voces.py', 'bin/generar_voz.exe']},
+              'hashes': {name: sha256(backend / name) for name in ['python/python.exe', 'modules/generar_voz.py', 'modules/listar_voces.py', 'modules/sapi_voice_common.py', 'bin/generar_voz.exe']},
               'selection': {'requested': args.voice, 'target_status': 'selected' if target else 'ambiguous' if matches else 'not_found',
                             'matches': matches, 'target': target, 'control': control},
               'cases': [inventory]}

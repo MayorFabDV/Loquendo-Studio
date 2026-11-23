@@ -97,7 +97,7 @@ Se verificaron píxeles de sprites transparentes en MP4 y WebM con alfa, incluid
 
 ## Reglas vigentes
 
-- Rama activa de la nueva fase: `feature/optimizacion-1.2.0`, desde `d1c02ea`. La recuperación explícita y las mejoras de audio/biblioteca se conservan en sus ramas y commits anteriores.
+- Optimización conservada en `feature/optimizacion-1.2.0`, desde `d1c02ea`. El parche SAPI futuro autorizado se trabaja en `fix/sapi-token-com-robustness`, desde `f0e29d4`, sin alterar la beta publicada ni sus binarios. Recuperación, audio/biblioteca y Fases 1–4 conservados.
 - Pruebas y commits locales pequeños después de cada bloque verificable.
 - Resumir cada fase antes de continuar con la siguiente.
 - No tocar respaldos, datos del usuario o ramas remotas.
@@ -220,3 +220,16 @@ La aclaración posterior del usuario sustituye el seguimiento anterior de `soloR
 - Conservados obligatoriamente: Python x86 embebido de 32 bits, FFmpeg, FFprobe, SAPI5 Loquendo (`generar_voz.exe`), PNGTuber con sus 3 expresiones, mezclador, proyectos, biblioteca musical y recuperación de sesiones.
 - **70 pruebas Node aprobadas, ninguna omitida** (`npm test`). Smokes de Electron reales aprobados (`--maintenance`, `--sapi`, `--desktop --music-library`, `--recovery-ux`). Binarios del paquete (`generar_voz.exe`, ffmpeg, ffprobe, python 32-bit) validados directamente en `dist/win-unpacked`. Preload presente en `app.asar`.
 - Informe técnico detallado en [OPTIMIZACION_FASE4.md](OPTIMIZACION_FASE4.md). No se generó instalador definitivo ni se avanzó a la Fase 5.
+
+## Parche SAPI autorizado después de publicar la beta
+
+Se confirmó la pre-release pública **[Loquendo Studio 1.2V Beta](https://github.com/MayorFabDV/Loquendo-Studio/releases/tag/Loquendo_Studio1.2v%28beta%29)**, tag `Loquendo_Studio1.2v(beta)` (referencia remota `933cecf5255ecf76985868ed80a3823da533bc07`). El usuario autorizó corregir inconsistencias demostradas de robustez sin afirmar que el E_FAIL de Leonor esté resuelto.
+
+- Rama separada `fix/sapi-token-com-robustness`, base `f0e29d4`; no se modificó la rama de optimización, el tag, assets ni binarios existentes.
+- Commit de núcleo `76b6c5f`: ID exacto de token en detector/frontend/backend/generador; compatibilidad de nombres y preferencias legacy; ambigüedades explícitas; filtro conservado; cleanup COM/errores; detector alternativo compartido; protocolo de ejecutable.
+- Commit `c3a33a9`: preferencias por descripción/alias únicos compatibles con el resolver, sin reescritura automática ni selección silenciosa ante coincidencias parciales ambiguas.
+- El exe publicado no entiende IDs nuevos. La rama usa Python embebido x86 cuando el exe no anuncia protocolo 2/32 bits. No se recompiló ni sustituyó el exe; `generar_voz.exe` original mantiene SHA-256 `f824afe81dfb2be4ac781303d2723f4740290083c20cd6e4965f74bc5763c4ea`.
+- Diagnóstico independiente v2 y ZIP depurado con tokens anonimizados. No se implementó la propuesta de diagnóstico general en Configuración.
+- **75 pruebas automatizadas aprobadas, ninguna omitida**, con 12 casos Python de robustez; ocho síntesis nativas de Jorge/Leonor por ID/nombre y plano/XML; prueba COM negativa; smokes Electron de ambas voces, externo/PNGTuber, recuperación, biblioteca/ducking y mantenimiento aprobados. Diagnóstico CMD/PowerShell: 26/26 comprobaciones.
+- Integridad de instalador/ZIP existentes contrastada con los digests de GitHub; exclusiones Java/LanguageTool/Whisper intactas. No se ejecutó build, instalador ni publicación durante este parche.
+- Informe de archivos, pruebas y limitaciones: [PARCHE_SAPI_ROBUSTEZ.md](PARCHE_SAPI_ROBUSTEZ.md). Pendiente validar el E_FAIL en el equipo del tester; WinError 3 continúa separado. No se inició Fase 5.
