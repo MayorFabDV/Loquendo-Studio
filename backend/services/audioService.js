@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
-const { randomUUID } = require('crypto');
+const { randomUUID, createHash } = require('crypto');
 
 class AudioService {
     constructor(pythonScript, audioFolder, ffmpegPath, pythonBinPath) {
@@ -18,6 +18,7 @@ class AudioService {
         this.audioFolder = audioFolder;
         this.ffmpegPath = ffmpegPath;
         this.pythonBin = pythonBinPath;
+        this._protocoloExeCompatible = null;
 
         if (!fs.existsSync(this.audioFolder)) {
             fs.mkdirSync(this.audioFolder, { recursive: true });
@@ -29,6 +30,19 @@ class AudioService {
         console.log('   whisperExe:', this.whisperExe, '| Existe:', fs.existsSync(this.whisperExe));
         console.log('   whisperModel:', this.whisperModel, '| Existe:', fs.existsSync(this.whisperModel));
         console.log('   audioFolder:', this.audioFolder);
+    }
+
+    _exeConTokensEstables() {
+        if (this._protocoloExeCompatible !== null) return this._protocoloExeCompatible;
+        this._protocoloExeCompatible = false;
+        if (!fs.existsSync(this.vozExe32) || String(this.vozExe32).toLowerCase().includes('.asar')) return false;
+        try {
+            // Solo metadatos, nunca síntesis. No enviar IDs nuevos al exe publicado antiguo.
+            const probe = spawnSync(this.vozExe32, ['--sapi-protocol'], { encoding: 'utf8', windowsHide: true, shell: false, timeout: 5000 });
+            const protocol = JSON.parse(String(probe.stdout || '').trim());
+            this._protocoloExeCompatible = probe.status === 0 && protocol.protocol === 2 && protocol.bits === 32;
+        } catch (error) { /* Exe antiguo o no disponible: usar el Python embebido, no el sistema. */ }
+        return this._protocoloExeCompatible;
     }
 
     _aplicarCalidad(rutaArchivo, calidad) {
@@ -287,8 +301,9 @@ class AudioService {
             const rutaArchivo = path.join(this.audioFolder, nombreArchivo);
             const vozFinal = voz || 'Loquendo Jorge';
             
-            console.log(`  Voz seleccionada: ${vozFinal}`);
-            console.log(` Texto recibido: ${texto.substring(0, 80)}...`);
+            const identity = String(vozFinal).trim().toLowerCase().replace(/^hkey_local_machine\\/, 'hklm\\').replace(/^hkey_current_user\\/, 'hkcu\\');
+            console.log(`  Voz solicitada (referencia): ${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`);
+            console.log(` Texto recibido: ${texto.length} caracteres`);
             
             const textoConDiccionarios = dictionaryService.aplicarConOpciones(texto, opciones || {});
             
@@ -306,12 +321,7 @@ class AudioService {
 
             const tieneTags = /\[voz:|\/voz\]|\[pause|\[slow|\[fast|\[soft|\[loud|\[emphasis|\[spell/i.test(textoParaVoz);
 
-            let exeExiste = false;
-            try {
-                exeExiste = fs.existsSync(this.vozExe32) && !String(this.vozExe32).toLowerCase().includes('.asar');
-            } catch (e) {
-                exeExiste = false;
-            }
+            const exeExiste = this._exeConTokensEstables();
             const usarPython = !exeExiste;
 
             if (usarPython) {
@@ -320,7 +330,7 @@ class AudioService {
                 console.log(` [INFO] Usando .exe 32-bit${tieneTags ? ' con etiquetas de voz' : ''}`);
             }
 
-            console.log(` Generando voz: ${vozFinal}`);
+            console.log(' Generando voz SAPI con identidad estable');
             let proceso;
 
             if (usarPython) {
@@ -344,7 +354,7 @@ class AudioService {
                 }
 
                 const argsVoz = [this.vozScript, textoParaVoz, vozFinal, rutaArchivo];
-                proceso = spawn(pythonCmd, argsVoz, { windowsHide: true, shell: false });
+                proceso = spawn(pythonCmd, ['-B', ...argsVoz], { windowsHide: true, shell: false });
             } else {
                 if (!fs.existsSync(this.vozExe32)) {
                     console.error('❌ generar_voz.exe no encontrado:', this.vozExe32);

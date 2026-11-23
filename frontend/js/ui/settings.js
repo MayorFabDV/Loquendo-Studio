@@ -251,10 +251,16 @@
         var select = document.getElementById('vozSeleccionada');
         if (!select || select.disabled || !select.options.length) return;
         if (!state.defaultVoice) return;
-        var existe = Array.prototype.some.call(select.options, function (opt) {
-            return opt.value === state.defaultVoice;
+        var opciones = Array.prototype.slice.call(select.options);
+        var exacta = opciones.filter(function (opt) { return opt.value === state.defaultVoice; });
+        if (exacta.length === 1) { select.value = exacta[0].value; return; }
+        var antigua = String(state.defaultVoice).trim().toLowerCase();
+        var matches = opciones.filter(function (opt) {
+            return String(opt.dataset.voiceName || opt.textContent).trim().toLowerCase() === antigua;
         });
-        if (existe) select.value = state.defaultVoice;
+        if (matches.length === 1) { select.value = matches[0].value; return; }
+        select.selectedIndex = -1;
+        window.notifications?.warning('La voz guardada no está disponible o es ambigua. Selecciona una voz concreta.');
     }
 
     function aplicar(k) {

@@ -25,7 +25,10 @@ test('mantenimiento bloquea transcripción directa y solicitud IA en AudioServic
             });
             return child;
         },
-        spawnSync() { throw new Error('No se debe iniciar otro proceso'); }
+        spawnSync(file,args) {
+            assert.equal(args.length,1);assert.equal(args[0],'--sapi-protocol');
+            return {status:0,stdout:'{"protocol":2,"bits":32}'};
+        }
     };
     const module = { exports: {} };
     const script = fs.readFileSync(path.join(__dirname, '../backend/services/audioService.js'), 'utf8');

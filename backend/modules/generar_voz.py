@@ -3,14 +3,15 @@ import sys
 import os
 import argparse
 import re
+import json
+import struct
 
-# ✅ FIX: Solo redirigir stdout si existe (no es --noconsole)
-if sys.platform == "win32" and sys.stdout is not None:
-    try:
-        import codecs
-        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-    except (AttributeError, OSError):
-        pass  # Sin consola, ignorar
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sapi_voice_common import (configurar_stdout, resolver_voz, referencia_token,
+                               registrar, capturar_fallo, detalle_error, ErrorVoz, PROTOCOL)
+
+# UTF-8 cuando hay stream; compatible con stdout=None y ejecución mediante runpy.
+configurar_stdout()
 
 def convertir_tags_textaloud_a_ssml(texto):
     """
@@ -184,132 +185,126 @@ def parsear_segmentos_voz(texto):
 
 
 def buscar_voz(speaker, nombre_busqueda):
-    """Busca una voz por nombre exacto o parcial."""
-    nombre_busqueda = nombre_busqueda.lower().strip()
-    voces = speaker.GetVoices()
-    
-    for i in range(voces.Count):
-        desc = voces.Item(i).GetDescription()
-        if nombre_busqueda == desc.lower():
-            return voces.Item(i)
-    
-    for i in range(voces.Count):
-        desc = voces.Item(i).GetDescription()
-        if nombre_busqueda in desc.lower():
-            return voces.Item(i)
-    
-    partes = nombre_busqueda.split()
-    if len(partes) > 1:
-        busqueda = partes[-1]
-        for i in range(voces.Count):
-            if busqueda in voces.Item(i).GetDescription().lower():
-                return voces.Item(i)
-    
-    return None
+    """ID exacto o nombre legacy inequívoco; nunca sustituir otra voz silenciosamente."""
+    return resolver_voz(speaker, nombre_busqueda)
+
+
+def _sintetizar(win32com_client, texto_input, nombre_voz_default, ruta_salida_input, context, cleanup):
+    speaker = stream = voz_default = nueva_voz = None
+    opened = associated = False
+    try:
+        registrar(context, 'SpVoice.Dispatch')
+        speaker = win32com_client.Dispatch('SAPI.SpVoice')
+        registrar(context, 'voice.resolve.default', request_ref=referencia_token(nombre_voz_default), token_ref=None, flags=None)
+        voz_default = buscar_voz(speaker, nombre_voz_default)
+        context['token_ref'] = referencia_token(voz_default.Id)
+        registrar(context, 'SpVoice.Voice.default')
+        speaker.Voice = voz_default
+        ruta_absoluta = os.path.abspath(ruta_salida_input)
+        registrar(context, 'output.makedirs')
+        directorio = os.path.dirname(ruta_absoluta)
+        if not os.path.exists(directorio):
+            os.makedirs(directorio)
+        if os.path.exists(ruta_absoluta):
+            os.remove(ruta_absoluta)
+        registrar(context, 'SpFileStream.Dispatch')
+        stream = win32com_client.Dispatch('SAPI.SpFileStream')
+        registrar(context, 'SpFileStream.Format.Type', format_requested=39)
+        stream.Format.Type = 39  # 48 kHz, 16 bits, estéreo
+        registrar(context, 'SpFileStream.Open')
+        stream.Open(ruta_absoluta, 3)
+        opened = True
+        registrar(context, 'SpVoice.AudioOutputStream.set')
+        associated = True  # Intentar desconexión también si el setter falla parcialmente.
+        speaker.AudioOutputStream = stream
+        wave_format = None
+        try:
+            wave_format = stream.Format.GetWaveFormatEx()
+            context['format_observed'] = {'rate': wave_format.SamplesPerSec, 'bits': wave_format.BitsPerSample, 'channels': wave_format.Channels}
+        except Exception:
+            context['format_observed'] = None
+        finally:
+            wave_format = None
+        for i, (nombre_voz, texto_segmento) in enumerate(parsear_segmentos_voz(texto_input), 1):
+            registrar(context, 'voice.resolve.segment', segment=i, request_ref=referencia_token(nombre_voz or nombre_voz_default), token_ref=None, flags=None)
+            nueva_voz = buscar_voz(speaker, nombre_voz) if nombre_voz else voz_default
+            context['token_ref'] = referencia_token(nueva_voz.Id)
+            registrar(context, 'SpVoice.Voice.segment')
+            speaker.Voice = nueva_voz
+            texto_ssml, usar_xml = preparar_ssml(texto_segmento)
+            flags = 8 if usar_xml else 0
+            registrar(context, 'SpVoice.Speak', flags=flags)
+            speaker.Speak(texto_ssml, flags)
+        registrar(context, 'SpVoice.Voice.restore', token_ref=referencia_token(voz_default.Id))
+        speaker.Voice = voz_default
+        return ruta_absoluta
+    finally:
+        # No alterar context: debe seguir señalando la etapa del error primario.
+        if opened:
+            try:
+                stream.Close()
+            except Exception as error:
+                cleanup.append(detalle_error(error, dict(context, stage='cleanup.SpFileStream.Close')))
+        if associated and speaker is not None:
+            try:
+                speaker.AudioOutputStream = None
+            except Exception as error:
+                cleanup.append(detalle_error(error, dict(context, stage='cleanup.AudioOutputStream.clear')))
+        speaker = stream = voz_default = nueva_voz = None
 
 
 def _procesar_audio_voz(win32com_client, pythoncom, texto_input, nombre_voz_default, ruta_salida_input):
-    speaker = win32com_client.Dispatch("SAPI.SpVoice")
-    voces = speaker.GetVoices()
-    print(f"Voces disponibles: {voces.Count}")
-
-    for i in range(voces.Count):
-        print(f"  {i}: {voces.Item(i).GetDescription()}")
-
-    segmentos = parsear_segmentos_voz(texto_input)
-    print(f"[OK] {len(segmentos)} segmento(s) de voz detectados")
-
-    ruta_absoluta = os.path.abspath(ruta_salida_input)
-    directorio = os.path.dirname(ruta_absoluta)
-    if not os.path.exists(directorio):
-        os.makedirs(directorio)
-
-    if os.path.exists(ruta_absoluta):
-        os.remove(ruta_absoluta)
-        print("Archivo anterior eliminado")
-
-    # VOZ POR DEFECTO
-    voz_default = buscar_voz(speaker, nombre_voz_default)
-    if voz_default:
-        speaker.Voice = voz_default
-        print(f"[OK] Voz por defecto: {voz_default.GetDescription()}")
-    else:
-        print(f"[WARN] Voz '{nombre_voz_default}' no encontrada, usando predeterminada")
-        voz_default = speaker.Voice
-
-    # Abrir stream
-    stream = win32com_client.Dispatch("SAPI.SpFileStream")
-    stream.Format.Type = 39  # 16kHz, 16-bit, mono
-    stream.Open(ruta_absoluta, 3)
-    speaker.AudioOutputStream = stream
-
-    # PROCESAR CADA SEGMENTO
-    for i, (nombre_voz, texto_segmento) in enumerate(segmentos, 1):
-        print(f"\n  Segmento {i}: voz='{nombre_voz or 'default'}'")
-
-        if nombre_voz:
-            nueva_voz = buscar_voz(speaker, nombre_voz)
-            if nueva_voz:
-                speaker.Voice = nueva_voz
-                print(f"  -> Voz cambiada a: {nueva_voz.GetDescription()}")
-            else:
-                print(f"  [WARN] Voz '{nombre_voz}' no encontrada")
-        else:
-            if voz_default:
-                speaker.Voice = voz_default
-                print(f"  -> Voz restaurada a: {voz_default.GetDescription()}")
-
-        texto_ssml, usar_xml = preparar_ssml(texto_segmento)
-        flags = 8 if usar_xml else 0
-
-        if usar_xml:
-            print(f"  [SSML] {texto_ssml[:80]}...")
-
-        speaker.Speak(texto_ssml, flags)
-
-    if voz_default:
-        speaker.Voice = voz_default
-
-    stream.Close()
-    speaker.AudioOutputStream = None
-
-    return ruta_absoluta
+    context = {'stage': 'start', 'format_requested': 39}
+    cleanup = []
+    try:
+        path = _sintetizar(win32com_client, texto_input, nombre_voz_default, ruta_salida_input, context, cleanup)
+    except Exception as error:
+        return {'ok': False, 'primary': capturar_fallo(error, context), 'cleanup_errors': cleanup}
+    if cleanup:
+        return {'ok': False, 'primary': cleanup[0], 'cleanup_errors': cleanup[1:]}
+    return {'ok': True, 'path': path, 'cleanup_errors': []}
 
 
 def generar_audio_multivoz(texto_input, nombre_voz_default, ruta_salida_input):
+    outcome = None
+    initialized = False
     try:
         import win32com.client
         import pythoncom
-
+        if struct.calcsize('P') != 4:
+            raise ErrorVoz('ARCHITECTURE_MISMATCH', 'SAPI requiere 32 bits')
         pythoncom.CoInitialize()
-        try:
-            ruta_absoluta = _procesar_audio_voz(
-                win32com.client, pythoncom, texto_input, nombre_voz_default, ruta_salida_input
-            )
-        finally:
-            # Liberar objetos COM antes de CoUninitialize para evitar
-            # "Win32 exception occurred releasing IUnknown"
+        initialized = True
+        outcome = _procesar_audio_voz(win32com.client, pythoncom, texto_input, nombre_voz_default, ruta_salida_input)
+    except Exception as error:
+        outcome = {'ok': False, 'primary': capturar_fallo(error, {'stage': 'COM.initialize'}), 'cleanup_errors': []}
+    finally:
+        if initialized:
             import gc
             gc.collect()
-            pythoncom.CoUninitialize()
-
-        print("\nEXITO")
-        return ruta_absoluta
-        
-    except ImportError:
-        print("ERROR: win32com no disponible. Instala: pip install pywin32")
+            try:
+                pythoncom.CoUninitialize()
+            except Exception as error:
+                secondary = capturar_fallo(error, {'stage': 'cleanup.CoUninitialize'})
+                if outcome and not outcome['ok']:
+                    outcome['cleanup_errors'].append(secondary)
+                else:
+                    outcome = {'ok': False, 'primary': secondary, 'cleanup_errors': []}
+    if not outcome['ok']:
+        if sys.stderr is not None:
+            print('SAPI_DIAGNOSTIC ' + json.dumps(outcome, ensure_ascii=False), file=sys.stderr, flush=True)
         sys.exit(1)
-    except Exception as e:
-        print("ERROR CRITICO: " + str(e))
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    print('\nEXITO')
+    return outcome['path']
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ['--sapi-protocol']:
+        print(json.dumps({'protocol': PROTOCOL, 'bits': struct.calcsize('P') * 8}))
+        sys.exit(0)
     parser = argparse.ArgumentParser(description="Generador de voz Loquendo Multi-Voz + SSML")
     parser.add_argument("texto", help="Texto a sintetizar")
-    parser.add_argument("voz", help="Nombre de la voz por defecto")
+    parser.add_argument("voz", help="ID de token SAPI o nombre antiguo inequívoco")
     parser.add_argument("salida", help="Ruta de salida del archivo WAV")
     args = parser.parse_args()
     generar_audio_multivoz(args.texto, args.voz, args.salida)

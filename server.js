@@ -410,14 +410,12 @@ appExpress.delete('/api/diccionario', (req, res) => { dbService.limpiarTodo(); r
 // --- Voces y CorrecciÃ³n ---
 appExpress.get('/api/voces', async (req, res) => {
     try {
-        const scriptVoces = path.join(BACKEND_DIR, 'modules', 'listar_voces.py');
-        if (!fs.existsSync(scriptVoces)) {
-            const scriptContent = `import win32com.client, json, sys, winreg\ndef q(t):\n    try:\n        r=t.Id.strip()\n        if not r.upper().startswith("HKEY_LOCAL_MACHINE\\\\"): return False\n        k=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r.split("HKEY_LOCAL_MACHINE\\\\",1)[1])\n        clsid=winreg.QueryValueEx(k,"CLSID")[0]\n        s="CLSID\\\\"+clsid\n        winreg.OpenKey(winreg.HKEY_CLASSES_ROOT,s)\n        winreg.OpenKey(winreg.HKEY_CLASSES_ROOT,s+"\\\\InprocServer32")\n        return True\n    except Exception:\n        return False\ntry:\n    voces = win32com.client.Dispatch("SAPI.SpVoice").GetVoices()\n    print(json.dumps([{"id": voces.Item(i).GetDescription(), "nombre": voces.Item(i).GetDescription()} for i in range(voces.Count) if q(voces.Item(i))], ensure_ascii=False))\nexcept Exception as e:\n    print(json.dumps({"error": str(e)})); sys.exit(1)`;
-            fs.writeFileSync(scriptVoces, scriptContent, 'utf8');
-        }
+        const detector = path.join(BACKEND_DIR, 'modules', 'listar_voces.py');
+        const scriptVoces = fs.existsSync(detector) ? detector : path.join(BACKEND_DIR, 'modules', 'sapi_voice_common.py');
+        if (!fs.existsSync(scriptVoces)) throw new Error('Detector SAPI no disponible');
         
         const resultado = await new Promise((resolve, reject) => {
-            const proceso = spawn(pythonCmd, [scriptVoces], { windowsHide: true });
+            const proceso = spawn(pythonCmd, ['-B', scriptVoces], { windowsHide: true });
             let stdout = '', stderr = '';
             proceso.stdout.on('data', (data) => { stdout += data.toString(); });
             proceso.stderr.on('data', (data) => { stderr += data.toString(); });
@@ -432,8 +430,8 @@ appExpress.get('/api/voces', async (req, res) => {
             });
         });
         
-        if (resultado.error) return res.status(500).json({ error: resultado.error });
-        res.json({ voces: resultado, total: resultado.length });
+        if (resultado.error) return res.status(500).json({ error: resultado.error, diagnostic: resultado.diagnostic });
+        res.json({ voces: resultado, total: resultado.length, voiceProtocol: 2 });
     } catch (error) {
         console.error('âŒ Error listando voces:', error.message);
         res.status(500).json({ error: 'No se pudieron detectar las voces' });
@@ -488,6 +486,7 @@ appExpress.post('/api/generar-audio', async (req, res) => {
     // FIX Bug #5: leer usarIA del body en lugar de hardcodear false
     const { texto, voz, modo, opciones, usarIA } = req.body;
     if (!texto || texto.trim() === '') return res.status(400).json({ error: 'Texto vacÃ­o' });
+    if (voz !== undefined && (typeof voz !== 'string' || !voz.trim())) return res.status(400).json({ error: 'Identificador de voz inválido' });
     
     try {
         const opcionesConMax = {

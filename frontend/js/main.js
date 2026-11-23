@@ -139,6 +139,17 @@ async function cargarVoces() {
         const vocesAcapella = [];
         const vocesMicrosoft = [];
         const vocesOtras = [];
+        const nombres = new Map();
+        for (const voz of data.voces) {
+            const key = voz.nombre.trim().toLowerCase();
+            nombres.set(key, (nombres.get(key) || 0) + 1);
+        }
+        const configurarOpcionVoz = (option, voz) => {
+            option.value = voz.id;
+            option.dataset.voiceName = voz.nombre;
+            option.textContent = nombres.get(voz.nombre.trim().toLowerCase()) > 1
+                ? `${voz.nombre} (${voz.tokenRef?.slice(-8) || 'selección específica'})` : voz.nombre;
+        };
         
         data.voces.forEach(voz => {
             const nombre = voz.nombre;
@@ -153,8 +164,7 @@ async function cargarVoces() {
             optgroup.label = 'Voces Loquendo';
             vocesLoquendo.forEach(voz => {
                 const option = document.createElement('option');
-                option.value = voz.id;
-                option.textContent = voz.nombre;
+                configurarOpcionVoz(option, voz);
                 optgroup.appendChild(option);
             });
             select.appendChild(optgroup);
@@ -165,8 +175,7 @@ async function cargarVoces() {
             optgroup.label = 'Voces Acapella';
             vocesAcapella.forEach(voz => {
                 const option = document.createElement('option');
-                option.value = voz.id;
-                option.textContent = voz.nombre;
+                configurarOpcionVoz(option, voz);
                 optgroup.appendChild(option);
             });
             select.appendChild(optgroup);
@@ -177,8 +186,7 @@ async function cargarVoces() {
             optgroup.label = 'Voces Microsoft';
             vocesMicrosoft.forEach(voz => {
                 const option = document.createElement('option');
-                option.value = voz.id;
-                option.textContent = voz.nombre;
+                configurarOpcionVoz(option, voz);
                 optgroup.appendChild(option);
             });
             select.appendChild(optgroup);
@@ -189,8 +197,7 @@ async function cargarVoces() {
             optgroup.label = 'Otras Voces';
             vocesOtras.forEach(voz => {
                 const option = document.createElement('option');
-                option.value = voz.id;
-                option.textContent = voz.nombre;
+                configurarOpcionVoz(option, voz);
                 optgroup.appendChild(option);
             });
             select.appendChild(optgroup);
@@ -362,6 +369,10 @@ async function generarAudio(event) {
     const chkSRT = document.getElementById('chkSRT_IA');
     const modoSelect = document.getElementById('modo');
     const textoFinal = resultado ? resultado.value : "";
+    if (vozSelect && !vozSelect.value) {
+        notificar('warning', 'Selecciona una voz disponible antes de generar audio.');
+        return;
+    }
 
     if (!textoFinal || textoFinal === "El texto procesado aparecerá aquí...") {
         notificar('warning', 'Primero debes automatizar un texto.');

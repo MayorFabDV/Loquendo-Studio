@@ -26,7 +26,7 @@ async function coordinator(){
         for(const file of ['ffmpeg.exe','ffprobe.exe'])fs.copyFileSync(path.join(repo,'backend/bin',file),path.join(root,'backend/bin',file));
         if(nativeVoice || process.argv.includes('--maintenance')){
             fs.mkdirSync(path.join(root,'backend/modules'),{recursive:true});
-            for(const file of ['generar_voz.py','generar_srt.py','generar_ass.py','listar_voces.py'])fs.copyFileSync(path.join(repo,'backend/modules',file),path.join(root,'backend/modules',file));
+            for(const file of ['generar_voz.py','sapi_voice_common.py','generar_srt.py','generar_ass.py','listar_voces.py'])fs.copyFileSync(path.join(repo,'backend/modules',file),path.join(root,'backend/modules',file));
             fs.symlinkSync(path.join(repo,'backend/python'),path.join(root,'backend/python'),'junction');extraLinks.push('backend/python');
         }
         if(nativeVoice){
@@ -193,12 +193,29 @@ async function renderer(){
         }
         if(process.env.PROJECT_TEST_SAPI==='1'){
             const voice=process.env.PROJECT_TEST_VOICE||'Jorge';
-            await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.value===${JSON.stringify(voice)})`);
-            await action(`document.getElementById('vozSeleccionada').value=${JSON.stringify(voice)};document.getElementById('resultado').value='Prueba de voz generada desde Electron.';
+            await wait(`Array.from(document.getElementById('vozSeleccionada').options).some(o=>o.dataset.voiceName===${JSON.stringify(voice)})`);
+            const token=await run(`Array.from(document.getElementById('vozSeleccionada').options).find(o=>o.dataset.voiceName===${JSON.stringify(voice)}).value`);
+            assert.ok(/^HKEY_LOCAL_MACHINE\\/i.test(token),'El selector debe transportar un token estable, no una descripción');
+            await action(`settings.set('defaultVoice',${JSON.stringify(voice)});settings.aplicarVozPorDefecto();`);
+            assert.ok(await run(`document.getElementById('vozSeleccionada').value===${JSON.stringify(token)}`),'La preferencia antigua debe resolver al ID estable');
+            assert.equal(await run(`localStorage.getItem('loquendo.default_voice')`),voice);
+            await action(`document.getElementById('vozSeleccionada').value=${JSON.stringify(token)};document.getElementById('resultado').value='Prueba de voz generada desde Electron.';
                 document.getElementById('calidadSeleccionada').value='16k';document.getElementById('chkSRT_IA').checked=true;await generarAudio();`);
             await wait(`audioEditor.audioBuffer && !audioEditor._cargandoEdicion`);
             const soloVoz=await run(`(async()=>{const r=await fetch('/api/generar-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'Prueba de voz sin transcripción durante mantenimiento.',voz:${JSON.stringify(voice)},usarIA:true})});if(!r.ok)throw Error(await r.text());return r.json();})()`);
             assert.equal(soloVoz.srt,null);assert.equal(soloVoz.ass,null,'La API ignora usarIA:true durante mantenimiento');
+            assert.equal(await run(`(async()=>{const r=await fetch('/api/generar-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'Prueba',voz:' '})});return r.status;})()`),400,'Una selección vacía no debe sintetizar con otra voz');
+            for(const identifier of [voice,token]){
+                const xml=await run(`(async()=>{const r=await fetch('/api/generar-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'[pause:100][emphasis]Prueba de voz XML.[/emphasis]',voz:${JSON.stringify(identifier)},usarIA:false})});if(!r.ok)throw Error('Falló XML SAPI');return r.json();})()`);
+                assert.ok(xml.url);assert.equal(xml.srt,null);
+            }
+            const detector=path.join(root,'backend/modules/listar_voces.py');
+            fs.renameSync(detector,detector+'.held-by-test');
+            try{
+                const fallback=await run(`(async()=>{const r=await fetch('/api/voces');if(!r.ok)throw Error('Falló detector alternativo');return r.json();})()`);
+                assert.ok(fallback.voces.some(v=>v.id===token),'El fallback debe usar los mismos IDs y filtro');
+                assert.equal(fs.existsSync(detector),false,'No debe generar otro script divergente');
+            }finally{fs.renameSync(detector+'.held-by-test',detector);}
             const url=await run('voiceAudioRealPath');
             const file=path.join(root,'backend/public',url.replace(/^\//,''));
             const info=spawnSync(path.join(root,'backend/bin/ffprobe.exe'),['-v','error','-show_entries','stream=sample_rate,channels','-of','json',file],{encoding:'utf8',windowsHide:true});

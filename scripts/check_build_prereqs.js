@@ -9,6 +9,7 @@ const required = [
     'backend/bin/generar_voz.exe',
     'backend/bin/ffmpeg.exe',
     'backend/modules/generar_voz.py',
+    'backend/modules/sapi_voice_common.py',
     'backend/modules/generar_srt.py',
     'backend/modules/generar_ass.py'
 ];
